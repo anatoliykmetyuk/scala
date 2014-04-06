@@ -1,4 +1,4 @@
-package subscript
+package subscript.test
 
 //import org.scalatest.FunSuite
 
@@ -123,7 +123,6 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  * 
  */
 //@RunWith(classOf[JUnitRunner])
-@Test
 class OperatorsSuite {
 
   /*
@@ -417,10 +416,11 @@ class OperatorsSuite {
 
   */
   
+  @Test
   def testBehaviours = {
     for ( (key, behaviours) <- scriptBehaviourList) {
       val aScript = key.asInstanceOf[Script]
-      val bodyString = DSL.toScriptBodyString(aScript)
+      val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
     }
   }
