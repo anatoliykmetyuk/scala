@@ -1,4 +1,4 @@
-package subscript
+package subscript.test
 
 //import org.scalatest.FunSuite
 
@@ -420,7 +420,7 @@ class OperatorsSuite {
   def testBehaviours = {
     for ( (key, behaviours) <- scriptBehaviourList) {
       val aScript = key.asInstanceOf[Script]
-      val bodyString = DSL.toScriptBodyString(aScript)
+      val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
     }
   }
