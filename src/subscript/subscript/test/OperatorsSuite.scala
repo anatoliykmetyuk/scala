@@ -1,4 +1,4 @@
-package subscript
+package subscript.test
 
 //import org.scalatest.FunSuite
 
@@ -165,7 +165,7 @@ class OperatorsSuite {
   def testScriptBehaviour(scriptDef: Script, scriptString: String, input: String, expectedResult: String) {
     
     def assert(s: String, cond: Boolean) {
-      Assert.assertTrue(f"$scriptString : input=$input expected=$expectedResult Error: $s", cond)
+      Assert.assertTrue(s"$scriptString : after input '${input}' should expect '${expectedResult}' Error: $s", cond)
     }
     //println("testScript("+scriptString+", "+input+" -> "+expectedResult+")")
     
@@ -183,7 +183,7 @@ class OperatorsSuite {
 	  val expectedResultAtoms   = (if (expectedResultSuccess||expectedResultFailure) expectedResult.drop(1) else expectedResult)
 	                              .sortWith(_<_).mkString
 
-      assert("test specification error: no atoms expected after failure (0)", !expectedResultFailure || expectedResultAtoms.isEmpty)
+      assert("test specification - no atoms expected after failure (0)", !expectedResultFailure || expectedResultAtoms.isEmpty)
 
 	  executor = new CommonScriptExecutor
 
@@ -195,15 +195,14 @@ class OperatorsSuite {
       val executionSuccess = scriptSuccessAtEndOfInput.getOrElse(executor.hasSuccess)
       
       if (!expectedResultSuccess) {
-        assert("script execution should have no success; accepted="+acceptedAtoms, !executionSuccess)
+        assert(s"script execution has unexpected success after input='${acceptedAtoms}'", !executionSuccess)
       }
       else { // note: only check for expectedAtoms here (in else branch); otherwise (-)&&a would raise false alarm
-        assert("script execution should have success; accepted="+acceptedAtoms, executionSuccess)
         val    expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
-        assert("expectedAtomsAtEndOfInput=" + expectedAtomsAtEndOfInputString + " required=" + expectedResultAtoms,
-                            expectedAtomsAtEndOfInputString==expectedResultAtoms) 
+        assert(s"script execution should have success; accepted='${acceptedAtoms}'", executionSuccess)
+        assert(s"expected atoms='${expectedAtomsAtEndOfInputString}'", expectedAtomsAtEndOfInputString==expectedResultAtoms) 
       }
-      assert("acceptedAtoms='" + acceptedAtoms + "' required='" + input+"'", acceptedAtoms==input) 
+      assert(s"accepted atoms='${acceptedAtoms}'", acceptedAtoms==input) 
     //}   
   }
 
@@ -421,10 +420,11 @@ class OperatorsSuite {
 
   */
   
+  @Test
   def testBehaviours = {
     for ( (key, behaviours) <- scriptBehaviourList) {
       val aScript = key.asInstanceOf[Script]
-      val bodyString = DSL.toScriptBodyString(aScript)
+      val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
     }
   }
