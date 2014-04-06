@@ -123,7 +123,6 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  * 
  */
 //@RunWith(classOf[JUnitRunner])
-@Test
 class OperatorsSuite {
 
   /*
@@ -417,6 +416,7 @@ class OperatorsSuite {
 
   */
   
+  @Test
   def testBehaviours = {
     for ( (key, behaviours) <- scriptBehaviourList) {
       val aScript = key.asInstanceOf[Script]
