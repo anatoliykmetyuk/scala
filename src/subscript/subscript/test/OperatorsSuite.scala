@@ -162,6 +162,10 @@ class OperatorsSuite {
   var executor: ScriptExecutor = null
 
   def testScriptBehaviour(scriptDef: Script, scriptString: String, input: String, expectedResult: String) {
+    
+    def assert(s: String, cond: Boolean) {
+      Assert.assertTrue(f"$scriptString : input=$input expected=$expectedResult Error: $s", cond)
+    }
     //println("testScript("+scriptString+", "+input+" -> "+expectedResult+")")
     
     textIndex += 1
@@ -178,7 +182,7 @@ class OperatorsSuite {
 	  val expectedResultAtoms   = (if (expectedResultSuccess||expectedResultFailure) expectedResult.drop(1) else expectedResult)
 	                              .sortWith(_<_).mkString
 
-      Assert.assertTrue("test specification error: no atoms expected after failure (0)", !expectedResultFailure || expectedResultAtoms.isEmpty)
+      assert("test specification error: no atoms expected after failure (0)", !expectedResultFailure || expectedResultAtoms.isEmpty)
 
 	  executor = new CommonScriptExecutor
 
@@ -190,15 +194,15 @@ class OperatorsSuite {
       val executionSuccess = scriptSuccessAtEndOfInput.getOrElse(executor.hasSuccess)
       
       if (!expectedResultSuccess) {
-        Assert.assertFalse("script execution should have no success; accepted="+acceptedAtoms, executionSuccess)
+        assert("script execution should have no success; accepted="+acceptedAtoms, !executionSuccess)
       }
       else { // note: only check for expectedAtoms here (in else branch); otherwise (-)&&a would raise false alarm
-        Assert.assertTrue("script execution should have success; accepted="+acceptedAtoms, executionSuccess)
+        assert("script execution should have success; accepted="+acceptedAtoms, executionSuccess)
         val    expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
-        Assert.assertTrue("expectedAtomsAtEndOfInput=" + expectedAtomsAtEndOfInputString + " required=" + expectedResultAtoms,
+        assert("expectedAtomsAtEndOfInput=" + expectedAtomsAtEndOfInputString + " required=" + expectedResultAtoms,
                             expectedAtomsAtEndOfInputString==expectedResultAtoms) 
       }
-      Assert.assertTrue("acceptedAtoms='" + acceptedAtoms + "' required='" + input+"'", acceptedAtoms==input) 
+      assert("acceptedAtoms='" + acceptedAtoms + "' required='" + input+"'", acceptedAtoms==input) 
     //}   
   }
 
