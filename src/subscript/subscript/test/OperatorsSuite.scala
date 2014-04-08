@@ -246,28 +246,16 @@ class OperatorsSuite {
    *   keys are script strings, which should also be keys in the scriptBodyMap, so that bodies can be found
    *   the outcomes are a input traces in relation to their outcomes, see #testScriptBehaviour
    */
-  val scriptBehaviourList1 = List( // list, not a map, to remain ordered
-     [a&b&c]   -> "cb->a" // goes wrong since "Ignore" status causes AAToBeReexecuted which may be stored in LIFO order...TBD in ScriptExecutor
-   , [(-)]     -> "->0"
-   , [(+)]     -> ""
-   , [(+-)]    -> ""
-   , [break]   -> "=(+-)"
-   , [.]       -> "=(+-)"
-   , [..]      -> "=(+-)"
-   , [...]     -> "=(+-)"
-                  
-   , [a]       -> "->a a"
-  )           
   val scriptBehaviourList = List( // list, not a map, to remain ordered
               
    // simple terms
      [(-)]     -> "->0"
-   , [(+)]     -> ""
-   , [(+-)]    -> ""
-   , [break]   -> ""
-   , [.]       -> ""
-   , [..]      -> ""
-   , [...]     -> ""
+   , [(+)]     -> "->1"
+   , [(+-)]    -> "->1"
+   , [break]   -> "->1"
+   , [.]       -> "->1"
+   , [..]      -> "->1"
+   , [...]     -> "->1"
                   
    , [a]       -> "->a a"
                                
@@ -280,9 +268,26 @@ class OperatorsSuite {
    , [a||b]    -> "->ab a b"
    , [a/b]     -> "->ab a b"
                                
+   // a op neutral
+   , [a (+)]   -> "->a a"
+   , [(+) a]   -> "->a a"
+   , [a&(+)]   -> "->a a"
+   , [(+)&a]   -> "->a a"
+   , [a&&(+)]  -> "->a a"
+   , [(+)&&a]  -> "->a a"
+                             
+   , [a+(-)]   -> "->a a"
+   , [(-)+a]   -> "->a a"
+   , [a|(-)]   -> "->a a"
+   , [(-)|a]   -> "->a a"
+   , [a||(-)]  -> "->a a"
+   , [(-)||a]  -> "->a a"
+   , [a/(-)]   -> "->a a"
+   , [(-)/a]   -> "->a a"
+                               
    // a op antineutral
-   , [a;(-)]   -> "->a a->0"
-   , [(-);a]   -> "->0"
+   , [a (-)]   -> "->a a->0"
+   , [(-) a]   -> "->0"
    , [a&(-)]   -> "->a a->0"
    , [(-)&a]   -> "->a a->0"
    , [a&&(-)]  -> "->0"
@@ -292,68 +297,68 @@ class OperatorsSuite {
    , [(+)+a]   -> "->1a a"
    , [a|(+)]   -> "->1a a"
    , [(+)|a]   -> "->1a a"
-   , [a||(+)]  -> ""
-   , [(+)||a]  -> ""
+   , [a||(+)]  -> "->1"
+   , [(+)||a]  -> "->1"
    , [a/(+)]   -> "->1a a"
    , [(+)/a]   -> "->1a a"
                                
    // 2 operand sequences with iterator or break or optional break, 
-   , [break;a] -> ""
-   , [.;a]     -> "->1a a"
-   , [..;a]    -> "->1a a->1a aa->1a"
-   , [...;a]   -> "->a  a->a  aa->a"
+   , [break a] -> "->1"
+   , [. a]     -> "->1a a"
+   , [.. a]    -> "->1a a->1a aa->1a"
+   , [... a]   -> "->a  a->a  aa->a"
                   
-   , [a;break] -> "->a  a"
+   , [a break] -> "->a  a"
    , [a;.]     -> "->a  a"
-   , [a;..]    -> "->a  a->1a aa->1a"
-   , [a;...]   -> "->a  a->a  aa->a"
+   , [a ..]    -> "->a  a->1a aa->1a"
+   , [a ...]   -> "->a  a->a  aa->a"
    
    // 3 operand sequences with iterator or break or optional break, 
-   , [a;b;break]   -> "->a a->b ab"
-   , [a;b;.]       -> "->a a->b ab"
-   , [a;b;..]      -> "->a  a->b ab->1a aba->b abab->1a"
-   , [a;b;...]     -> "->a  a->b ab->a  aba->b abab->a"
+   , [a b break]   -> "->a a->b ab"
+   , [a b;.]       -> "->a a->b ab"
+   , [a b ..]      -> "->a  a->b ab->1a aba->b abab->1a"
+   , [a b ...]     -> "->a  a->b ab->a  aba->b abab->a"
                       
-   , [a;break;b]   -> "->a  a"
-   , [a;.;b]       -> "->a  a->1b ab"
-   , [a;..;b]      -> "->a  a->1b ab->a aba->1b"
-   , [a;...;b]     -> "->a  a->b  ab->a aba->b"
+   , [a break b]   -> "->a  a"
+   , [a;. b]       -> "->a  a->1b ab"
+   , [a .. b]      -> "->a  a->1b ab->a aba->1b"
+   , [a ... b]     -> "->a  a->b  ab->a aba->b"
                       
-   , [break;a;b]   -> "->1"
-   , [.;a;b]       -> "->1a a->b ab"
-   , [..;a;b]      -> "->1a a->b ab->1a aba->b"
-   , [...;a;b]     -> "->a  a->b  ab->a aba->b"
+   , [break a b]   -> "->1"
+   , [. a b]       -> "->1a a->b ab"
+   , [.. a b]      -> "->1a a->b ab->1a aba->b"
+   , [... a b]     -> "->a  a->b  ab->a aba->b"
    
    // 2 level nested 2 operand sequences with iterator or break or optional break, 
-   , [a;(b;break)] -> "->a  a->b ab"
-   , [a;(b;.)]     -> "->a  a->b ab"
-   , [a;(b;..)]    -> "->a  a->b ab->1b abb->1b"
-   , [a;(b;...)]   -> "->a  a->b  ab->b"
+   , [a; b break]  -> "->a  a->b ab"
+   , [a;(b;.   )]  -> "->a  a->b ab"
+   , [a; b ..   ]  -> "->a  a->b ab->1b abb->1b"
+   , [a; b ...  ]  -> "->a  a->b  ab->b"
                       
-   , [(a;b);break] -> "->a a->b ab"
-   , [(a;b);.]     -> "->a a->b ab"
-   , [(a;b);..]    -> "->a  a->b ab->1a aba->b abab->1a"
-   , [(a;b);...]   -> "->a  a->b ab->a  aba->b abab->a"
+   , [a b; break]  -> "->a a->b ab"
+   , [a b; .    ]  -> "->a a->b ab"
+   , [a b; ..   ]  -> "->a  a->b ab->1a aba->b abab->1a"
+   , [a b; ...  ]  -> "->a  a->b ab->a  aba->b abab->a"
                       
-   , [a;(break;b)] -> "->a  a"
-   , [a;(.;b)]     -> "->a  a->1b ab"
-   , [a;(..;b)]    -> "->a  a->1b ab->1b"
-   , [a;(...;b)]   -> "->a  a->b  ab->b"
+   , [a; break b]  -> "->a  a"
+   , [a; .     b]  -> "->a  a->1b ab"
+   , [a; ..    b]  -> "->a  a->1b ab->1b"
+   , [a; ...   b]  -> "->a  a->b  ab->b"
                       
-   , [(a;break);b] -> "->a  a->b ab"
-   , [(a;.);b]     -> "->a  a->b ab"
-   , [(a;..);b]    -> "->a  a->ab aa->ab ab aab"
-   , [(a;...);b]   -> "->a  a->a  aa->a"
+   , [a break;b]   -> "->a  a->b ab"
+   , [(a;. ) ;b]   -> "->a  a->b ab"
+   , [a ..   ;b]   -> "->a  a->ab aa->ab ab aab"
+   , [a ...  ;b]   -> "->a  a->a  aa->a"
                       
-   , [break;(a;b)] -> "->1"
-   , [.;(a;b)]     -> "->1a a->b ab"
-   , [..;(a;b)]    -> "->1a a->b ab->1a aba->b"
-   , [...;(a;b)]   -> "->a  a->b  ab->a aba->b"
+   , [break; a b]  -> "->1"
+   , [.    ; a b]  -> "->1a a->b ab"
+   , [..   ; a b]  -> "->1a a->b ab->1a aba->b"
+   , [...  ; a b]  -> "->a  a->b  ab->a aba->b"
                       
-   , [(break;a);b] -> "b"
-   , [(.;a);b]     -> "->ab  a->b ab b"
-   , [(..;a);b]    -> "->ab  a->ab aa->ab b ab aab"
-   , [(...;a);b]   -> "->a  a->a  aa->a"
+   , [break a; b]  -> "->b b"
+   , [.     a; b]  -> "->ab  a->b ab b"
+   , [..    a; b]  -> "->ab  a->ab aa->ab b ab aab"
+   , [...   a; b]  -> "->a  a->a  aa->a"
 
    // parallel composition
    , [(...;a)&b]   -> "->ab  a->ab  aa->ab  b->a  ba->a  ab->a  aba->a"
@@ -372,7 +377,7 @@ class OperatorsSuite {
    , [(a;b)/(+)]   -> "->1a a->1b ab"
    
    // optional break
-   , [ a / . / b ]             -> "a"
+   , [ a / . / b ]             -> "->a a"
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
    , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
    , [ a b | . | c d ]         -> "->a a->bc  ab->1c ac->bd abc->1d abcd acb->1d acd->1b acbd acdb"
@@ -381,9 +386,9 @@ class OperatorsSuite {
    , [ . | a b ]               -> "->1a a->b  ab"
    , [ . / a b / . / c d ]     -> "->1a a->bc ab ac->d acd"
    , [ a b  | .  | (+) ]       -> "->a a->1b ab"
-   , [ a b || . || (+) ]       -> "a"
-   , [ a b  & .  & (-) ]       -> "ab0"
-   , [ a b && . && (-) ]       -> "a0"
+   , [ a b || . || (+) ]       -> "->a a"
+   , [ a b  & .  & (-) ]       -> "->a a->b ab->0"
+   , [ a b && . && (-) ]       -> "->a a->0"
    , [ (a b+(+))  & .  & (-) ] -> "->1a a->b ab->0"
    , [ (a b+(+)) && . && (-) ] -> "->1a a->0"
 
