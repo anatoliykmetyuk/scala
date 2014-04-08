@@ -1,6 +1,6 @@
 package subscript.akka
 
-import subscript.DSL._scriptType
+import subscript.DSL._
 import scala.collection.mutable.ListBuffer
 import subscript.vm._
 import akka.actor._
@@ -107,16 +107,9 @@ object SubScriptActor {
     case SynchronizationMessage(_, lock) => lock.synchronized(lock.notify())
   }
     
-  def executeScript(script: _scriptType) = synchronized {
-    val template = extractTemplate(script)
+  def executeScript(script: Script) = synchronized {
+    val template = getScriptTemplate(script)
     vm.invokeFromET { vm.activateFrom(parallelOp, template) }
-  }
-  
-  
-  def extractTemplate(script: _scriptType) = {
-    val extractor = N_call(T_call("", null))
-    script(extractor)
-    extractor.t_callee
   }
   
   def releaseVm() = Stopper.release
