@@ -166,15 +166,8 @@ class CommonScriptExecutor extends ScriptExecutor {
   def connect(parentNode: CallGraphParentNodeTrait, childNode: CallGraphTreeNode) {
     childNode.parent = parentNode
     childNode.scriptExecutor = parentNode.scriptExecutor
-    parentNode.children.append(childNode)
-    
-    parentNode match {
-      case p: CallGraphTreeNode_n_ary =>
-        childNode match {case N_break(_) | N_optional_break(_) | N_optional_break_loop(_) => p.breakWaker = p.lastActivatedChild case _ =>}
-        p.lastActivatedChild = childNode
-      
-      case _ =>
-    }
+    parentNode.appendChild(childNode)
+    parentNode.nActivatedChildren += 1
   }
   // disconnect a child node from its parent
   def disconnect(childNode: CallGraphNodeTrait) {
@@ -218,7 +211,7 @@ class CommonScriptExecutor extends ScriptExecutor {
   def insertDeactivation(n:CallGraphNodeTrait,c:CallGraphNodeTrait) = insert(Deactivation(n, c, false))
   // insert a continuation message
   def insertContinuation(message: CallGraphMessage[_<:CallGraphNodeTrait], child: CallGraphTreeNode = null): Unit = {
-    val n = message.node.asInstanceOf[CallGraphTreeNode_n_ary]
+    val n = message.node.asInstanceOf[ N_n_ary_op]
     var c = n.continuation 
     
     // Continuations are merged with already existing ones
@@ -403,7 +396,7 @@ class CommonScriptExecutor extends ScriptExecutor {
       executeCodeIfDefined(message.node, message.node.onActivateOrResume)
       message.node match {
            //case n@N_root            (t: T_1_ary     ) => activateFrom(n, t.child0)
-           case n@N_code_tiny                  (t)  => n.hasSuccess = true; executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
+           case n@N_code_tiny                  (t)  => n.setSuccess(true); executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
            case n@N_localvar                   (t)  => if (t.isLoop) setIteration_n_ary_op_ancestor(n); 
             val v = executeCode(n);n.n_ary_op_ancestor.initLocalVariable(t.localVariable.name, n.pass, v); doNeutral(n); insertDeactivation(n,null)
            case n@N_privatevar                 (t) => n.n_ary_op_ancestor.initLocalVariable(t.name, n.pass, n.getLocalVariableHolder(t.name).value)
@@ -422,7 +415,7 @@ class CommonScriptExecutor extends ScriptExecutor {
            case n@N_epsilon                    (t) => insert(Success(n)); insertDeactivation(n,null)
            case n@N_nu                         (t) => doNeutral(n);       insertDeactivation(n,null)
            case n@N_while                      (t) => setIteration_n_ary_op_ancestor(n); 
-                                                      n.hasSuccess = executeCode(n)
+                                                      n.setSuccess(executeCode(n))
                                                       doNeutral(n)
                                                       if (!n.hasSuccess) {
                                                          insert(Break(n, null, ActivationMode.Inactive))
@@ -462,7 +455,11 @@ class CommonScriptExecutor extends ScriptExecutor {
    * insert success messages for each parent node
    */
   def handleSuccess(message: Success): Unit = {
-          message.node match {
+         if (message.node.hasSuccess) {
+           return // should not occur?
+         }
+         
+         message.node match {
                case n@  N_annotation (_) => {} // onSuccess?
                case n@  N_then       (t: T_2_ary        )  => if (message.child.template==t.child0) {
                                                                            activateFrom(n, t.child1)
@@ -484,7 +481,7 @@ class CommonScriptExecutor extends ScriptExecutor {
                                                               n.transferParameters
                case _ =>
           }
-         message.node.hasSuccess = true
+         message.node.setSuccess(true)
          executeCodeIfDefined(message.node, message.node.onSuccess)
          message.node.forEachParent(p => insert(Success(p, message.node)))
   }
@@ -502,6 +499,9 @@ class CommonScriptExecutor extends ScriptExecutor {
                                                                    //don't return; just put the continuations in place
                                                                  }
                case n@  N_n_ary_op      (_: T_n_ary, _     )  => if(message.child!=null) {
+                                                                   if (n.indexChild_marksOptionalPart  >= 0 &&
+                                                                       n.indexChild_marksOptionalPart < message.child.index)
+                                                                     n.aaActivated_optional = true
                                                                    insertContinuation(message)
                                                                    //don't return; just put the continuations in place
                                                                  }
@@ -635,7 +635,7 @@ class CommonScriptExecutor extends ScriptExecutor {
    * after an AA started in a communication reachable from multiple child nodes (*)
    */
   def handleAAHappened(message: AAHappened): Unit = {
-    message.node.hasSuccess   = false
+    message.node.setSuccess(false)
     message.node.numberOfBusyActions += (message.mode match {
       case     AtomicCodeFragmentExecuted =>  0
       case DurationalCodeFragmentStarted  =>  1
@@ -680,9 +680,6 @@ class CommonScriptExecutor extends ScriptExecutor {
        case _ =>	    
 	  }
     
-    val operator = message.node.n_ary_op_ancestor
-    if (operator != null && (operator.breakWaker eq message.node)) operator.aaHappenedSinceLastOptionalBreak = true
-    
     // message.child may be null now
     message.node.forEachParent(p => insert(AAHappened(p, message.node, message.mode)))
   }
@@ -697,7 +694,7 @@ class CommonScriptExecutor extends ScriptExecutor {
    */
   def handleBreak(message: Break): Unit = {
       message.node match {
-        case nn:CallGraphTreeNode_n_ary =>
+        case nn: N_n_ary_op =>
 	        if (nn.activationMode!=ActivationMode.Inactive) {
 	            nn.activationMode = message.activationMode
 	        }
@@ -827,33 +824,40 @@ class CommonScriptExecutor extends ScriptExecutor {
     var activationEndedOptionally = false
     var childNode: CallGraphNodeTrait = null // may indicate node from which the a message came
 
-    val isSequential = 
-     n.template.kind match {
-      case ";" | "|;"  | "||;" |  "|;|" => true
-      case _ => false
-     }
+    var shouldSucceed = false    
 
-    if (n.activationMode!=ActivationMode.Inactive) {
-     n.template.kind match {
-      case "%" => val d = message.deactivations; 
-                  val b = message.break
-                  if (d!=Nil) {
-                    activateNextOrEnded = d.size>0 && !d.head.excluded
-                    if (activateNextOrEnded) {
-                      childNode = d.head.node
-                    }
-                  }
-      case ";" | "|;" 
-       | "||;" |  "|;|" => // messy; maybe the outer if on the activationMode should be moved inside the match{}
-                           // ??? if both s && b: why not doing something with both s.child & b.child ???
-                         val s = message.success
-                         val b = message.break
-                         if      (s!=null) {activateNextOrEnded = true; childNode = s.child}
-                         else if (b!=null) {activateNextOrEnded = true; childNode = b.child
-                           activationEndedOptionally = b.activationMode==ActivationMode.Optional 
-                         }
+    val isSequential = 
+       n.template.kind match {
+        case ";" | "|;"  | "||;" |  "|;|" => true
+        case _ => false
+       }
+    
+    if (isSequential) {
       
-      case "+" | "|+" | "|+|" 
+       val s = message.success
+       val b = message.break
+       if (b!=null) {activateNextOrEnded = true; childNode = b.child
+                     if (b.activationMode==ActivationMode.Optional) {
+                       activationEndedOptionally = true
+                     }
+                     else n.mustBreak
+                    }
+       if (s!=null) {activateNextOrEnded = true; childNode = s.child}
+    }
+    else
+    {
+     if (n.activationMode!=ActivationMode.Inactive) {
+       n.template.kind match {
+//      case "%" => val d = message.deactivations; 
+//                  val b = message.break
+//                  if (d!=Nil) {
+//                    activateNextOrEnded = d.size>0 && !d.head.excluded
+//                    if (activateNextOrEnded) {
+//                      childNode = d.head.node
+//                    }
+//                  }
+         
+      case "+" | "|+" | "|+|" // "+" node activations may be broken by "." if no atomic actions had been activated
                       => val a = message.aaActivated; val c = message.caActivated; val b = message.break
                          activateNextOrEnded = if (b==null) true
                                                else if (b.activationMode==ActivationMode.Optional) a!=null || c!=null
@@ -877,29 +881,49 @@ class CommonScriptExecutor extends ScriptExecutor {
                          if (activateNextOrEnded) {
                            childNode = n.lastActivatedChild
                          }
+      
+      /*
+       *       . & a     => no pause; a is optional
+       * (+) & . & a     => no pause; a is optional
+       *  a  & . & b     => pause; after a happens b is activated as optional
+       */
+      case _ if n.indexChild_marksPause >= 0 && message.aaHappeneds!=Nil => 
+                         if (message.aaHappeneds.exists(a=>a.node.index > n.indexChild_marksOptionalPart)) {
+                           activateNextOrEnded = true
+                           n.activationMode = ActivationMode.Active
+                           n.nActivatedOptionalChildren = 0
+                           n.indexChild_marksOptionalPart = n.indexChild_marksPause
+                           n.indexChild_marksPause        = -1
+                           n.aaActivated_optional         = false
+                           childNode = n.lastActivatedChild
+                         }
                          
-      case _          => if (message.activation!=null || message.aaHappeneds!=Nil || message.success!=null || message.deactivations != Nil) {
-                           val b  = message.break
-                           //val ahs = message.aaHappeneds
-                           // n.aaHappenedSinceLastOptionalBreak = n.aaHappenedSinceLastOptionalBreak || ahs!=Nil
-                           if (b==null||b.activationMode==ActivationMode.Optional) {
-                             if (n.activationMode==ActivationMode.Optional) {
-                                 activateNextOrEnded = n.aaHappenedSinceLastOptionalBreak
-                                 if (activateNextOrEnded) {
-                                   n.activationMode = ActivationMode.Active
-                                   n.aaHappenedSinceLastOptionalBreak = false
-                                   childNode = n.lastActivatedChild
-                                 }
-                             }
-                             else if (message.activation!=null) {
-                               activateNextOrEnded = true
-                               childNode = n.lastActivatedChild
-                             }
+       case _  =>        val b = message.break
+                         if (b==null) {
+                           activateNextOrEnded = true
+                           childNode = n.lastActivatedChild
+                         } 
+                         else if (b.activationMode==ActivationMode.Optional) {
+                           if (n.aaActivated_optional) { 
+                             // TBD make a good test to see whether optional parts started
+                             n.activationMode = ActivationMode.Optional // TBD: may possibly be dropped???; check n.indexChild_marksPause >= 0
+                             n.indexChild_marksPause = b.child.index
+                           }
+                           else {
+                             activateNextOrEnded = true
+                             n.activationMode = ActivationMode.Active
+                             n.nActivatedOptionalChildren = 0
+                             n.indexChild_marksOptionalPart = n.indexChild_marksPause
+                             n.indexChild_marksPause        = -1
+                             n.aaActivated_optional         = false
+                             childNode = n.lastActivatedChild
                            }
                          }
-      }
+       }
+     }
     }
-	var nextActivationTemplateIndex = 0
+
+    var nextActivationTemplateIndex = 0
 	var nextActivationPass = 0
 	if (activateNextOrEnded) {
 	  // old: childNode = if (T_n_ary.isLeftMerge(n.template.kind)) n.lastActivatedChild else message.childNode ; now done before
@@ -908,7 +932,7 @@ class CommonScriptExecutor extends ScriptExecutor {
 	  
 	  message.node.activationMode = ActivationMode.Active
 	  
-	  if (n.hadBreak) activationEnded = true
+	  if (n.hadFullBreak) activationEnded = true
 	  else if (nextActivationTemplateIndex==message.node.template.children.size) {
 	    if (message.node.isIteration) {
 	      nextActivationTemplateIndex = 0
@@ -928,7 +952,7 @@ class CommonScriptExecutor extends ScriptExecutor {
     var nodesToBeExcluded : Buffer[CallGraphNodeTrait] = null
     var nodesToBeSuspended: Buffer[CallGraphNodeTrait] = null
     n.template.kind match {
-                  
+
       case "/" | "|/" 
         | "|/|"        => // deactivate to the right when one has finished successfully
         				      // TBD: something goes wrong here; LookupFrame2 does not "recover" from a Cancel search
@@ -950,36 +974,33 @@ class CommonScriptExecutor extends ScriptExecutor {
                             }
       case _ =>          
     }
-    var shouldSucceed = false    
     // decide further on success and resumptions
-    if (!shouldSucceed) { // could already have been set for .. as child of ;
+    if (!shouldSucceed && !n.hasSuccess) { // could already have been set for .. as child of ;
       
       // TBD: improve
-      if (activateNextOrEnded || message.success != null || message.aaHappeneds != Nil) {
-        var nodesToBeResumed: Buffer[CallGraphNodeTrait] = null
-        if (message.success != null || message.aaHappeneds != Nil) {
-          n.template.kind match {
+      //var nodesToBeResumed: Buffer[CallGraphNodeTrait] = null
+      //if (message.success != null || message.aaHappeneds != Nil) {
+      n.template.kind match {
+            case ";" => shouldSucceed = activationEnded || activationEndedOptionally
             case "/" => shouldSucceed = message.success != null ||
                                         message.aaHappeneds.exists(_.child.index<n.rightmostChildThatEndedInSuccess_index) || 
-		                                n.children.exists((e:CallGraphNodeTrait)=>e.hasSuccess)
+		                                n.nActivatedChildrenWithSuccess > 0
             case _ =>
 		          T_n_ary_op.getLogicalKind(n.template.kind) match {
 		            case LogicalKind.None =>
-		            case LogicalKind.And  => shouldSucceed = (isSequential || !n.aChildEndedInFailure && !activateNext) &&
-		                                                     n.children.forall((e:CallGraphNodeTrait)=>e.hasSuccess)
-		            case LogicalKind.Or   => shouldSucceed = n.aChildEndedInSuccess || 
-		                                                     n.children.exists((e:CallGraphNodeTrait)=>e.hasSuccess)
+		            case LogicalKind.And  => shouldSucceed = !activateNext &&
+		                                                     n.nActivatedMandatoryChildrenWithoutSuccess == 0
+		            case LogicalKind.Or   => shouldSucceed = n.nActivatedChildrenWithSuccess > 0
                   }
-          }
-        }
       }
 	}
-    if (shouldSucceed && (
-        !isSequential   ||   // TBD: check for other Sequential operators";"
-        activationEnded || // reached the end
-        message.break != null // succeed on sequential breaks, including the optional ones
-      ) ) {
-      insert(Success(n)) // TBD: prevent multiple successes at same "time"
+    println(s"activationMode=${n.activationMode} activateNextOrEnded=$activateNextOrEnded activationEndedOptionally=$activationEndedOptionally n.hadFullBreak=${n.hadFullBreak}")
+    println(s"nActivatedMandatoryChildren=${n.nActivatedMandatoryChildren} nActivatedMandatoryChildrenWithSuccess=${n.nActivatedMandatoryChildrenWithSuccess} nActivatedMandatoryChildrenWithoutSuccess=${n.nActivatedMandatoryChildrenWithoutSuccess} ")
+    println(s"nActivatedOptionalChildren=${n.nActivatedOptionalChildren} nActivatedOptionalChildrenWithSuccess=${n.nActivatedOptionalChildrenWithSuccess} nActivatedOptionalChildrenWithoutSuccess=${n.nActivatedOptionalChildrenWithoutSuccess} ")
+    println(s"indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart} indexChild_marksPause=${n.indexChild_marksPause} ")
+
+    if (shouldSucceed) {
+      insert(Success(n))   // TBD: prevent multiple successes at same "time"
     }
     // do exclusions and suspensions
     if (nodesToBeExcluded !=null) nodesToBeExcluded .foreach((n) => insert(Exclude(message.node,n)))

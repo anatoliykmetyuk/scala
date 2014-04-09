@@ -73,7 +73,7 @@ abstract class AACodeFragmentExecutor[N<:N_atomic_action](_n: N, _scriptExecutor
   def naa = n.asInstanceOf[N]
   def doCodeExecution(lowLevelCodeExecutor: CodeExecutorTrait): Unit = lowLevelCodeExecutor.doCodeExecution{
     ()=>
-      n.hasSuccess = true
+      n.setSuccess(true)
       n.isExecuting = true
       try {
         // naa.template.code.apply.apply(naa) don't get this to work, so use a match statement:
@@ -203,8 +203,8 @@ class SwingCodeExecutorAdapter[CE<:CodeExecutorTrait] extends CodeExecutorAdapte
 case class EventHandlingCodeFragmentExecutor[N<:N_atomic_action](_n: N, _scriptExecutor: ScriptExecutor) extends AACodeFragmentExecutor(_n, _scriptExecutor)  {
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = executeMatching(true) // dummy method needed because of a flaw in the class hierarchy
   def executeMatching(isMatching: Boolean): Unit = {  // not to be called by scriptExecutor, but by application code
-    n.hasSuccess = isMatching
-    if (n.hasSuccess) 
+    n.setSuccess(isMatching)
+    if (isMatching) 
     {
       n.doCode // may affect n.hasSuccess
     }

@@ -37,14 +37,15 @@ import scala.collection.mutable._
       var index = -1
 	  def node: N
 
-	  val className = "%14s".format(getClass.getSimpleName)
-      override def toString = index+" "+className+" "+node
+	  val className = getClass.getSimpleName
+      override def toString =    index+" "+className+" "+node
+      def toFormattedString = f"$index%3d $className%14s $node"
   }
   // various kinds of messages sent around in the script call graph
   abstract class CallGraphMessageN extends CallGraphMessage[CallGraphNodeTrait]
   
 	case class Activation   (node: CallGraphNodeTrait) extends CallGraphMessageN {priority = 8 }
-	case class Continuation (node: CallGraphTreeNode_n_ary) extends CallGraphMessageN {
+	case class Continuation (node:  N_n_ary_op) extends CallGraphMessageN {
 	  priority = 4
 	  var activation: Activation = null
 	  var deactivations: List[Deactivation] = Nil
@@ -56,15 +57,17 @@ import scala.collection.mutable._
 	  var childNode  : CallGraphNodeTrait = null
 	  
 	  override def toString = {
-	    var result = super.toString
-	    if (activation   !=null) result += " "+activation
-	    if (deactivations!=Nil ) result += " "+deactivations.mkString
-	    if (success      !=null) result += " "+success
-	    if (break        !=null) result += " "+break
-	    if (aaActivated  !=null) result += " "+aaActivated
-	    if (caActivated  !=null) result += " "+caActivated
-	    if (aaHappeneds  !=Nil ) result += " "+aaHappeneds.mkString
-	    if (childNode    !=null) result += " "+childNode
+	    var strs = new ListBuffer[String]
+	    if (activation   !=null) strs += activation   .toString
+	    if (deactivations!=Nil ) strs += deactivations.mkString
+	    if (success      !=null) strs += success      .toString
+	    if (break        !=null) strs += break        .toString
+	    if (aaActivated  !=null) strs += aaActivated  .toString
+	    if (caActivated  !=null) strs += caActivated  .toString
+	    if (aaHappeneds  !=Nil ) strs += aaHappeneds  .mkString
+	    if (childNode    !=null) strs += childNode    .toString
+	    var result = super.toString +
+	                 s" {${strs.mkString(", ")}} ${node.infoString}"
 	    result
 	  }
 	}

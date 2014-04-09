@@ -15,7 +15,7 @@ package subscript.vm
  *    _execute(scriptDef, debugger, executor)
  */
 
-object SimpleScriptDebuggerObject extends SimpleScriptDebugger {
+object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) return
     ScriptExecutorFactory.addScriptDebugger(this)
@@ -27,7 +27,8 @@ object SimpleScriptDebuggerObject extends SimpleScriptDebugger {
     }
     catch {
       case e: ClassNotFoundException => println("Could not find class "+className)
-      case other: Throwable => println(other)
+      case e: java.lang.reflect.InvocationTargetException => throw e.getTargetException
+      case other: Throwable => other.printStackTrace
     }
   }
 }
@@ -59,7 +60,7 @@ class SimpleScriptDebugger extends ScriptDebugger {
 	      print(if(i==depth)"*"else if (branches.contains(i)) "|" else if(j%5==0)"-"else" ")
 	    }
 	    j+=1
-	    println(n)
+	    println(n.infoString)
 	    n match {
 	      case p:CallGraphParentNodeTrait => 
 	        val pcl=p.children.length
@@ -76,7 +77,7 @@ class SimpleScriptDebugger extends ScriptDebugger {
   def traceMessages: Unit = {
 	if (traceLevel >= 1) {
 	  println("=== Messages ===")
-	  callGraphMessages.foreach(println(_))
+	  callGraphMessages.foreach(m=>println(m.toFormattedString))
 	  println("=== End ===")
 	}
   }

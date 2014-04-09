@@ -138,6 +138,9 @@ class OperatorsSuite {
   val logicalOrOperators  = logicalOr_string .split(" ") 
   val behaviorOperators   = logicalAndOperators.toList:::logicalOrOperators.toList
   
+  var testIndexForDebugging = -1
+  def debug = testIndexForDebugging >= 0
+  
   /*
    * Low level stuff
    */
@@ -159,17 +162,28 @@ class OperatorsSuite {
   
   var expectedAtomsAtEndOfInput: Option[List[Char]] = None
   var scriptSuccessAtEndOfInput: Option[Boolean]    = None
-  var textIndex = 0
   var executor: ScriptExecutor = null
+  var currentTestIndex = 0
 
   def testScriptBehaviour(scriptDef: Script, scriptString: String, input: String, expectedResult: String) {
     
+    currentTestIndex += 1
+    
+    val testInfo = s"$currentTestIndex $scriptString : after input '${input}' should expect '${expectedResult}'"
+
     def assert(s: String, cond: Boolean) {
-      Assert.assertTrue(s"$scriptString : after input '${input}' should expect '${expectedResult}' Error: $s", cond)
+      Assert.assertTrue(s"$testInfo Error: $s", cond)
     }
     //println("testScript("+scriptString+", "+input+" -> "+expectedResult+")")
     
-    textIndex += 1
+    if (testIndexForDebugging > 0 && 
+        testIndexForDebugging != currentTestIndex)
+    {
+      return
+    }
+    if (debug) {
+      println(testInfo)
+    }
     //test(textIndex+". script "+scriptString+"     :     "+input+" -> "+expectedResult) {
     
 	  acceptedAtoms         = ""
@@ -187,7 +201,6 @@ class OperatorsSuite {
 
 	  executor = new CommonScriptExecutor
 
-	  val debug = false
 	  val debugger = if (debug) new SimpleScriptDebugger else null
 	  
       _execute(scriptDef, debugger, executor)
@@ -241,6 +254,10 @@ class OperatorsSuite {
     c = atom('c')
     d = atom('d')
 
+  val scriptBehaviourList_for_debug = List(
+     [a..; b]       -> "->a  a->ab aa->ab ab aab"
+  )
+    
   /*
    * scriptBehaviourMap: relation between scripts and outcomes
    *   keys are script strings, which should also be keys in the scriptBodyMap, so that bodies can be found
@@ -427,7 +444,8 @@ class OperatorsSuite {
   
   @Test
   def testBehaviours = {
-    for ( (key, behaviours) <- scriptBehaviourList) {
+    val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
+    for ( (key, behaviours) <- behaviours) {
       val aScript = key.asInstanceOf[Script]
       val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
@@ -442,14 +460,10 @@ class OperatorsSuite {
   //testLogicalAnd
 
 }
-/*
-object OperatorsSuite extends OperatorsSuite {
-  def main( args: Array[String]): Unit = {
-    for ( (key, behaviours) <- scriptBehaviourList) {
-      val (aScript, aString) = key.asInstanceOf[(Script,String)]
-      val bodyString = DSL.toScriptBodyString(aScript)
-      println(f"$aString%25s <==> $bodyString%25s")
-    }
+
+object OperatorsSuiteApp extends OperatorsSuite {
+  def main(args: Array[String]): Unit = {
+    if (args.length > 0) testIndexForDebugging = args(0).toInt
+    testBehaviours
   }
 }
-*/

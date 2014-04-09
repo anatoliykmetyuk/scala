@@ -57,7 +57,15 @@ object OnSuccess
  
 trait CallGraphNodeTrait {
   type T <: TemplateNode
-  var hasSuccess = false
+  private var _hasSuccess = false
+  def hasSuccess = _hasSuccess
+  
+  def setSuccess(value: Boolean) {
+    if (_hasSuccess == value) return
+    _hasSuccess = value
+    forEachParent(p => p childChangesSuccess(this))
+  }
+  
   var isExcluded = false
   var pass = 0
   def template: T
@@ -109,6 +117,7 @@ trait CallGraphNodeTrait {
   var rightmostChildThatEndedInSuccess_index = -1
 
   override def toString = index+" "+template
+  def infoString = f"$index%2d $template"
 
   // TBD: are these necessary? :
   //var aaHappenedCountAtLastSuccess = 0
@@ -144,10 +153,20 @@ trait CallGraphNodeTrait {
 
 // a non-leaf node:
 trait CallGraphParentNodeTrait extends CallGraphNodeTrait {
+  var nActivatedChildren = 0 // i.e. including the number of already deactivated children)
+  var nActivatedChildrenWithSuccess = 0
+  def nActivatedChildrenWithoutSuccess = nActivatedChildren - nActivatedChildrenWithSuccess
+  def nActiveChildren = children.size
+  def nDeactivatedChildren = nActivatedChildren - nActiveChildren
+
   val children = new ListBuffer[CallGraphNodeTrait]
   def forEachChild(task: (CallGraphNodeTrait) => Unit): Unit = {
     children.foreach(task(_))
   }
+  def childChangesSuccess(child: CallGraphNodeTrait) = {
+    nActivatedChildrenWithSuccess += (if (child.hasSuccess) 1 else -1)
+  }
+  def appendChild(c: CallGraphNodeTrait) = children.append(c)
 }
 
 trait DoCodeHolder[R] extends CallGraphNodeTrait {
@@ -216,21 +235,6 @@ abstract class N_atomic_action  extends CallGraphLeafNode with DoCodeHolder[Unit
   var msgAAToBeExecuted: CallGraphMessage[CallGraphNodeTrait] = null
 }
 
-abstract class CallGraphTreeNode_n_ary extends CallGraphTreeParentNode {
-  type T <: T_n_ary_op
-  var isIteration      = false
-  var hadBreak         = false
-  var activationMode = ActivationMode.Active
-  def getLogicalKind = T_n_ary_op.getLogicalKind(template)
-  var continuation: Continuation = null
-  var lastActivatedChild: CallGraphNodeTrait = null
-  var aaHappenedSinceLastOptionalBreak = false
-  def mustBreak = hadBreak = true
-  
-  var breakWaker: CallGraphNodeTrait = null
-  
-}
-
 // The case classes for the bottom node types
 
 case class N_code_normal     (template: T_code_normal  ) extends N_atomic_action {type T = T_code_normal  ; def doCode = template.code.apply.apply(this)}
@@ -241,7 +245,7 @@ case class N_code_unsure     (template: T_code_unsure  ) extends N_atomic_action
   def result = _result
   def result_=(value: UnsureExecutionResult.UnsureExecutionResultType): Unit = {
     _result = value
-    hasSuccess = value==UnsureExecutionResult.Success
+    setSuccess(value==UnsureExecutionResult.Success)
   }
 }
 case class N_code_eventhandling         (template: T_code_eventhandling     ) extends N_atomic_action {type T = T_code_eventhandling     ; def doCode = template.code.apply.apply(this)}
@@ -250,7 +254,7 @@ case class N_code_eventhandling_loop    (template: T_code_eventhandling_loop) ex
   def result = _result
   def result_=(value: LoopingExecutionResult.LoopingExecutionResultType): Unit = {
     _result = value
-    hasSuccess = value==LoopingExecutionResult.Success || value==LoopingExecutionResult.Break || value==LoopingExecutionResult.OptionalBreak
+    setSuccess(value==LoopingExecutionResult.Success || value==LoopingExecutionResult.Break || value==LoopingExecutionResult.OptionalBreak)
   }
 }
 case class N_localvar[V](template: T_localvar[V]) extends CallGraphLeafNode with DoCodeHolder[V] {
@@ -282,14 +286,74 @@ case class N_annotation[CN<:CallGraphNodeTrait,CT<:TemplateChildNode] (template:
 case class N_launch_anchor      (template: T_launch_anchor                       ) extends CallGraphTreeParentNode {type T = T_launch_anchor }
 case class N_then               (template: T_then                                ) extends CallGraphTreeParentNode {type T = T_then     }
 case class N_then_else          (template: T_then_else                           ) extends CallGraphTreeParentNode {type T = T_then_else}
-case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolean) extends CallGraphTreeNode_n_ary {type T = T_n_ary_op      
+case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolean) extends CallGraphTreeParentNode {type T = T_n_ary_op      
+  var isIteration      = false
+  var hadFullBreak     = false
+  var activationMode = ActivationMode.Active
+  def getLogicalKind = T_n_ary_op.getLogicalKind(template)
+  var continuation: Continuation = null
+
+  override def infoString = f"${super.infoString}%.10s S=${hasSuccess} nActivated=${nActivatedChildren} (=${nActivatedChildrenWithSuccess}S+${nActivatedChildrenWithoutSuccess}N)"
+
+  /*
+   * some bookkeeping.
+   * Optional children are children of this operator (which must be parallel or similar), 
+   * which have been activated after an optional break had occurred, and for which no atomic action has happened.
+   * This will in general happen in the "y" parts (and thereafter the "z" part) of
+   * x & . & y
+   * x & . & y & . & z
+   */
+  var nActivatedOptionalChildren                = 0
+  var nActivatedOptionalChildrenWithSuccess     = 0
+  def nActivatedOptionalChildrenWithoutSuccess  = nActivatedOptionalChildren       - nActivatedOptionalChildrenWithSuccess
+  def nActivatedMandatoryChildren               = nActivatedChildren               - nActivatedOptionalChildren
+  def nActivatedMandatoryChildrenWithSuccess    = nActivatedChildrenWithSuccess    - nActivatedOptionalChildrenWithSuccess
+  def nActivatedMandatoryChildrenWithoutSuccess = nActivatedChildrenWithoutSuccess - nActivatedOptionalChildrenWithoutSuccess
+  
+  /*
+   * Consider
+   *   x & . & y        and
+   *   x & . & y . & z
+   * After activation of x, the activation is paused at the first period (".") in case atomic actions had been activated in x.
+   * The pause is then undone, and y is activated as an optional part.
+   * The position in the call graph of the period between x and y is then identified by indexChild_marksOptionalPart
+   * If after activation of y another period is encountered and atomic actions had been activated in y, 
+   * then the position of that period is identified by indexChild_marksPause, and activation stops there.
+   * If no atomic actions had been activated then activation just continues (maybe not a good strategy).
+   * 
+   * As soon as such an atomic action has happened, the z part is activated, and 
+   * indexChild_marksOptionalPart becomes indexChild_marksPause, and the latter becomes -1.
+   */
+  var indexChild_marksOptionalPart = -1
+  var indexChild_marksPause = -1
+  var aaActivated_optional = false
+
+  override def appendChild(c: CallGraphNodeTrait) = {
+    super.appendChild(c); 
+    if (isOptionalChild(c)) nActivatedOptionalChildren += 1
+    lastActivatedChild = c
+  }
+  
+  
+  override def childChangesSuccess(child: CallGraphNodeTrait) = {
+    val delta = if (child.hasSuccess) 1 else -1
+    nActivatedChildrenWithSuccess += delta
+    if (isOptionalChild(child)) nActivatedOptionalChildrenWithSuccess += delta
+  }
+  def isOptionalChild(c:CallGraphNodeTrait) = {indexChild_marksOptionalPart >= 0 && c.index >= indexChild_marksOptionalPart}
+  
+  var lastActivatedChild: CallGraphNodeTrait = null
+  def mustBreak = hadFullBreak = true
+  
+  //var breakWaker: CallGraphNodeTrait = null
+  
   val mapNamePassToVariableHolder = new HashMap[(Symbol,Int), VariableHolder[_]]
   def    initLocalVariable[V<:Any](name: Symbol, fromPass: Int, value: V)         = mapNamePassToVariableHolder += ((name,fromPass)->new VariableHolder(value))
   def    getVariableHolder[V<:Any](name: Symbol, fromPass: Int):VariableHolder[V] = mapNamePassToVariableHolder.get((name,fromPass)) match {
                                                                                       case None=>null 
                                                                                       case Some(v:VariableHolder[V]) => v 
                                                                                       case _ => throw new Exception("not matched")}
-  override def toString = super.toString+/*" "+children.length+*/(if(isIteration)" ..."else"")
+  override def toString = super.toString+(if(isIteration)" ..."else"")
 }
 
 // only one class for normal script calls and communicator-script calls

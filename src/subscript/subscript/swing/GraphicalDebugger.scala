@@ -445,7 +445,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         g.setFont(nameFont)
         drawStringCentered(g, s, hCenter, vCenter)
 	    n match {
-          case nn: CallGraphTreeNode_n_ary => 
+          case nn:  N_n_ary_op => 
             if (nn.activationMode!=ActivationMode.Active) {
               val s = if (nn.activationMode!=ActivationMode.Inactive) "-" else "."
               g.setFont(smallFont)
