@@ -303,7 +303,8 @@ case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolea
    * x & . & y
    * x & . & y & . & z
    */
-  var nActivatedOptionalChildren                = 0
+  var _nActivatedOptionalChildren               = 0
+  def nActivatedOptionalChildren                = _nActivatedOptionalChildren
   var nActivatedOptionalChildrenWithSuccess     = 0
   def nActivatedOptionalChildrenWithoutSuccess  = nActivatedOptionalChildren       - nActivatedOptionalChildrenWithSuccess
   def nActivatedMandatoryChildren               = nActivatedChildren               - nActivatedOptionalChildren
@@ -330,10 +331,13 @@ case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolea
 
   override def appendChild(c: CallGraphNodeTrait) = {
     super.appendChild(c); 
-    if (isOptionalChild(c)) nActivatedOptionalChildren += 1
+    if (isOptionalChild(c)) _nActivatedOptionalChildren += 1
     lastActivatedChild = c
   }
-  
+  def resetNActivatedOptionalChildren = {
+    _nActivatedOptionalChildren = 0
+    nActivatedOptionalChildrenWithSuccess = 0
+  }
   
   override def childChangesSuccess(child: CallGraphNodeTrait) = {
     val delta = if (child.hasSuccess) 1 else -1

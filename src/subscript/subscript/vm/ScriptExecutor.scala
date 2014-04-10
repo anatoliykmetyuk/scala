@@ -131,7 +131,8 @@ trait ScriptExecutor {
   /*
    * Simple tracing and error tracking
    */
-  def trace(s: String) = {}// println(s)
+  val doTrace = false
+  def trace(s: String) = if (doTrace) println(s)
   def error(s: String) {throw new Exception(s)}
 }
 
@@ -883,39 +884,77 @@ class CommonScriptExecutor extends ScriptExecutor {
                          }
       
       /*
-       *       . & a     => no pause; a is optional
-       * (+) & . & a     => no pause; a is optional
-       *  a  & . & b     => pause; after a happens b is activated as optional
+       *       . / a     => no pause; a is optional
+       * (-) / . / a     => no pause; a is optional
+       *  a  / . / b     => pause; after a happens / is done
        */
-      case _ if n.indexChild_marksPause >= 0 && message.aaHappeneds!=Nil => 
-                         if (message.aaHappeneds.exists(a=>a.node.index > n.indexChild_marksOptionalPart)) {
+      case "/" | "|/"  | "|/|" if n.indexChild_marksPause >= 0 && message.aaHappeneds!=Nil => 
+                         if (message.aaHappeneds.exists(a=>a.node.index > n.indexChild_marksOptionalPart) && message.deactivations==Nil) {
                            activateNextOrEnded = true
                            n.activationMode = ActivationMode.Active
-                           n.nActivatedOptionalChildren = 0
+                           n.resetNActivatedOptionalChildren
                            n.indexChild_marksOptionalPart = n.indexChild_marksPause
                            n.indexChild_marksPause        = -1
                            n.aaActivated_optional         = false
                            childNode = n.lastActivatedChild
                          }
                          
+      /*
+       *       . & a     => no pause; a is optional
+       * (+) & . & a     => no pause; a is optional
+       *  a  & . & b     => pause; after a happens b is activated as optional
+       */
+      case _ if n.indexChild_marksPause >= 0 && message.aaHappeneds!=Nil && message.aaHappeneds.exists(a=>a.child.index > n.indexChild_marksOptionalPart) => 
+                         if (doTrace) println(s"A: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+
+                           activateNextOrEnded = true
+                           n.activationMode = ActivationMode.Active
+                           n.resetNActivatedOptionalChildren
+                           n.indexChild_marksOptionalPart = n.indexChild_marksPause
+                           n.indexChild_marksPause        = -1
+                           n.aaActivated_optional         = false
+                           childNode = n.lastActivatedChild
+
+      case _ if n.indexChild_marksOptionalPart >= 0 && message.aaHappeneds!=Nil && message.aaHappeneds.exists(a=>a.child.index > n.indexChild_marksOptionalPart) => 
+                         if (doTrace) println(s"B: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+
+                           activateNextOrEnded = true
+                           n.activationMode = ActivationMode.Active
+                           n.resetNActivatedOptionalChildren
+                           n.indexChild_marksOptionalPart = n.indexChild_marksPause
+                           n.indexChild_marksPause        = -1
+                           n.aaActivated_optional         = false
+                           childNode = n.lastActivatedChild
+                         
        case _  =>        val b = message.break
                          if (b==null) {
+                           if (doTrace) println(s"D: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
                            activateNextOrEnded = true
                            childNode = n.lastActivatedChild
                          } 
                          else if (b.activationMode==ActivationMode.Optional) {
                            if (n.aaActivated_optional) { 
-                             // TBD make a good test to see whether optional parts started
+                             if (doTrace) println(s"E: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+                             activateNextOrEnded = true
+                             n.activationMode = ActivationMode.Active
+                             n.resetNActivatedOptionalChildren
+                             n.indexChild_marksOptionalPart = n.indexChild_marksPause
+                             n.indexChild_marksPause        = -1
+                             n.aaActivated_optional         = false
+                             childNode = n.lastActivatedChild
+                           }
+                           else if (message.aaActivated != null){// TBD: wrong test; we should ask whether any AA had been activated in the part before "."
+                             if (doTrace) println(s"F: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
                              n.activationMode = ActivationMode.Optional // TBD: may possibly be dropped???; check n.indexChild_marksPause >= 0
                              n.indexChild_marksPause = b.child.index
                            }
                            else {
+                             if (doTrace) println(s"G: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
                              activateNextOrEnded = true
-                             n.activationMode = ActivationMode.Active
-                             n.nActivatedOptionalChildren = 0
-                             n.indexChild_marksOptionalPart = n.indexChild_marksPause
+                             n.activationMode = ActivationMode.Optional
+                             n.resetNActivatedOptionalChildren
+                             n.indexChild_marksOptionalPart = b.child.index
                              n.indexChild_marksPause        = -1
-                             n.aaActivated_optional         = false
                              childNode = n.lastActivatedChild
                            }
                          }
@@ -994,11 +1033,13 @@ class CommonScriptExecutor extends ScriptExecutor {
                   }
       }
 	}
-    println(s"activationMode=${n.activationMode} activateNextOrEnded=$activateNextOrEnded activationEndedOptionally=$activationEndedOptionally n.hadFullBreak=${n.hadFullBreak}")
-    println(s"nActivatedMandatoryChildren=${n.nActivatedMandatoryChildren} nActivatedMandatoryChildrenWithSuccess=${n.nActivatedMandatoryChildrenWithSuccess} nActivatedMandatoryChildrenWithoutSuccess=${n.nActivatedMandatoryChildrenWithoutSuccess} ")
-    println(s"nActivatedOptionalChildren=${n.nActivatedOptionalChildren} nActivatedOptionalChildrenWithSuccess=${n.nActivatedOptionalChildrenWithSuccess} nActivatedOptionalChildrenWithoutSuccess=${n.nActivatedOptionalChildrenWithoutSuccess} ")
-    println(s"indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart} indexChild_marksPause=${n.indexChild_marksPause} ")
-
+    if (doTrace) {
+      println(s"activationMode=${n.activationMode}\nactivateNextOrEnded=$activateNextOrEnded\nactivationEndedOptionally=$activationEndedOptionally\nn.hadFullBreak=${n.hadFullBreak}")
+      println(s"nActivatedMandatoryChildren=${n.nActivatedMandatoryChildren}\nnActivatedMandatoryChildrenWithSuccess=${n.nActivatedMandatoryChildrenWithSuccess}\nnActivatedMandatoryChildrenWithoutSuccess=${n.nActivatedMandatoryChildrenWithoutSuccess} ")
+      println(s"nActivatedOptionalChildren=${n.nActivatedOptionalChildren}\nnActivatedOptionalChildrenWithSuccess=${n.nActivatedOptionalChildrenWithSuccess}\nnActivatedOptionalChildrenWithoutSuccess=${n.nActivatedOptionalChildrenWithoutSuccess} ")
+      println(s"indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}\nindexChild_marksPause=${n.indexChild_marksPause} ")
+      println(s"aaActivated_optional=${n.aaActivated_optional} ")
+    }
     if (shouldSucceed) {
       insert(Success(n))   // TBD: prevent multiple successes at same "time"
     }
