@@ -13,7 +13,17 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  * This class is a test suite for the script operators as implemented in the SubScript VM. 
  * 
  * To run the test suite, you can 
+ * 
  *  - right-click the file in eclipse and chose "Run As" - "JUnit Test"
+ *  - run from the command line, e.g.,
+ *  
+ *    qbin/scala -classpath build/quick/classes/subscript:build/deps/junit/junit-4.10.jar subscript.test.OperatorsSuiteApp 
+ *    qbin/scala -classpath build/quick/classes/subscript:build/deps/junit/junit-4.10.jar subscript.test.OperatorsSuiteApp 45
+ *  
+ *    The second command line example specifies an index of a test as a parameter. 
+ *    The program will then only run this test, while logging debug messages about the internal ongoings of the SubScript VM. 
+ *    This is in particular useful after a failing test has occurred.
+ *    One may call this "progression testing", as opposite of "regression testing"
  *  
  * *************************** 
  * High level methods
@@ -24,29 +34,28 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  *     
  *      (-)
  *      a
+ *      a b
  *      a;b
  *      a+b
  *      
  *    a, b, c are called "atoms"
  *    
- * - testLogicalOr, testLogicalAnd: 
- *     check logic behavior of operators.
- *     
- *   And-like operators (; & &&) have neutral operand (+)
- *    Or-like operators (+ | || /) have neutral operand (-)
- *   And there is the generic neutral operand (+-).
- *   So it is tested whether script equivalences such as the following hold:
- *     x#n = x
- *     n#x = x
- *     for each operator #, for each neutral operand (+-) and, depending on #, (+) or (-)
- *                       and for x equal to (+) (-) (+-) a
+ * - testFailingBehaviours: 
+ *     behaviour cases that are known to fail may be marked using "FAIL:". 
+ *   Then such behaviour cases should in a sense fail; if not an error has apparently been resolved
+ *   and the FAIL: marking should be taken away. 
+ *   So if the behavior in itself is OK, JUnit will report a problem of the type:
+ *   java.lang.AssertionError: 376 a b+(+)&.&(-) : 
+ *      after input '' should expect '1a' 
+ *      This test had been marked as 'FAIL:' but it is passed anyway. Please remove the mark.
+ *   
  *  
  * *************************** 
  * Test case specifications
  * *************************** 
  * 
  *   A script test case specification is a tuple of
- *   - a script expression, depicted as a string, e.g., "a+b"
+ *   - a script lambda expression, e.g., "[a+b]"
  *   - a "behaviours" string, i.e. a space-separated-list of behaviour cases, e.g. "->a a->b ab"
  *   
  *   A behaviour case either matches one of the following:
@@ -59,15 +68,23 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  *        
  *   Example test specification: 
  *   
- *      "a|b" -> "->ab a->1b b->1a ab ba"  
+ *      [a|b] -> "->ab a->1b b->1a ab ba"  
  *       
  *   BTW: a behaviour "a" is equivalent to "a->1" etc.
  *
+ *  - each behaviour case may be prefixed with "FAIL:", to mark an expected failure. E.g., 
+ *  
+ *    [ (a b+(+))  & .  & (-) ] -> "->1a FAIL:a->b FAIL:ab->0"
+ *  
+ *  
  * *************************** 
  * Low level implementation 
  * *************************** 
  * 
- * testBehaviours, testLogicalOr, testLogicalAnd call testScriptBehaviours 
+ * main and JUnit will each call both testBehaviours() and testFailingBehaviours() 
+ * 
+ * These two call testBehaviours(testExpectedFailures: Boolean)
+ * which in turn calls testScriptBehaviours 
  * 
  * testScriptBehaviours creates a script structure for the vm, and interprets the specified behaviours 
  * - a referred behaviour "=expr" results in a recursive call to testScriptBehaviours
@@ -141,18 +158,25 @@ class OperatorsSuite {
   var testIndexForDebugging = -1
   def debug = testIndexForDebugging >= 0
   
+  val FAILmarker = "FAIL:"
+  
   /*
    * Low level stuff
    */
-  def testScriptBehaviours(scriptDef: Script, scriptString: String, behaviours: String) {
+  def testScriptBehaviours(scriptDef: Script, scriptString: String, behaviours: String, testExpectedFailures: Boolean) {
     
     import scala.util.matching.Regex
     val pattern = new Regex(" +") // replace all multispaces by a single space, just before splitting behaviours:
     for (behaviour<-(pattern replaceAllIn(behaviours," ")).split(" ")) {
       val inputAndResult = behaviour.split("->")
-      val input          = inputAndResult(0)
-      val expectedResult = if (inputAndResult.length>1) inputAndResult(1) else "1"
-      testScriptBehaviour(scriptDef, scriptString, input, expectedResult)
+      var input          = inputAndResult(0)
+      val hasFAILmarker  = input.startsWith(FAILmarker)
+      if (hasFAILmarker)   input = input.substring(FAILmarker.length)
+      if (hasFAILmarker == testExpectedFailures)
+      {
+        val expectedResult = if (inputAndResult.length>1) inputAndResult(1) else "1"
+        testScriptBehaviour(scriptDef, scriptString, input, expectedResult, expectFailure=testExpectedFailures)
+      }
     }
   }
 
@@ -165,14 +189,16 @@ class OperatorsSuite {
   var executor: ScriptExecutor = null
   var currentTestIndex = 0
 
-  def testScriptBehaviour(scriptDef: Script, scriptString: String, input: String, expectedResult: String) {
+  def testScriptBehaviour(scriptDef: Script, scriptString: String, input: String, expectedResult: String, expectFailure: Boolean) {
     
     currentTestIndex += 1
+    var hadFailure = false
     
-    val testInfo = s"$currentTestIndex $scriptString : after input '${input}' should expect '${expectedResult}'"
+    lazy val testInfo = s"$currentTestIndex $scriptString : after input '${input}' should expect '${expectedResult}'"
 
     def assert(s: String, cond: Boolean) {
-      Assert.assertTrue(s"$testInfo Error: $s", cond)
+      if (!cond         ) hadFailure = true
+      if (!expectFailure) Assert.assertTrue(s"$testInfo Error: $s", cond)
     }
     //println("testScript("+scriptString+", "+input+" -> "+expectedResult+")")
     
@@ -184,7 +210,6 @@ class OperatorsSuite {
     if (debug) {
       println(testInfo)
     }
-    //test(textIndex+". script "+scriptString+"     :     "+input+" -> "+expectedResult) {
     
 	  acceptedAtoms         = ""
 	  inputStream           = scala.io.Source.fromString(input).toStream
@@ -216,7 +241,10 @@ class OperatorsSuite {
         assert(s"expected atoms='${expectedAtomsAtEndOfInputString}'", expectedAtomsAtEndOfInputString==expectedResultAtoms) 
       }
       assert(s"accepted atoms='${acceptedAtoms}'", acceptedAtoms==input) 
-    //}   
+    
+      if (expectFailure) {
+         Assert.assertTrue(s"$testInfo This test had been marked as 'FAIL:' but it is passed anyway. Please remove the mark.", hadFailure)
+      }
   }
 
   // utility method: remove 1 occurrence of elt from list; see http://stackoverflow.com/a/5640727
@@ -398,57 +426,39 @@ class OperatorsSuite {
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
    , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
    , [ a b | . | c d ]         -> "->a a->bc  ab->1c ac->bd abc->1d abcd acb->1d acd->1b acbd acdb"
-// , [ . / a b ]               -> "->1a a->b  ab"
+   , [ . / a b ]               -> "FAIL:->1a a->b  ab"
    , [ . & a b ]               -> "->1a a->b  ab"
-// , [ . | a b ]               -> "->1a a->b  ab"
-// , [ . / a b / . / c d ]     -> "->1a a->bc ab ac->d acd"
-// , [ a b  | .  | (+) ]       -> "->a a->1b ab"
-// , [ a b || . || (+) ]       -> "->a a"
-// , [ a b  & .  & (-) ]       -> "->a a->b ab->0"   does ab
-// , [ a b && . && (-) ]       -> "->a a->0"
-// , [ (a b+(+))  & .  & (-) ] -> "->1a a->b ab->0"
-// , [ (a b+(+)) && . && (-) ] -> "->1a a->0"
+   , [ . | a b ]               -> "FAIL:->1a a->b  ab"
+   , [ . / a b / . / c d ]     -> "FAIL:->1a a->bc ab ac->d acd"
+   , [ a b  | .  | (+) ]       -> "FAIL:->a a->1b ab"
+   , [ a b || . || (+) ]       -> "FAIL:->a FAIL:a"
+   , [ a b  & .  & (-) ]       -> "->a a->b FAIL:ab->0"
+   , [ a b && . && (-) ]       -> "->a      FAIL:a->0"
+   , [ (a b+(+))  & .  & (-) ] -> "->1a     FAIL:a->b FAIL:ab->0"
+   , [ (a b+(+)) && . && (-) ] -> "FAIL:->1a FAIL:a->0"
 
   )
 
   val scriptBehaviourMap = scriptBehaviourList.toMap
-  
-  /*
-   * Test logic behaviour
-   * For each behaviour operator #, a neutral operand (for #) n, another operand x, it should hold:
-   *  x#n = x
-   *  n#x = x
-   *  
-   *  (+-) should need only behave neutrally next to an "a": (+-)#a = a#(+-) = a
-   */
-  //def testLogicalOr  = testLogic(false, logicalOrOperators )
-  //def testLogicalAnd = testLogic( true, logicalAndOperators)
-  
-  /*
-  def testLogic(isLogicalAnd: Boolean, operatorStrings: Seq[String]) = {
-    val    neutralProcess = if ( isLogicalAnd) _empty else _deadlock
-    val notNeutralProcess = if (!isLogicalAnd) _empty else _deadlock
-    for (opStr<-operatorStrings) {
-      //val op = _op(opStr) _
-      testScriptBehaviours(neutralProcess.kindAsString+opStr+"a"         , "=a", _op(opStr)(_neutral,_a)) 
-      testScriptBehaviours("a"         +opStr+neutralProcess.kindAsString, "=a", _op(opStr)(_a,_neutral))
-      
-      for ( (operandStr, operandTemplate)<-Map("a"->_a, _deadlock.kindAsString->_deadlock, _empty.kindAsString->_empty)) {
-          testScriptBehaviours(neutralProcess.kindAsString+opStr+operandStr         , "="+operandStr, _op(opStr)(neutralProcess,operandTemplate))
-          testScriptBehaviours(operandStr         +opStr+neutralProcess.kindAsString, "="+operandStr, _op(opStr)(operandTemplate,neutralProcess))
-      }
-    }
-  }
 
-  */
+  // There are two test methods: 
+  // - the first tests behaviours that are expected to be properly implemented
+  // - the second tests behaviours, marked with FAIL:, that have been known to fail. 
+  //   if such a behaviour unexpectedly passes the test then this results in a JUnit failure.
+  //   That should be a trigger to regard the issue underlying to the FAIL: marking to be resolved.
+  //   So then the FAIL: marking should be removed and JUnit will be able to proceed further.
+  @Test
+  def testBehaviours: Unit = testBehaviours(testExpectedFailures=false)
   
   @Test
-  def testBehaviours = {
+  def testFailingBehaviours: Unit = testBehaviours(testExpectedFailures=true)
+
+  def testBehaviours(testExpectedFailures: Boolean): Unit = {
     val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
     for ( (key, behaviours) <- behaviours) {
       val aScript = key.asInstanceOf[Script]
       val bodyString = toScriptBodyString(aScript)
-      testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
+      testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String], testExpectedFailures)
     }
   }
   
@@ -465,5 +475,6 @@ object OperatorsSuiteApp extends OperatorsSuite {
   def main(args: Array[String]): Unit = {
     if (args.length > 0) testIndexForDebugging = args(0).toInt
     testBehaviours
+    testFailingBehaviours
   }
 }
