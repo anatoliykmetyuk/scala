@@ -232,7 +232,7 @@ case class T_annotation[CN<:CallGraphNodeTrait,CT<:TemplateChildNode](code: () =
   type N=N_annotation[CN,CT] 
 }
 
-case class T_call(calleeName: String, code: () => N_call => _scriptType) extends T_0_ary with TemplateCodeHolder[N_call, _scriptType] {type N = N_call}
+case class T_call(calleeName: String, code: () => N_call => _scriptType[Unit]) extends T_0_ary with TemplateCodeHolder[N_call, _scriptType[Unit]] {type N = N_call}
 
 case class T_script (owner: AnyRef, kind: String, name: Symbol, child0: TemplateChildNode) extends TemplateNode_1_Trait with TemplateRootNode {
   type N = N_script

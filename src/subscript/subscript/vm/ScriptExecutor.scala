@@ -456,9 +456,11 @@ class CommonScriptExecutor extends ScriptExecutor {
    * insert success messages for each parent node
    */
   def handleSuccess(message: Success): Unit = {
-         if (message.node.hasSuccess) {
-           return // should not occur?
-         }
+         // The following lines had been inserted on 10 April 2014 [c8f7a57], and outcommented on 22 April 2014.
+         // These were wrong: a success message for a [while] would not be processed any more
+         //if (message.node.hasSuccess) {
+         //  return // should not occur?
+         //}
          
          message.node match {
                case n@  N_annotation (_) => {} // onSuccess?

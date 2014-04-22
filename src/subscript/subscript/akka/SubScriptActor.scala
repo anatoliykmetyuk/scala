@@ -107,7 +107,7 @@ object SubScriptActor {
     case SynchronizationMessage(_, lock) => lock.synchronized(lock.notify())
   }
     
-  def executeScript(script: Script) = synchronized {
+  def executeScript(script: Script[Unit]) = synchronized {
     val template = getScriptTemplate(script)
     vm.invokeFromET { vm.activateFrom(parallelOp, template) }
   }

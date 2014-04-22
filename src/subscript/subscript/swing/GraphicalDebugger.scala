@@ -252,7 +252,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         val vCenter  = boxTop  + BOX_H/2
 
         val r = new Rectangle(boxLeft, boxTop, boxWidth, BOX_H)
-        val n = if (currentMessage==null) null else currentMessage.node.asInstanceOf[CallGraphNodeTrait]
+        val n = if  (currentMessage==null||currentMessage.node==null) null 
+                else currentMessage.node.asInstanceOf[CallGraphNodeTrait]
         
         val nameFont = t match {
           case _:T_call => smallFont

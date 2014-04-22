@@ -1330,10 +1330,12 @@ self =>
     def    here_Ident = Ident( here_Name) // Note: such items should be def's rather than val's; else the Typer will get confused
     def   there_Ident = Ident(there_Name)
                                                      
+    val nameScala       = newTermName("scala")
     val nameSubScript   = newTermName("subscript")
     val nameDSL         = newTermName("DSL")
     val nameVM          = newTermName("vm")
-    val name_scriptType = newTypeName("_scriptType")
+    val name_scriptType = newTypeName("Script")
+    val name_unitType   = newTypeName("Unit")
  
     def sSubScriptDSL: Tree = Select(Ident(nameSubScript), nameDSL)
     def sSubScriptVM : Tree = Select(Ident(nameSubScript), nameVM )
@@ -1346,8 +1348,10 @@ self =>
     def sActualConstrainedParameter: Tree = Select(sSubScriptVM, actualConstrainedParameter_Name)
     def sActualAdaptingParameter   : Tree = Select(sSubScriptVM,    actualAdaptingParameter_Name)
 
-    def s_script    : Tree = Select(sSubScriptDSL, script_Name)
-    def s_scriptType: Tree = Select(sSubScriptDSL, name_scriptType)
+    def s_Unit       : Tree = Select(Ident(nameScala), name_unitType)
+    def s_script     : Tree = Select(sSubScriptDSL, script_Name)
+    def s_scriptType0: Tree = Select(sSubScriptDSL, name_scriptType)
+    def s_scriptType : Tree = AppliedTypeTree(s_scriptType0, List(s_Unit))
     
     final val raw_space = " "
     final val raw_semi  = ";"

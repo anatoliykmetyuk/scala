@@ -431,7 +431,7 @@ case class CommunicatorRole(communicator: Communicator) {
 
 // Utility stuff for Script Call Graph Nodes
 object CallGraphNode {
-  type _scriptType = N_call=>Unit
+  type _scriptType[T] = N_call=>T
   
   var currentStamp = 0; // used for searching common ancestors
   

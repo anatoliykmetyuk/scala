@@ -163,7 +163,7 @@ class OperatorsSuite {
   /*
    * Low level stuff
    */
-  def testScriptBehaviours(scriptDef: Script, scriptString: String, behaviours: String, testExpectedFailures: Boolean) {
+  def testScriptBehaviours(scriptDef: Script[Unit], scriptString: String, behaviours: String, testExpectedFailures: Boolean) {
     
     import scala.util.matching.Regex
     val pattern = new Regex(" +") // replace all multispaces by a single space, just before splitting behaviours:
@@ -189,7 +189,7 @@ class OperatorsSuite {
   var executor: ScriptExecutor = null
   var currentTestIndex = 0
 
-  def testScriptBehaviour(scriptDef: Script, scriptString: String, input: String, expectedResult: String, expectFailure: Boolean) {
+  def testScriptBehaviour(scriptDef: Script[Unit], scriptString: String, input: String, expectedResult: String, expectFailure: Boolean) {
     
     currentTestIndex += 1
     var hadFailure = false
@@ -436,6 +436,12 @@ class OperatorsSuite {
    , [ a b && . && (-) ]       -> "->a      FAIL:a->0"
    , [ (a b+(+))  & .  & (-) ] -> "->1a     FAIL:a->b FAIL:ab->0"
    , [ (a b+(+)) && . && (-) ] -> "FAIL:->1a FAIL:a->0"
+   
+   // Threaded code fragments
+   , [ a {**} .. ; b ]             -> "->a a->ab aa->ab ab aab"
+   
+   // Various
+   , [(a {**} b) ... || c...]  -> "->ac a->bc ab->ac c->ac cc->ac ca->bc ac->bc acc->bc acb->ac"
 
   )
 
@@ -456,7 +462,7 @@ class OperatorsSuite {
   def testBehaviours(testExpectedFailures: Boolean): Unit = {
     val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
     for ( (key, behaviours) <- behaviours) {
-      val aScript = key.asInstanceOf[Script]
+      val aScript = key.asInstanceOf[Script[Unit]]
       val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String], testExpectedFailures)
     }

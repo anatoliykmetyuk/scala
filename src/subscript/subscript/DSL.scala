@@ -40,10 +40,9 @@ import subscript.vm._
  * Usage: see example programs
  */
 object DSL {
-  type _scriptType = CallGraphNode._scriptType
-  type Script = _scriptType
-  def _script   (owner : AnyRef, name        : Symbol      , p: FormalParameter[_]*)(_t: TemplateChildNode): Script = {(_c: N_call) => _c.calls(T_script    (owner, "script"       , name,     _t), p:_*)}
-  def _comscript(owner : AnyRef, communicator: Communicator, p: FormalParameter[_]*)                       : Script = {(_c: N_call) => _c.calls(T_commscript(owner, "communicator" , communicator), p:_*)}
+  type Script[T] = CallGraphNode._scriptType[T]
+  def _script   (owner : AnyRef, name        : Symbol      , p: FormalParameter[_]*)(_t: TemplateChildNode): Script[Unit] = {(_c: N_call) => _c.calls(T_script    (owner, "script"       , name,     _t), p:_*)}
+  def _comscript(owner : AnyRef, communicator: Communicator, p: FormalParameter[_]*)                       : Script[Unit] = {(_c: N_call) => _c.calls(T_commscript(owner, "communicator" , communicator), p:_*)}
   
 // TBD: communication scripts
 //  def _communication(owner: Any, names: Symbol*): N_communication => TemplateNode = {
@@ -53,25 +52,25 @@ object DSL {
 //    (_c: N_communication) => _c.inits(T_communication("communication", names.toList.map(_.asInstanceOf[Symbol])), owner)
 //  }
 
-  def getScriptTemplate    (s: Script): T_script     = {val nc = N_call(T_call("", null)); s(nc); nc.t_callee}
-  def getScriptBodyTemplate(s: Script): TemplateNode = getScriptTemplate(s).child0
-  def toScriptString    (s: Script): String =          getScriptTemplate    (s).hierarchyString
-  def toScriptBodyString(s: Script): String = {val c = getScriptBodyTemplate(s); if(c==null) "" else c.hierarchyString}
+  def getScriptTemplate    (s: Script[Unit]): T_script     = {val nc = N_call(T_call("", null)); s(nc); nc.t_callee}
+  def getScriptBodyTemplate(s: Script[Unit]): TemplateNode = getScriptTemplate(s).child0
+  def toScriptString    (s: Script[Unit]): String =          getScriptTemplate    (s).hierarchyString
+  def toScriptBodyString(s: Script[Unit]): String = {val c = getScriptBodyTemplate(s); if(c==null) "" else c.hierarchyString}
   def _communication(body: N_communication => TemplateNode) = Communication(body)
   def _communicator(name: Symbol) = Communicator(name)
   def _relate(communication: Communication, crs: CommunicatorRole*): Unit = communication.setCommunicatorRoles(crs.toList)
 
   implicit def communicatorToCommunicatorRole(c: Communicator) = new CommunicatorRole(c)
   
-  def _execute(_script: Script): ScriptExecutor = _execute(_script, null, true)
-  def _execute(_script: Script, executor: ScriptExecutor): ScriptExecutor = _execute(_script, null, executor)
-  def _execute(_script: Script, debugger: ScriptDebugger): ScriptExecutor = _execute(_script, debugger, false)
-  def _execute(_script: Script,                           allowDebugger: Boolean): ScriptExecutor = _execute(_script, null, allowDebugger)
-  def _execute(_script: Script, debugger: ScriptDebugger, allowDebugger: Boolean): ScriptExecutor = {
+  def _execute(_script: Script[Unit]): ScriptExecutor = _execute(_script, null, true)
+  def _execute(_script: Script[Unit], executor: ScriptExecutor): ScriptExecutor = _execute(_script, null, executor)
+  def _execute(_script: Script[Unit], debugger: ScriptDebugger): ScriptExecutor = _execute(_script, debugger, false)
+  def _execute(_script: Script[Unit],                           allowDebugger: Boolean): ScriptExecutor = _execute(_script, null, allowDebugger)
+  def _execute(_script: Script[Unit], debugger: ScriptDebugger, allowDebugger: Boolean): ScriptExecutor = {
     val executor = ScriptExecutorFactory.createScriptExecutor(allowDebugger && debugger == null)
     _execute(_script, debugger, executor)
   }
-  def _execute(_script: Script, debugger: ScriptDebugger, executor: ScriptExecutor): ScriptExecutor = {
+  def _execute(_script: Script[Unit], debugger: ScriptDebugger, executor: ScriptExecutor): ScriptExecutor = {
     if (debugger!=null) debugger.attach(executor)
     _script(executor.anchorNode)
     executor.run
@@ -93,7 +92,7 @@ object DSL {
   def _eventhandling0     (cf: => Unit) = T_code_eventhandling     (() => (_here:N_code_eventhandling     ) => cf)
   def _eventhandling_loop0(cf: => Unit) = T_code_eventhandling_loop(() => (_here:N_code_eventhandling_loop) => cf)
 
-  implicit def _call      (calleeName: String, cf: => _scriptType) = T_call(calleeName, ()=>n=>cf)
+  implicit def _call      (calleeName: String, cf: => Script[Unit]) = T_call(calleeName, ()=>n=>cf)
   
   implicit def valueToActualValueParameter[T<:Any](value: T) = new ActualValueParameter(value)
 
