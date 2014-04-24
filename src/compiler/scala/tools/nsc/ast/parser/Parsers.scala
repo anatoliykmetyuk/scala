@@ -519,8 +519,12 @@ self =>
           case SEMI           => if (nparens == 0 && nbraces == 0) return
           case NEWLINE        => if (nparens == 0 && nbraces == 0) return
           case NEWLINES       => if (nparens == 0 && nbraces == 0) return
-          case RPAREN         =>                                           nparens -= 1
-          case LPAREN         =>                                           nparens += 1
+          case RPAREN
+             | RPAREN_ASTERISK 
+             | RPAREN_ASTERISK2 =>                                         nparens -= 1
+          case LPAREN
+             | LPAREN_ASTERISK 
+             | LPAREN_ASTERISK2 =>                                         nparens += 1
           case RBRACE            
 	         | RBRACE_DOT              
 	         | RBRACE_DOT3         
@@ -1474,6 +1478,8 @@ self =>
     val mapOperatorNameToDSLFunName = mapOperatorStringToDSLFunString map {case(k,v) => (newTermName(k): Name, newTermName("_"+v): Name)}
     
     val mapTokenToDSLFunString = Map[Int,String](
+        LPAREN_ASTERISK  -> "launch",
+        LPAREN_ASTERISK2 -> "launch_anchor",
         LBRACE          -> "normal",
         LBRACE_ASTERISK -> "threaded",
         LBRACE_QMARK    -> "unsure",
@@ -1499,6 +1505,8 @@ self =>
     val break_Name = newTermName("_break")
     
     val mapTokenToVMNodeString = Map[Int,String](
+        LPAREN_ASTERISK          -> "launch",
+        LPAREN_ASTERISK2         -> "launch_anchor",
         LBRACE                   -> "code_normal",
         LBRACE_ASTERISK          -> "code_threaded",
         LBRACE_QMARK             -> "code_unsure",
@@ -1571,6 +1579,8 @@ self =>
          | LPAREN_MINUS_RPAREN      
          | LPAREN_PLUS_MINUS_RPAREN 
          | LPAREN_SEMI_RPAREN       
+         | LPAREN_ASTERISK       
+         | LPAREN_ASTERISK2       
          | LBRACE                   
          | LBRACE_DOT               
          | LBRACE_DOT3              
@@ -1616,9 +1626,9 @@ self =>
                              "·"
                              ("?" simpleValueExpression ":")
  
-   networkingArrow        =+ "<=="  "==>"  "<==>"   "<<==>"   "<==>>"  "<<==>>"
-                             (+ "<<=={" "<=={" "=={"; scalaCode ; "}==>>" "}==>" "}==" )
-                             (+ "<<==(" "<==(" "==("; scalaTupel; ")==>>" ")==>" ")==" )
+   networkingArrow        =  "==>" 
+                          +  "=={" scalaCode  "}==>"
+                          +  "==(" scalaTupel ")==>"
  
   channelName_dots        =+ "<-->"   "<==>"
                              "<-.->"  "<=.=>"
@@ -1674,9 +1684,15 @@ self =>
     
     var scriptExpressionParenthesesNestingLevel = 0
     
-    @inline final def inScriptParens[T](body: => T): T = {
-      accept(LPAREN); scriptExpressionParenthesesNestingLevel += 1; val ret = body
-      accept(RPAREN); scriptExpressionParenthesesNestingLevel -= 1; ret
+    @inline final def inScriptParens[T<:Tree](lparen: Int, body: => T): Tree = {
+      val rparen = lparen match {case LPAREN           => RPAREN 
+                                 case LPAREN_ASTERISK  => RPAREN_ASTERISK 
+                                 case LPAREN_ASTERISK2 => RPAREN_ASTERISK2}
+      accept(lparen); scriptExpressionParenthesesNestingLevel += 1; val ret = body
+      accept(rparen); scriptExpressionParenthesesNestingLevel -= 1; 
+      
+      if (lparen==LPAREN) ret 
+      else Apply(dslFunFor(lparen), List(ret))
     }
     
     // the following aims to provide a context for Script data.
@@ -2043,14 +2059,12 @@ self =>
    privateDeclaration      = "private" identifiers
 
   unary                   = ..(unaryPrefixOperator + directive); scriptCommaExpression;
-                            .. unaryPostfixOperator
                             
   scriptCommaExpression   = simpleScriptTerm .. ","
  
   directive               = "@" scalaCode ":"
  
   unaryPrefixOperator     =+ "!"  "-"  "~"
-  unaryPostfixOperator    =+ "*"  "**"
  */
 
     def scriptCommaExpression(isNegated: Boolean): Tree = {
@@ -2252,7 +2266,9 @@ self =>
                             tryTerm
                             ifTerm     // ??? TBD: lift this to between scriptExpression_7 and scriptExpression_6
                             specialTerm 
-                            "(" scriptExpression ")"
+                            "("   scriptExpression   ")"
+                            "(*"  scriptExpression  "*)"
+                            "(**" scriptExpression "**)"
  
   scriptCall              = implicitScriptCall
                         |+| methodOrScriptCall
@@ -2333,7 +2349,9 @@ self =>
          | DOT2                             
          | DOT3                         => atPos(in.offset){in.nextToken(); dslFunFor(currentToken)} // TBD: transform in later phase
       case IDENTIFIER if (isBreakIdent) => atPos(in.offset){in.nextToken(); dslFunForBreak         }
-      case LPAREN                       => atPos(in.offset){inScriptParens(scriptExpr())}
+      case LPAREN 
+         | LPAREN_ASTERISK
+         | LPAREN_ASTERISK2 => atPos(in.offset){inScriptParens(currentToken, scriptExpr())}
       case LBRACE           
          | LBRACE_DOT              
          | LBRACE_DOT3         

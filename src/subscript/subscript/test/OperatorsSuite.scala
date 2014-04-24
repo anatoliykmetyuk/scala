@@ -179,7 +179,7 @@ class OperatorsSuite {
       if (hasFAILmarker == testExpectedFailures)
       {
         val expectedResult = if (inputAndResult.length>1) inputAndResult(1) else "1"
-        testScriptBehaviour(scriptDef, scriptString, input, expectedResult, expectFailure=testExpectedFailures)
+        testScriptBehaviour(scriptDef, scriptString, input, expectedResult, expectTestFailure=testExpectedFailures)
       }
     }
   }
@@ -193,37 +193,27 @@ class OperatorsSuite {
   var executor: ScriptExecutor = null
   var currentTestIndex = 0
 
-  def testScriptBehaviour(scriptDef: Script[Unit], scriptString: String, input: String, expectedResult: String, expectFailure: Boolean) {
+  def testScriptBehaviour(scriptDef: Script[Unit], scriptString: String, input: String, expectedResult: String, expectTestFailure: Boolean) {
     
     currentTestIndex += 1
-    var hadFailure = false
+    var hadTestFailure = false
     
-    lazy val testInfo = s"$currentTestIndex $scriptString : after input '${input}' should expect '${expectedResult}'"
+    lazy val afterInput    = if(input=="") "" else s"after input: $input"
+    lazy val failureString = if(expectTestFailure) " - Fails" else ""
+    lazy val testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult$failureString"
 
     def assert(s: String, cond: Boolean) {
-      if (!cond         ) hadFailure = true
-      if (!expectFailure) Assert.assertTrue(s"$testInfo Error: $s", cond)
+      if (!cond         ) hadTestFailure = true
+      if (!expectTestFailure) Assert.assertTrue(s"$testInfo Error: $s", cond)
     }
-    //println("testScript("+scriptString+", "+input+" -> "+expectedResult+")")
     
     if (testIndexForDebugging > 0 && 
-        testIndexForDebugging != currentTestIndex)
-    {
-      return
-    }
-
+        testIndexForDebugging != currentTestIndex) return
+ 
 	executor = new CommonScriptExecutor
 
-    if (debug) {
-      println(testInfo)
-      if (doVerbose) executor.doTrace = true
-    }
-    else if (doVerbose) {
-      val afterInput = if(input=="") "" else s"after input: $input"
-      val failure = if(expectFailure) "Fails" else ""
-      println(f"test $currentTestIndex%3d:   $scriptString%-12s   $afterInput%-18s should expect: $expectedResult $failure")
-    }
-     
+    if (doVerbose || debug) println(testInfo)
+    if (doVerbose && debug) executor.doTrace = true
     
 	  acceptedAtoms         = ""
 	  inputStream           = scala.io.Source.fromString(input).toStream
@@ -244,18 +234,18 @@ class OperatorsSuite {
       
       val executionSuccess = scriptSuccessAtEndOfInput.getOrElse(executor.hasSuccess)
       
-      if (!expectedResultSuccess) {
-        assert(s"script execution has unexpected success after input='${acceptedAtoms}'", !executionSuccess)
-      }
-      else { // note: only check for expectedAtoms here (in else branch); otherwise (-)&&a would raise false alarm
-        val    expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
-        assert(s"script execution should have success; accepted='${acceptedAtoms}'", executionSuccess)
-        assert(s"expected atoms='${expectedAtomsAtEndOfInputString}'", expectedAtomsAtEndOfInputString==expectedResultAtoms) 
-      }
+      if (expectedResultSuccess) 
+           assert(s"script execution has unexpectedly no success after input '${acceptedAtoms}'",executionSuccess)
+      else assert(s"script execution has unexpected success after input '${acceptedAtoms}'"   , !executionSuccess)
+
+      val    expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
+      
+      assert(s"expected atoms='${expectedAtomsAtEndOfInputString}'", expectedAtomsAtEndOfInputString==expectedResultAtoms) 
       assert(s"accepted atoms='${acceptedAtoms}'", acceptedAtoms==input) 
     
-      if (expectFailure) {
-         Assert.assertTrue(s"$testInfo This test had been marked as 'FAIL:' but it is passed anyway. Please remove the mark.", hadFailure)
+      if (expectTestFailure) {
+         if (!hadTestFailure) 
+           println(s"$testInfo This test had been marked as 'FAIL:' but it is passed anyway. Please remove the mark.")
       }
   }
 
@@ -436,7 +426,7 @@ class OperatorsSuite {
    // optional break
    , [ a / .     ]             -> "->a a"
    , [ a / ..    ]             -> "->a a"
-   , [ a b / ..  ]             -> "->a a->ab ab aa->ab"
+   , [ a b / ..  ]             -> "->a FAIL:a->ab ab aa->ab"
    , [ a / . / b ]             -> "->a a"
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
    , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
@@ -453,10 +443,30 @@ class OperatorsSuite {
    , [ (a b+(+)) && . && (-) ] -> "->1a FAIL:a->0"
    
    // Threaded code fragments
-   , [ a {**} .. ; b ]             -> "->a a->ab aa->ab ab aab"
+   , [ a {**} .. ; b ]         -> "->a a->ab aa->ab ab aab"
+
+   // launching
+   , [ (** a **) ]             -> "a"
+   , [ (** a b **)   ]         -> "ab"
+   , [ (** a **) b  ]          -> "ab"
+   
+   , [ (*  a  *)]              -> "a"
+   , [ (* a b *)]              -> "ab"
+   , [ (* a *) b  ]            -> "->ab a->b b->a ab ba"
+   , [ (* a b *) c d ]         -> "->ac a->bc  c->ad  ab->c  ac->bd  ca->bd  cd->a  abc->d  acb->d acd->b cab->d cad->b cda->b abcd  acbd acdb cabd cadb cdab"
+   
+   , [ (** (* a b *) **) c]    -> "->a a->b abc"
+   , [ (** (* a b *) c **) d]  -> "->ac a->bc  c->a ab->c ac->b ca->b abc->d acb->d cab->d abcd acbd cabd"
+
+   , [ {here.launch([  a  ])}     ] -> "a"
+   , [ {here.launch([ a b ])}     ] -> "ab"
+   , [ {here.launch([  a  ])} b   ] -> "->ab a->b b->a ab ba"
+   , [ {here.launch([ a b ])} c d ] -> "->ac a->bc  c->ad  ab->c  ac->bd  ca->bd  cd->a  abc->d  acb->d acd->b cab->d cad->b cda->b abcd  acbd acdb cabd cadb cdab"
+   , [ (**{here.launch([ a b ])}**) c]    -> "->a a->b abc"
+   , [ (**{here.launch([ a b ])} c**) d]  -> "->ac a->bc  c->a ab->c ac->b ca->b abc->d acb->d cab->d abcd acbd cabd"
    
    // Various
-   , [(a {**} b) ... || c...]  -> "->ac a->bc ab->ac c->ac cc->ac ca->bc ac->bc acc->bc acb->ac"
+   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
 
   )
 

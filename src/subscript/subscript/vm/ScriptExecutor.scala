@@ -108,6 +108,7 @@ trait ScriptExecutor {
       result
     }
   }
+  def launch(n: CallGraphNodeTrait, aScript: CallGraphNode._scriptType[_])
   
   /*
    * methods supporting debuggers
@@ -135,15 +136,21 @@ trait ScriptExecutor {
   def trace(s: String) = if (doTrace) println(s)
   def error(s: String) {throw new Exception(s)}
   
+  def traceAttribute(name: String, value: Any) = println(f"$name%41s: $value")
   def traceAttributes(n: N_n_ary_op, str: String) = {
-    
     println(s"$str:")
-
-    println(s"activationMode=${n.activationMode}\nhadFullBreak=${n.hadFullBreak}")
-    println(s"nActivatedMandatoryChildren=${n.nActivatedMandatoryChildren}\nnActivatedMandatoryChildrenWithSuccess=${n.nActivatedMandatoryChildrenWithSuccess}\nnActivatedMandatoryChildrenWithoutSuccess=${n.nActivatedMandatoryChildrenWithoutSuccess} ")
-    println(s"nActivatedOptionalChildren=${n.nActivatedOptionalChildren}\nnActivatedOptionalChildrenWithSuccess=${n.nActivatedOptionalChildrenWithSuccess}\nnActivatedOptionalChildrenWithoutSuccess=${n.nActivatedOptionalChildrenWithoutSuccess} ")
-    println(s"indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}\nindexChild_marksPause=${n.indexChild_marksPause} ")
-    println(s"aaActivated_optional=${n.aaActivated_optional} ")
+    traceAttribute("activationMode", n.activationMode)
+    traceAttribute("hadFullBreak", n.hadFullBreak)
+    traceAttribute("nActivatedMandatoryChildren", n.nActivatedMandatoryChildren)
+    traceAttribute("nActivatedMandatoryChildrenWithSuccess", n.nActivatedMandatoryChildrenWithSuccess)
+    traceAttribute("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
+    traceAttribute("nActivatedOptionalChildren", n.nActivatedOptionalChildren)
+    traceAttribute("nActivatedOptionalChildrenWithSuccess", n.nActivatedOptionalChildrenWithSuccess)
+    traceAttribute("nActivatedOptionalChildrenWithoutSuccess", n.nActivatedOptionalChildrenWithoutSuccess)
+    traceAttribute("indexChild_marksOptionalPart", n.indexChild_marksOptionalPart)
+    traceAttribute("indexChild_marksPause", n.indexChild_marksPause)
+    traceAttribute("aaActivated", n.aaActivated)
+    traceAttribute("aaActivated_optional", n.aaActivated_optional)
   }
 
 }
@@ -297,6 +304,17 @@ class CommonScriptExecutor extends ScriptExecutor {
   rootNode.scriptExecutor = this 
   connect(parentNode = rootNode, childNode = anchorNode)
   
+  // launch a script from a piece of Scala code; 
+  def launch(n: CallGraphNodeTrait, aScript: CallGraphNode._scriptType[_]) {
+    val launchAnchor       = CallGraphNode.getLowestLaunchAnchorAncestor(n) // could be rootNode
+    val callAnchorTemplate =     T_call("<launched>", null)
+    val callAnchorNode     =     N_call(callAnchorTemplate)
+    connect(parentNode = launchAnchor, childNode = callAnchorNode)
+    // callAnchorTemplate.parent = launchAnchor.template // would not be mutual...
+    aScript(callAnchorNode)
+    activateFrom(callAnchorNode, callAnchorNode.t_callee, Some(0))
+  }
+  
   /*
    * activate a new node from the given parent node using the given template.
    * The optional pass is relevant in case the parent is an n_ary operator
@@ -435,7 +453,7 @@ class CommonScriptExecutor extends ScriptExecutor {
                                                       }
                                                       insertDeactivation(n,null)
                                                                        
-           case n@N_launch                     (t) => activateFrom(CallGraphNode.getLowestLaunchAnchorAncestor(n), t.child0, Some(0)); insertDeactivation(n,null)
+           case n@N_launch                     (t) => activateFrom(CallGraphNode.getLowestLaunchAnchorAncestor(n), t.child0, Some(0)); doNeutral(n); insertDeactivation(n,null)
            case n@N_launch_anchor              (t) => activateFrom(n, t.child0, Some(0))
            case n@N_1_ary_op                   (t) => activateFrom(n, t.child0); insertContinuation1(message)
            case n@N_annotation                 (t) => activateFrom(n, t.child0); executeCode(n)
@@ -475,25 +493,14 @@ class CommonScriptExecutor extends ScriptExecutor {
          //}
          
          message.node match {
-               case n@  N_annotation (_) => {} // onSuccess?
-               case n@  N_then       (t: T_2_ary        )  => if (message.child.template==t.child0) {
-                                                                           activateFrom(n, t.child1)
-                                                                           return
-                                                              }
-               case n@  N_then_else  (t: T_3_ary        )  => if (message.child.template==t.child0) {
-                                                                              activateFrom(n, t.child1)
-                                                                              return
-                                                              }
-               case n@  N_1_ary_op   (t: T_1_ary        )  => if(message.child!=null) {
-                                                                insertContinuation1(message) 
-                                                                return
-                                                              }
-               case n@  N_n_ary_op   (_: T_n_ary, _      ) => if(message.child!=null) {
-                                                                insertContinuation(message) 
-                                                                return
-                                                              }
-               case n@  N_call       (_: T_call          ) => if (!n.allActualParametersMatch) {return}
-                                                              n.transferParameters
+               case n@  N_annotation   (_  ) => {} // onSuccess?
+               case n@  N_then         (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_then_else    (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_1_ary_op     (t  ) => if (message.child         != null) {insertContinuation1(message); return}
+               case n@  N_n_ary_op     (_,_) => if (message.child         != null) {insertContinuation (message); return}
+               case n@  N_launch_anchor(_  ) => if(n.nActivatedChildrenWithoutSuccess > 0) {return}
+               case n@  N_call         (_  ) => if (!n.allActualParametersMatch) {return}
+                                                n.transferParameters
                case _ =>
           }
          message.node.setSuccess(true)
@@ -1055,10 +1062,10 @@ class CommonScriptExecutor extends ScriptExecutor {
 	}
     if (doTrace) {
       traceAttributes(n, "Finally")
-      println(s"activateNext=$activateNext")
-      println(s"activationEnded=$activationEnded")
-      println(s"activationEndedOptionally=$activationEndedOptionally")
-      println(s"shouldSucceed=$shouldSucceed")
+      traceAttribute("activateNext", activateNext)
+      traceAttribute("activationEnded", activationEnded)
+      traceAttribute("activationEndedOptionally", activationEndedOptionally)
+      traceAttribute("shouldSucceed", shouldSucceed)
     }
     if (shouldSucceed) {
       insert(Success(n))   // TBD: prevent multiple successes at same "time"

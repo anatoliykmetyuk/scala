@@ -273,12 +273,15 @@ trait Scanners extends ScannersCommon {
         case CASE     => sepRegions = ARROW    :: sepRegions
         
         // subscript tokens
-        case LBRACE_DOT      => sepRegions = RBRACE_DOT     :: sepRegions
-        case LBRACE_DOT3     => sepRegions = RBRACE_DOT3    :: sepRegions
-        case LBRACE_QMARK    => sepRegions = RBRACE_QMARK   :: sepRegions
-        case LBRACE_EMARK    => sepRegions = RBRACE_EMARK   :: sepRegions
-        case LBRACE_ASTERISK => sepRegions = RBRACE_ASTERISK:: sepRegions
-        case LBRACE_CARET    => sepRegions = RBRACE_CARET   :: sepRegions
+        case LBRACE_DOT       => sepRegions = RBRACE_DOT      :: sepRegions
+        case LBRACE_DOT3      => sepRegions = RBRACE_DOT3     :: sepRegions
+        case LBRACE_QMARK     => sepRegions = RBRACE_QMARK    :: sepRegions
+        case LBRACE_EMARK     => sepRegions = RBRACE_EMARK    :: sepRegions
+        case LBRACE_ASTERISK  => sepRegions = RBRACE_ASTERISK :: sepRegions
+        case LBRACE_CARET     => sepRegions = RBRACE_CARET    :: sepRegions
+        
+        case LPAREN_ASTERISK  => sepRegions = RPAREN_ASTERISK :: sepRegions
+        case LPAREN_ASTERISK2 => sepRegions = RPAREN_ASTERISK2:: sepRegions
        
         case RBRACE   => while   (!sepRegions.isEmpty && sepRegions.head != RBRACE)
                                    sepRegions = sepRegions.tail
@@ -290,7 +293,9 @@ trait Scanners extends ScannersCommon {
            | RBRACE_QMARK   
            | RBRACE_EMARK   
            | RBRACE_ASTERISK
-           | RBRACE_CARET   
+           | RBRACE_CARET  
+           | RPAREN_ASTERISK
+           | RPAREN_ASTERISK2
        
                        => if (!sepRegions.isEmpty && sepRegions.head == lastToken) sepRegions = sepRegions.tail;   discardDocBuffer()
         case ARROW     => if (!sepRegions.isEmpty && sepRegions.head == lastToken) sepRegions = sepRegions.tail
@@ -431,7 +436,7 @@ trait Scanners extends ScannersCommon {
             }
           }
           fetchLT
-        case '!' | '^' | '*' | '?' =>
+        case '!' | '^' | '?' =>
           val chOld = ch
           nextChar()
           if (isInSubScript_nativeCode && ch=='}') {
@@ -439,10 +444,22 @@ trait Scanners extends ScannersCommon {
             token = chOld match {
               case '!' => RBRACE_EMARK
               case '^' => RBRACE_CARET
-              case '*' => RBRACE_ASTERISK
               case '?' => RBRACE_QMARK
             }
           }
+          else {
+            putChar(chOld)
+            getOperatorRest()
+          }
+        case '*' =>
+          val chOld = ch
+          nextChar()
+          if      (isInSubScript_nativeCode && ch=='}') {nextChar(); token = RBRACE_ASTERISK}
+          else if (isInSubScript_expression && ch==')') {nextChar(); token = RPAREN_ASTERISK}
+          else if (isInSubScript_expression && ch=='*') {nextChar()
+                                           if (ch==')') {nextChar(); token = RPAREN_ASTERISK2}
+                                           else {putChar('*'); putChar('*'); getOperatorRest()}
+          }                                 
           else {
             putChar(chOld)
             getOperatorRest()
@@ -556,24 +573,29 @@ trait Scanners extends ScannersCommon {
             }
           }
         case '(' => nextChar(); token = LPAREN
-          if (isInSubScript_expression) { // (+)  (-)  (+-)  (;)
-            var isSpecialOperand = false            
-            val lookahead = lookaheadReader
-            if   (lookahead.ch == '+') {lookahead.nextChar() // no } 
-              if (lookahead.ch == '-') {lookahead.nextChar()}
-              isSpecialOperand = lookahead.ch == ')'
+          if (isInSubScript_expression) { // (+)  (-)  (+-)  (;) (* (**
+            if   (ch == '*') {nextChar(); token = LPAREN_ASTERISK // no }
+              if (ch == '*') {nextChar(); token = LPAREN_ASTERISK2}
             }
-            else if (lookahead.ch == '-' 
-                 ||  lookahead.ch == ';') {lookahead.nextChar();
+            else {
+              var isSpecialOperand = false            
+              val lookahead = lookaheadReader
+              if   (lookahead.ch == '+') {lookahead.nextChar() // no } 
+                if (lookahead.ch == '-') {lookahead.nextChar()}
                 isSpecialOperand = lookahead.ch == ')'
-            }
-            if (isSpecialOperand) {
-              if      (ch == '+') {nextChar(); token = LPAREN_PLUS_RPAREN // no }
-                if    (ch == '-') {nextChar(); token = LPAREN_PLUS_MINUS_RPAREN}
               }
-              else if (ch == '-') {nextChar(); token = LPAREN_MINUS_RPAREN}
-              else if (ch == ';') {nextChar(); token = LPAREN_SEMI_RPAREN}
-              nextChar();
+              else if (lookahead.ch == '-' 
+                   ||  lookahead.ch == ';') {lookahead.nextChar();
+                  isSpecialOperand = lookahead.ch == ')'
+              }
+              if (isSpecialOperand) {
+                if      (ch == '+') {nextChar(); token = LPAREN_PLUS_RPAREN // no }
+                  if    (ch == '-') {nextChar(); token = LPAREN_PLUS_MINUS_RPAREN}
+                }
+                else if (ch == '-') {nextChar(); token = LPAREN_MINUS_RPAREN}
+                else if (ch == ';') {nextChar(); token = LPAREN_SEMI_RPAREN}
+                nextChar()
+              }
             }
           }          
         case ')' => nextChar(); token = RPAREN
@@ -1224,6 +1246,10 @@ trait Scanners extends ScannersCommon {
     case LPAREN_MINUS_RPAREN      => "(-)"
     case LPAREN_PLUS_MINUS_RPAREN => "(+-)"
     case LPAREN_SEMI_RPAREN       => "(;)"
+    case LPAREN_ASTERISK          => "(*"
+    case LPAREN_ASTERISK2         => "(**"
+    case RPAREN_ASTERISK          => "*)"
+    case RPAREN_ASTERISK2         => "**)"
     
     case _ =>
       (token2name get token) match {
@@ -1293,7 +1319,9 @@ trait Scanners extends ScannersCommon {
 								RBRACE_QMARK    -> 0, 
 								RBRACE_EMARK    -> 0, 
 								RBRACE_ASTERISK -> 0, 
-								RBRACE_CARET    -> 0)
+								RBRACE_CARET    -> 0, 
+								RPAREN_ASTERISK -> 0, 
+								RPAREN_ASTERISK2-> 0)
 
     /** The source code with braces and line starts annotated with [NN] showing the index */
     private def markedSource = {

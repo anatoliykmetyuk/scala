@@ -117,7 +117,8 @@ trait CallGraphNodeTrait {
   var rightmostChildThatEndedInSuccess_index = -1
 
   override def toString = index+" "+template
-  def infoString = f"$index%2d $template"
+  def    basicInfoString = f"$index%2d $template"
+  def infoString = basicInfoString
 
   // TBD: are these necessary? :
   //var aaHappenedCountAtLastSuccess = 0
@@ -149,6 +150,8 @@ trait CallGraphNodeTrait {
     if (a==null) return null
     a.getLogicalKind
   }
+  
+  def launch(aScript: CallGraphNode._scriptType[_]) = {_scriptExecutor.launch(this, aScript)}
 }
 
 // a non-leaf node:
@@ -167,6 +170,7 @@ trait CallGraphParentNodeTrait extends CallGraphNodeTrait {
     nActivatedChildrenWithSuccess += (if (child.hasSuccess) 1 else -1)
   }
   def appendChild(c: CallGraphNodeTrait) = children.append(c)
+  def extendedInfoString = f"$basicInfoString%.10s S=${hasSuccess} nActivated=${nActivatedChildren} (=${nActivatedChildrenWithSuccess}S+${nActivatedChildrenWithoutSuccess}N)"
 }
 
 trait DoCodeHolder[R] extends CallGraphNodeTrait {
@@ -283,7 +287,9 @@ case class N_annotation[CN<:CallGraphNodeTrait,CT<:TemplateChildNode] (template:
 }
 
 // the following 4 types may have multiple children active synchronously
-case class N_launch_anchor      (template: T_launch_anchor                       ) extends CallGraphTreeParentNode {type T = T_launch_anchor }
+case class N_launch_anchor      (template: T_launch_anchor                       ) extends CallGraphTreeParentNode {type T = T_launch_anchor;
+  override def infoString = extendedInfoString
+}
 case class N_then               (template: T_then                                ) extends CallGraphTreeParentNode {type T = T_then     }
 case class N_then_else          (template: T_then_else                           ) extends CallGraphTreeParentNode {type T = T_then_else}
 case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolean) extends CallGraphTreeParentNode {type T = T_n_ary_op      
@@ -293,7 +299,7 @@ case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolea
   def getLogicalKind = T_n_ary_op.getLogicalKind(template)
   var continuation: Continuation = null
 
-  override def infoString = f"${super.infoString}%.10s S=${hasSuccess} nActivated=${nActivatedChildren} (=${nActivatedChildrenWithSuccess}S+${nActivatedChildrenWithoutSuccess}N)"
+  override def infoString = extendedInfoString
 
   /*
    * some bookkeeping.
