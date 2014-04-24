@@ -131,9 +131,21 @@ trait ScriptExecutor {
   /*
    * Simple tracing and error tracking
    */
-  val doTrace = false
+  var doTrace = false
   def trace(s: String) = if (doTrace) println(s)
   def error(s: String) {throw new Exception(s)}
+  
+  def traceAttributes(n: N_n_ary_op, str: String) = {
+    
+    println(s"$str:")
+
+    println(s"activationMode=${n.activationMode}\nhadFullBreak=${n.hadFullBreak}")
+    println(s"nActivatedMandatoryChildren=${n.nActivatedMandatoryChildren}\nnActivatedMandatoryChildrenWithSuccess=${n.nActivatedMandatoryChildrenWithSuccess}\nnActivatedMandatoryChildrenWithoutSuccess=${n.nActivatedMandatoryChildrenWithoutSuccess} ")
+    println(s"nActivatedOptionalChildren=${n.nActivatedOptionalChildren}\nnActivatedOptionalChildrenWithSuccess=${n.nActivatedOptionalChildrenWithSuccess}\nnActivatedOptionalChildrenWithoutSuccess=${n.nActivatedOptionalChildrenWithoutSuccess} ")
+    println(s"indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}\nindexChild_marksPause=${n.indexChild_marksPause} ")
+    println(s"aaActivated_optional=${n.aaActivated_optional} ")
+  }
+
 }
 
 /*
@@ -505,6 +517,7 @@ class CommonScriptExecutor extends ScriptExecutor {
                                                                    if (n.indexChild_marksOptionalPart  >= 0 &&
                                                                        n.indexChild_marksOptionalPart < message.child.index)
                                                                      n.aaActivated_optional = true
+                                                                   n.aaActivated = true
                                                                    insertContinuation(message)
                                                                    //don't return; just put the continuations in place
                                                                  }
@@ -907,7 +920,7 @@ class CommonScriptExecutor extends ScriptExecutor {
        *  a  & . & b     => pause; after a happens b is activated as optional
        */
       case _ if n.indexChild_marksPause >= 0 && message.aaHappeneds!=Nil && message.aaHappeneds.exists(a=>a.child.index > n.indexChild_marksOptionalPart) => 
-                         if (doTrace) println(s"A: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+                           if (doTrace) traceAttributes(n, "A")
 
                            activateNextOrEnded = true
                            n.activationMode = ActivationMode.Active
@@ -918,8 +931,7 @@ class CommonScriptExecutor extends ScriptExecutor {
                            childNode = n.lastActivatedChild
 
       case _ if n.indexChild_marksOptionalPart >= 0 && message.aaHappeneds!=Nil && message.aaHappeneds.exists(a=>a.child.index > n.indexChild_marksOptionalPart) => 
-                         if (doTrace) println(s"B: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
-
+                           if (doTrace) traceAttributes(n, "B")
                            activateNextOrEnded = true
                            n.activationMode = ActivationMode.Active
                            n.resetNActivatedOptionalChildren
@@ -930,13 +942,17 @@ class CommonScriptExecutor extends ScriptExecutor {
                          
        case _  =>        val b = message.break
                          if (b==null) {
-                           if (doTrace) println(s"D: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
-                           activateNextOrEnded = true
-                           childNode = n.lastActivatedChild
+                           if (message.aaHappeneds != Nil || message.activation != null) {
+                             if (doTrace) traceAttributes(n, "C")
+                             activateNextOrEnded = true
+                             childNode = n.lastActivatedChild
+                           }
+                           else if (doTrace) traceAttributes(n, "D")
+
                          } 
                          else if (b.activationMode==ActivationMode.Optional) {
                            if (n.aaActivated_optional) { 
-                             if (doTrace) println(s"E: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+                             if (doTrace) traceAttributes(n, "E")
                              activateNextOrEnded = true
                              n.activationMode = ActivationMode.Active
                              n.resetNActivatedOptionalChildren
@@ -945,13 +961,15 @@ class CommonScriptExecutor extends ScriptExecutor {
                              n.aaActivated_optional         = false
                              childNode = n.lastActivatedChild
                            }
-                           else if (message.aaActivated != null){// TBD: wrong test; we should ask whether any AA had been activated in the part before "."
-                             if (doTrace) println(s"F: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+                           else if (message.aaActivated != null
+                                ||  n.indexChild_marksOptionalPart < 0 && n.aaActivated){ // TBD: possibly wrong test; 
+                                                          // we should ask whether any AA had been activated in the part before "."
+                             if (doTrace) traceAttributes(n, "F")
                              n.activationMode = ActivationMode.Optional // TBD: may possibly be dropped???; check n.indexChild_marksPause >= 0
                              n.indexChild_marksPause = b.child.index
                            }
                            else {
-                             if (doTrace) println(s"G: indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}  indexChild_marksPause=${n.indexChild_marksPause} ")
+                             if (doTrace) traceAttributes(n, "G")
                              activateNextOrEnded = true
                              n.activationMode = ActivationMode.Optional
                              n.resetNActivatedOptionalChildren
@@ -1036,11 +1054,11 @@ class CommonScriptExecutor extends ScriptExecutor {
       }
 	}
     if (doTrace) {
-      println(s"activationMode=${n.activationMode}\nactivateNextOrEnded=$activateNextOrEnded\nactivationEndedOptionally=$activationEndedOptionally\nn.hadFullBreak=${n.hadFullBreak}")
-      println(s"nActivatedMandatoryChildren=${n.nActivatedMandatoryChildren}\nnActivatedMandatoryChildrenWithSuccess=${n.nActivatedMandatoryChildrenWithSuccess}\nnActivatedMandatoryChildrenWithoutSuccess=${n.nActivatedMandatoryChildrenWithoutSuccess} ")
-      println(s"nActivatedOptionalChildren=${n.nActivatedOptionalChildren}\nnActivatedOptionalChildrenWithSuccess=${n.nActivatedOptionalChildrenWithSuccess}\nnActivatedOptionalChildrenWithoutSuccess=${n.nActivatedOptionalChildrenWithoutSuccess} ")
-      println(s"indexChild_marksOptionalPart=${n.indexChild_marksOptionalPart}\nindexChild_marksPause=${n.indexChild_marksPause} ")
-      println(s"aaActivated_optional=${n.aaActivated_optional} ")
+      traceAttributes(n, "Finally")
+      println(s"activateNext=$activateNext")
+      println(s"activationEnded=$activationEnded")
+      println(s"activationEndedOptionally=$activationEndedOptionally")
+      println(s"shouldSucceed=$shouldSucceed")
     }
     if (shouldSucceed) {
       insert(Success(n))   // TBD: prevent multiple successes at same "time"

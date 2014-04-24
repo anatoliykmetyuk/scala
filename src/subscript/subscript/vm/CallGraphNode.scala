@@ -327,6 +327,7 @@ case class N_n_ary_op           (template: T_n_ary_op      , isLeftMerge: Boolea
    */
   var indexChild_marksOptionalPart = -1
   var indexChild_marksPause = -1
+  var aaActivated = false
   var aaActivated_optional = false
 
   override def appendChild(c: CallGraphNodeTrait) = {

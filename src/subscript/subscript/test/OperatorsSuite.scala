@@ -25,6 +25,8 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  *    This is in particular useful after a failing test has occurred.
  *    One may call this "progression testing", as opposite of "regression testing"
  *  
+ * Command line option -v is for verbose output.
+ * 
  * *************************** 
  * High level methods
  * *************************** 
@@ -143,6 +145,8 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
 @Test
 class OperatorsSuite {
 
+  var doVerbose = false
+  
   /*
    * Behaviour operators characterized by their logic property
    * Logical-Or  means that (-) ("zero") is the neutral element
@@ -207,9 +211,19 @@ class OperatorsSuite {
     {
       return
     }
+
+	executor = new CommonScriptExecutor
+
     if (debug) {
       println(testInfo)
+      if (doVerbose) executor.doTrace = true
     }
+    else if (doVerbose) {
+      val afterInput = if(input=="") "" else s"after input: $input"
+      val failure = if(expectFailure) "Fails" else ""
+      println(f"test $currentTestIndex%3d:   $scriptString%-12s   $afterInput%-18s should expect: $expectedResult $failure")
+    }
+     
     
 	  acceptedAtoms         = ""
 	  inputStream           = scala.io.Source.fromString(input).toStream
@@ -223,8 +237,6 @@ class OperatorsSuite {
 	                              .sortWith(_<_).mkString
 
       assert("test specification - no atoms expected after failure (0)", !expectedResultFailure || expectedResultAtoms.isEmpty)
-
-	  executor = new CommonScriptExecutor
 
 	  val debugger = if (debug) new SimpleScriptDebugger else null
 	  
@@ -422,6 +434,9 @@ class OperatorsSuite {
    , [(a;b)/(+)]   -> "->1a a->1b ab"
    
    // optional break
+   , [ a / .     ]             -> "->a a"
+   , [ a / ..    ]             -> "->a a"
+   , [ a b / ..  ]             -> "->a a->ab ab aa->ab"
    , [ a / . / b ]             -> "->a a"
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
    , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
@@ -430,12 +445,12 @@ class OperatorsSuite {
    , [ . & a b ]               -> "->1a a->b  ab"
    , [ . | a b ]               -> "FAIL:->1a a->b  ab"
    , [ . / a b / . / c d ]     -> "FAIL:->1a a->bc ab ac->d acd"
-   , [ a b  | .  | (+) ]       -> "FAIL:->a a->1b ab"
-   , [ a b || . || (+) ]       -> "FAIL:->a FAIL:a"
+   , [ a b  | .  | (+) ]       -> "->a a->1b ab"
+   , [ a b || . || (+) ]       -> "->a a"
    , [ a b  & .  & (-) ]       -> "->a a->b FAIL:ab->0"
-   , [ a b && . && (-) ]       -> "->a      FAIL:a->0"
+   , [ a b && . && (-) ]       -> "->a a->0"
    , [ (a b+(+))  & .  & (-) ] -> "->1a     FAIL:a->b FAIL:ab->0"
-   , [ (a b+(+)) && . && (-) ] -> "FAIL:->1a FAIL:a->0"
+   , [ (a b+(+)) && . && (-) ] -> "->1a FAIL:a->0"
    
    // Threaded code fragments
    , [ a {**} .. ; b ]             -> "->a a->ab aa->ab ab aab"
@@ -479,7 +494,10 @@ class OperatorsSuite {
 
 object OperatorsSuiteApp extends OperatorsSuite {
   def main(args: Array[String]): Unit = {
-    if (args.length > 0) testIndexForDebugging = args(0).toInt
+    for (i <- 0 to args.length-1) {
+      if (args(i)=="-v") doVerbose = true
+      else testIndexForDebugging = args(i).toInt
+    }
     testBehaviours
     testFailingBehaviours
   }
