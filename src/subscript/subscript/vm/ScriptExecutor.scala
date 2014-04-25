@@ -53,7 +53,8 @@ object ScriptExecutorFactory {
 /*
  * Trait for Script executors
  */
-trait ScriptExecutor {
+trait ScriptExecutor extends MessagePriorities
+{
   
   def rootNode: N_launch_anchor
   
@@ -96,12 +97,25 @@ trait ScriptExecutor {
       //}
     }
   }
+  
+  /**
+   * Dequeue a call graph message.
+   * If minimalPriorityForAA > Int.MinValue 
+   *     the message should have priority  > PRIORITY.AAToBeExecuted
+   *                          or priority == PRIORITY.AAToBeExecuted (so the message is an AAToBeExecuted) 
+   *                           and then the node should have priority >= minimalPriorityForAA
+   */
   def dequeueCallGraphMessage(minimalPriorityForAA: Int): CallGraphMessage = {
     callGraphMessages.synchronized {
       if (callGraphMessages.isEmpty) return null
-      callGraphMessages.head match {
-        case aatbe@AAToBeExecuted(n: N_atomic_action) => if (n.priority < minimalPriorityForAA) return null
-        case _ =>
+      if (minimalPriorityForAA > Int.MinValue) {
+        val h = callGraphMessages.head
+        if (h.priority <= PRIORITY_AAToBeExecuted) {
+          h match {
+            case aatbe@AAToBeExecuted(n: N_atomic_action) if (n.priority >= minimalPriorityForAA) =>
+            case _ => return null
+          }
+        }
       }
       callGraphMessageCount -= 1
       val result = callGraphMessages.dequeue

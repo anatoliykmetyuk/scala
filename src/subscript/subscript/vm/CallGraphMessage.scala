@@ -32,25 +32,7 @@ import scala.collection.mutable._
   case object DurationalCodeFragmentStarted extends AAHappenedMode
   case object DurationalCodeFragmentEnded   extends AAHappenedMode
   
-  trait CallGraphMessage {
-  
-    type N <: CallGraphNodeTrait
-    
-    var index = -1
-	def node: N
-
-    def priority: Int     // TBD: determine good priority levels
-    def secondaryPriority = -node.index // oldest nodes first
-    def  tertiaryPriority = 0
-    
-	val className = getClass.getSimpleName
-    override def toString =    index+" "+className+" "+node
-    def toFormattedString = f"$index%3d $className%14s $node"
-  }
-
-  // various kinds of messages sent around in the script call graph
-  abstract class CallGraphMessageN extends CallGraphMessage {
-  
+  trait MessagePriorities {
     val PRIORITY_AAToBeReexecuted             =  0
     val PRIORITY_AAToBeExecuted               =  1
     val PRIORITY_CAActivatedTBD               =  2
@@ -69,8 +51,27 @@ import scala.collection.mutable._
     val PRIORITY_CAActivated                  = 15
     val PRIORITY_AAHappened                   = 17
     val PRIORITY_InvokeFromET                 = Int.MaxValue // TBD
-    
   }
+
+  trait CallGraphMessage {
+  
+    type N <: CallGraphNodeTrait
+    
+    var index = -1
+	def node: N
+
+    def priority: Int     // TBD: determine good priority levels
+    def secondaryPriority = -node.index // oldest nodes first
+    def  tertiaryPriority = 0
+    
+	val className = getClass.getSimpleName
+    override def toString =    index+" "+className+" "+node
+    def toFormattedString = f"$index%3d $className%14s $node"
+  }
+
+  // various kinds of messages sent around in the script call graph
+  abstract class CallGraphMessageN extends CallGraphMessage with MessagePriorities
+  
 	case class Activation   (node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Activation}
 	case class Continuation (node:  N_n_ary_op)        extends CallGraphMessageN {
 	  type N = N_n_ary_op; 
