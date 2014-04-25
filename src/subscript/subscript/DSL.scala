@@ -167,11 +167,11 @@ object DSL {
   def _interrupt_0_or_more(children: TemplateChildNode*) = _op("%/%/")(children:_*)
   
   
-  def _not               = _op1("!")_
-  def _not_react         = _op1("-")_
-  def _react             = _op1("~")_
-  def _launch            = _op1("*")_
-  def _launch_anchor     = _op1("**")_
+  def _not           = _op1("!")_
+  def _not_react     = _op1("-")_
+  def _react         = _op1("~")_
+  def _launch        = (child0  : TemplateChildNode ) => T_launch(child0)
+  def _launch_anchor = (child0  : TemplateChildNode ) => T_launch_anchor(child0)
 
   def _empty                                = T_epsilon            ()
   def _deadlock                             = T_delta              ()

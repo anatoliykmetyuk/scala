@@ -120,8 +120,8 @@ object TemplateNode {
         val s = children.map(hierarchyString(_, thisNode, isSpaceSeq)).mkString(if (isSpaceSeq) " " else thisNode.kindAsString)
         if (doParenthesize) "(" + s + ")" else s
       case T_1_ary_op(kind: String, _) =>   kind + hierarchyString(children.head, thisNode, false)
-      case T_launch          (_) => thisNode.kindAsString + hierarchyString(children.head, thisNode, false)
-      case T_launch_anchor   (_) => thisNode.kindAsString + hierarchyString(children.head, thisNode, false)
+      case T_launch          (_) => "(*"  + hierarchyString(children.head, thisNode, false) +  "*)"
+      case T_launch_anchor   (_) => "(**" + hierarchyString(children.head, thisNode, false) + "**)"
       case T_if            (_,_) => "if()["      + hierarchyString(children.head, thisNode, false) + "]"
       case T_if_else     (_,_,_) => "if()["      + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
       case T_then          (_,_) =>     "["      + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + "]"
