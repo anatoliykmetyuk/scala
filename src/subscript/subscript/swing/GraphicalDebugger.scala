@@ -64,7 +64,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
   }
 
   var messageBeingHandled = false
-  var currentMessage: CallGraphMessage[_ <: subscript.vm.CallGraphNodeTrait] = null
+  var currentMessage: CallGraphMessage = null
   
   def interestingContinuationInternals(c: Continuation): List[String] = {
      var ss: List[String] = Nil
@@ -252,9 +252,11 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         val vCenter  = boxTop  + BOX_H/2
 
         val r = new Rectangle(boxLeft, boxTop, boxWidth, BOX_H)
-        val n = if  (currentMessage==null||currentMessage.node==null) null 
-                else currentMessage.node.asInstanceOf[CallGraphNodeTrait]
-        
+        //val n = if  (currentMessage==null||currentMessage.node==null) null 
+        //        else currentMessage.node.asInstanceOf[CallGraphNodeTrait]    strange NPE's
+        val n1 = if  (currentMessage==null) null 
+                 else currentMessage.node
+        val n = n1.asInstanceOf[CallGraphNodeTrait]
         val nameFont = t match {
           case _:T_call => smallFont
           case _        => normalFont
@@ -582,7 +584,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
     }
     catch {case e: InterruptedException => }
   }
-  def logMessage_GUIThread(m: String, msg: CallGraphMessage[_ <: CallGraphNodeTrait]) {
+  def logMessage_GUIThread(m: String, msg: CallGraphMessage) {
     
       if (msg match {
         case Activation(_)       => checkBox_log_Activation  .selected
@@ -600,7 +602,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         javax.swing.SwingUtilities.invokeLater(runnable)
       }
   }
-  def logMessage(m: String, msg: CallGraphMessage[_]) {
+  def logMessage(m: String, msg: CallGraphMessage) {
     if (msgLogListModel.size > maxLogListMsgs)
       msgLogListModel.removeRange(0, logListMsgsCleanups)
     msgLogListModel.addElement(m + " " + msg)
@@ -650,15 +652,15 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
   def callGraphMessages = scriptExecutor.callGraphMessages
   def rootNode          = scriptExecutor.rootNode
   
-  def messageHandled(m: CallGraphMessage[_ <: subscript.vm.CallGraphNodeTrait]): Unit = {
+  def messageHandled(m: CallGraphMessage): Unit = {
     currentMessage = m
     messageBeingHandled(true) 
     awaitMessageBeingHandled(false)
     currentMessage = null
   }
-  def messageQueued      (m: CallGraphMessage[_ <: CallGraphNodeTrait]                 ) = logMessage_GUIThread("++", m)
-  def messageDequeued    (m: CallGraphMessage[_ <: CallGraphNodeTrait]                 ) = logMessage_GUIThread("--", m)
-  def messageContinuation(m: CallGraphMessage[_ <: CallGraphNodeTrait], c: Continuation) = logMessage_GUIThread("**", c)
+  def messageQueued      (m: CallGraphMessage                 ) = logMessage_GUIThread("++", m)
+  def messageDequeued    (m: CallGraphMessage                 ) = logMessage_GUIThread("--", m)
+  def messageContinuation(m: CallGraphMessage, c: Continuation) = logMessage_GUIThread("**", c)
   def messageAwaiting: Unit = {
     if (checkBox_log_Wait .selected) currentMessageTF.text = "Waiting..."
     if (checkBox_step_Wait.selected) callGraphPanel.repaint()

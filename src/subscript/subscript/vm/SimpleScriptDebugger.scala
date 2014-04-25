@@ -42,7 +42,7 @@ class SimpleScriptDebugger extends ScriptDebugger {
   var nSteps = 0
   var maxSteps = 0 // 0 means unlimited
   val highTraceLevel = 10
-  var traceLevel = 2 // 0-no tracing; 1-message handling; 2-message insertion+handling; highTraceLevel-every step a tree 
+  var traceLevel = highTraceLevel //2 // 0-no tracing; 1-message handling; 2-message insertion+handling; highTraceLevel-every step a tree 
   def trace(level:Int,as: Any*) = {
     if (traceLevel>=level) {
       as.foreach {a=>print(a.toString)}; 
@@ -83,7 +83,7 @@ class SimpleScriptDebugger extends ScriptDebugger {
   }
   
   
-  def messageHandled(m: CallGraphMessage[_ <: subscript.vm.CallGraphNodeTrait]): Unit = {
+  def messageHandled(m: CallGraphMessage): Unit = {
         trace(1,">> ",m)
         m match {
           case AAToBeExecuted(_) =>
@@ -92,8 +92,8 @@ class SimpleScriptDebugger extends ScriptDebugger {
           case _ =>  
         }
   }
-  def messageQueued      (m: CallGraphMessage[_ <: subscript.vm.CallGraphNodeTrait]                 ) = trace(2, "++ ", m)
-  def messageDequeued    (m: CallGraphMessage[_ <: subscript.vm.CallGraphNodeTrait]                ) = trace(2, "-- ", m)
-  def messageContinuation(m: CallGraphMessage[_ <: subscript.vm.CallGraphNodeTrait], c: Continuation) = trace(2, "** ", c)
+  def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m)
+  def messageDequeued    (m: CallGraphMessage                ) = trace(2, "-- ", m)
+  def messageContinuation(m: CallGraphMessage, c: Continuation) = trace(2, "** ", c)
   def messageAwaiting: Unit = {traceTree; traceMessages}
 }

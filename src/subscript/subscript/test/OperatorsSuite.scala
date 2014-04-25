@@ -465,6 +465,15 @@ class OperatorsSuite {
    , [ (**{here.launch([ a b ])}**) c]    -> "->a a->b abc"
    , [ (**{here.launch([ a b ])} c**) d]  -> "->ac a->bc  c->a ab->c ac->b ca->b abc->d acb->d cab->d abcd acbd cabd"
    
+   // failure
+   , [ {?here.fail?} ]        -> "->0"
+   
+   // priorities
+   , [      @{there.priority=  1}:{} + {}(-)] -> "->1"
+   , [ {} + @{there.priority=  1}:     {}(-)] -> "->0"
+   , [      @{there.priority= -1}:{} + {}(-)] -> "->0"
+   , [ {} + @{there.priority= -1}:     {}(-)] -> "->1"
+   
    // Various
    , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
 
