@@ -46,7 +46,7 @@ object UnsureExecutionResult extends Enumeration {
 
 object LoopingExecutionResult extends Enumeration {
   type LoopingExecutionResultType = Value
-  val Success, Failure, Break, OptionalBreak = Value
+  val Success, Failure, Ignore, Break, OptionalBreak = Value
 }
 
 object OnActivate
@@ -252,6 +252,8 @@ case class N_code_unsure     (template: T_code_unsure  ) extends N_atomic_action
     _result = value
     setSuccess(value==UnsureExecutionResult.Success)
   }
+  def fail   = result = UnsureExecutionResult.Failure
+  def ignore = result = UnsureExecutionResult.Ignore
 }
 case class N_code_eventhandling         (template: T_code_eventhandling     ) extends N_atomic_action {type T = T_code_eventhandling     ; def doCode = template.code.apply.apply(this)}
 case class N_code_eventhandling_loop    (template: T_code_eventhandling_loop) extends N_atomic_action {type T = T_code_eventhandling_loop; def doCode = template.code.apply.apply(this)
@@ -261,6 +263,10 @@ case class N_code_eventhandling_loop    (template: T_code_eventhandling_loop) ex
     _result = value
     setSuccess(value==LoopingExecutionResult.Success || value==LoopingExecutionResult.Break || value==LoopingExecutionResult.OptionalBreak)
   }
+  def fail           = result = LoopingExecutionResult.Failure
+  def ignore         = result = LoopingExecutionResult.Ignore
+  def break          = result = LoopingExecutionResult.Break
+  def break_optional = result = LoopingExecutionResult.OptionalBreak
 }
 case class N_localvar[V](template: T_localvar[V]) extends CallGraphLeafNode with DoCodeHolder[V] {
   type T = T_localvar[V]
