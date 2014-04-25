@@ -236,7 +236,8 @@ trait CallGraphNonTreeParentNode extends CallGraphNonTreeNode with CallGraphPare
 abstract class N_atomic_action  extends CallGraphLeafNode with DoCodeHolder[Unit] {
   type T <: T_atomic_action
   override def asynchronousAllowed: Boolean = true
-  var msgAAToBeExecuted: CallGraphMessage[CallGraphNodeTrait] = null
+  var msgAAToBeExecuted: CallGraphMessage = null
+  var priority = 0 // < 0 is low, > 0 is high
 }
 
 // The case classes for the bottom node types
@@ -459,8 +460,12 @@ object CallGraphNode {
   
   // find the lowest launch_anchor common ancestor of a node
   //
-  def getLowestLaunchAnchorAncestor(n: CallGraphNodeTrait) = 
-      getLowestSingleCommonAncestor(n, _.isInstanceOf[N_launch_anchor] )
+  def getLowestLaunchAnchorAncestor(n: CallGraphNodeTrait): N_launch_anchor = 
+    n match {
+      case nla@N_launch_anchor(_) => nla
+      case _ => getLowestSingleCommonAncestor(n, _.isInstanceOf[N_launch_anchor] ).asInstanceOf[N_launch_anchor]
+  }
+      
       
   // find the lowest single common ancestor of a node, that fulfills a given condition:
   // easy when there is 0 or 1 parents

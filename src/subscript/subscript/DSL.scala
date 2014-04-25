@@ -72,7 +72,7 @@ object DSL {
   }
   def _execute(_script: Script[Unit], debugger: ScriptDebugger, executor: ScriptExecutor): ScriptExecutor = {
     if (debugger!=null) debugger.attach(executor)
-    _script(executor.anchorNode)
+    executor.initializeExecution(_script)
     executor.run
   }
 
