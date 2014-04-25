@@ -61,7 +61,7 @@ trait ScriptExecutor extends MessagePriorities
   //val anchorNode: N_call
   def hasSuccess: Boolean
   def initializeExecution(s: CallGraphNode._scriptType[_])
-  def run: ScriptExecutor
+  def run(s: CallGraphNode._scriptType[_]): ScriptExecutor
   def insert(sga: CallGraphMessage)
   
   /*
@@ -1171,7 +1171,8 @@ class CommonScriptExecutor extends ScriptExecutor {
    * TBD: check for deadlock situations in case of unmatching communications.
    * The condition for the synchronized wait should be tightened 
    */
-  def run: ScriptExecutor = {
+  def run(s: CallGraphNode._scriptType[_]): ScriptExecutor = {
+    initializeExecution(s)
     while (hasActiveProcesses) { // main execution loop
       if (tryHandleMessage(Int.MinValue)==null) awaitMessages
     }

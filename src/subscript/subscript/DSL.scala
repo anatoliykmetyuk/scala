@@ -72,8 +72,7 @@ object DSL {
   }
   def _execute(_script: Script[Unit], debugger: ScriptDebugger, executor: ScriptExecutor): ScriptExecutor = {
     if (debugger!=null) debugger.attach(executor)
-    executor.initializeExecution(_script)
-    executor.run
+    executor.run(_script)
   }
 
   implicit // these code fragment variations require the "here" parameter explicitly
