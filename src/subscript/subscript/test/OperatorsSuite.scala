@@ -83,10 +83,7 @@ import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, Unsur
  * Low level implementation 
  * *************************** 
  * 
- * main and JUnit will each call both testBehaviours() and testFailingBehaviours() 
- * 
- * These two call testBehaviours(testExpectedFailures: Boolean)
- * which in turn calls testScriptBehaviours 
+ * main and JUnit will each call testBehaviours which in turn calls for each lambda script testScriptBehaviours 
  * 
  * testScriptBehaviours creates a script structure for the vm, and interprets the specified behaviours 
  * - a referred behaviour "=expr" results in a recursive call to testScriptBehaviours
@@ -167,7 +164,7 @@ class OperatorsSuite {
   /*
    * Low level stuff
    */
-  def testScriptBehaviours(scriptDef: Script[Unit], scriptString: String, behaviours: String, testExpectedFailures: Boolean) {
+  def testScriptBehaviours(scriptDef: Script[Unit], scriptString: String, behaviours: String) {
     
     import scala.util.matching.Regex
     val pattern = new Regex(" +") // replace all multispaces by a single space, just before splitting behaviours:
@@ -176,11 +173,8 @@ class OperatorsSuite {
       var input          = inputAndResult(0)
       val hasFAILmarker  = input.startsWith(FAILmarker)
       if (hasFAILmarker)   input = input.substring(FAILmarker.length)
-      if (hasFAILmarker == testExpectedFailures)
-      {
-        val expectedResult = if (inputAndResult.length>1) inputAndResult(1) else "1"
-        testScriptBehaviour(scriptDef, scriptString, input, expectedResult, expectTestFailure=testExpectedFailures)
-      }
+      val expectedResult = if (inputAndResult.length>1) inputAndResult(1) else "1"
+      testScriptBehaviour(scriptDef, scriptString, input, expectedResult, expectTestFailure = hasFAILmarker)
     }
   }
 
@@ -196,57 +190,56 @@ class OperatorsSuite {
   def testScriptBehaviour(scriptDef: Script[Unit], scriptString: String, input: String, expectedResult: String, expectTestFailure: Boolean) {
     
     currentTestIndex += 1
-    var hadTestFailure = false
     
     lazy val afterInput    = if(input=="") "" else s"after input: $input"
-    lazy val failureString = if(expectTestFailure) " - Fails" else ""
-    lazy val testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult$failureString"
+    lazy val failureString = if(expectTestFailure) "Fails as marked" else "Fails"
+    lazy val testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult%4s"
 
-    def assert(s: String, cond: Boolean) {
-      if (!cond         ) hadTestFailure = true
-      if (!expectTestFailure) Assert.assertTrue(s"$testInfo Error: $s", cond)
-    }
-    
     if (testIndexForDebugging > 0 && 
         testIndexForDebugging != currentTestIndex) return
  
-	executor = new CommonScriptExecutor
+	val expectedResultFailure = expectedResult(0)=='0'
+	val expectedResultSuccess = expectedResult(0)=='1'
+	val expectedResultAtoms   = (if (expectedResultSuccess||expectedResultFailure) expectedResult.drop(1) else expectedResult)
+	                            .sortWith(_<_).mkString
 
-    if (doVerbose || debug) println(testInfo)
-    if (doVerbose && debug) executor.doTrace = true
-    
-	  acceptedAtoms         = ""
-	  inputStream           = scala.io.Source.fromString(input).toStream
-	  expectedAtoms         = Nil
-	  expectedAtomsAtEndOfInput = None
-	  scriptSuccessAtEndOfInput = None
-	   
-	  val expectedResultFailure = expectedResult(0)=='0'
-	  val expectedResultSuccess = expectedResult(0)=='1'
-	  val expectedResultAtoms   = (if (expectedResultSuccess||expectedResultFailure) expectedResult.drop(1) else expectedResult)
-	                              .sortWith(_<_).mkString
-
-      assert("test specification - no atoms expected after failure (0)", !expectedResultFailure || expectedResultAtoms.isEmpty)
-
-	  val debugger = if (debug) new SimpleScriptDebugger else null
-	  
+	if (expectedResultFailure && !expectedResultAtoms.isEmpty)                              
+       println(s"$testInfo -  Error in test specification: no atoms should be expected in combination with 0") // very unlikely to occur
+    else {
+      if (debug) println(testInfo)
+        
+      acceptedAtoms         = ""
+      inputStream           = scala.io.Source.fromString(input).toStream
+      expectedAtoms         = Nil
+      expectedAtomsAtEndOfInput = None
+      scriptSuccessAtEndOfInput = None
+      
+      executor     = new CommonScriptExecutor
+      val debugger = if (debug) new SimpleScriptDebugger else null
+      if (doVerbose && debug) {executor.doTrace = true; debugger.traceLevel = 3}
+      
       _execute(scriptDef, debugger, executor)
       
       val executionSuccess = scriptSuccessAtEndOfInput.getOrElse(executor.hasSuccess)
+      val expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
       
-      if (expectedResultSuccess) 
-           assert(s"script execution has unexpectedly no success after input '${acceptedAtoms}'",executionSuccess)
-      else assert(s"script execution has unexpected success after input '${acceptedAtoms}'"   , !executionSuccess)
-
-      val    expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
-      
-      assert(s"expected atoms='${expectedAtomsAtEndOfInputString}'", expectedAtomsAtEndOfInputString==expectedResultAtoms) 
-      assert(s"accepted atoms='${acceptedAtoms}'", acceptedAtoms==input) 
-    
-      if (expectTestFailure) {
-         if (!hadTestFailure) 
-           println(s"$testInfo This test had been marked as 'FAIL:' but it is passed anyway. Please remove the mark.")
+      var hadTestFailure = false
+      if (executionSuccess                != expectedResultSuccess
+      ||  expectedAtomsAtEndOfInputString != expectedResultAtoms
+      ||  acceptedAtoms != input) 
+      {
+         hadTestFailure = true
+         if (!expectTestFailure||doVerbose||debug) {
+           val expectedItemsStr = " expects: "+(if(executionSuccess) "1" else "")+expectedAtomsAtEndOfInputString
+           val acceptedInputStr = if (acceptedAtoms == input) "" else s" accepted input: $acceptedAtoms"
+           println(s"$testInfo - $failureString;$acceptedInputStr$expectedItemsStr")
+         }
+      }    
+      if (!hadTestFailure) {
+         if (expectTestFailure)       println(s"$testInfo - Ok although marked as 'FAIL:'. Please remove the mark")
+         else if (doVerbose || debug) println(s"$testInfo - Ok")
       }
+    }
   }
 
   // utility method: remove 1 occurrence of elt from list; see http://stackoverflow.com/a/5640727
@@ -442,7 +435,7 @@ class OperatorsSuite {
    , [ (a b+(+))  & .  & (-) ] -> "->1a     FAIL:a->b FAIL:ab->0"
    , [ (a b+(+)) && . && (-) ] -> "->1a FAIL:a->0"
    
-   // Threaded code fragments
+   // Threaded code fragments. TBD: check whether the test mechanism can handle this; maybe not
    , [ a {**} .. ; b ]         -> "->a a->ab aa->ab ab aab"
 
    // launching
@@ -481,24 +474,17 @@ class OperatorsSuite {
 
   val scriptBehaviourMap = scriptBehaviourList.toMap
 
-  // There are two test methods: 
-  // - the first tests behaviours that are expected to be properly implemented
-  // - the second tests behaviours, marked with FAIL:, that have been known to fail. 
+  // Tests behaviours  marked with FAIL: have been known to fail. 
   //   if such a behaviour unexpectedly passes the test then this results in a JUnit failure.
   //   That should be a trigger to regard the issue underlying to the FAIL: marking to be resolved.
   //   So then the FAIL: marking should be removed and JUnit will be able to proceed further.
   @Test
-  def testBehaviours: Unit = testBehaviours(testExpectedFailures=false)
-  
-  @Test
-  def testFailingBehaviours: Unit = testBehaviours(testExpectedFailures=true)
-
-  def testBehaviours(testExpectedFailures: Boolean): Unit = {
+  def testBehaviours: Unit = {
     val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
     for ( (key, behaviours) <- behaviours) {
       val aScript = key.asInstanceOf[Script[Unit]]
       val bodyString = toScriptBodyString(aScript)
-      testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String], testExpectedFailures)
+      testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
     }
   }
   
@@ -518,6 +504,5 @@ object OperatorsSuiteApp extends OperatorsSuite {
       else testIndexForDebugging = args(i).toInt
     }
     testBehaviours
-    testFailingBehaviours
   }
 }
