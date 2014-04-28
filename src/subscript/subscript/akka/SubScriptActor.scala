@@ -5,8 +5,11 @@ import scala.collection.mutable.ListBuffer
 import subscript.vm._
 import akka.actor._
 
-trait SubScriptActor extends Actor {
 
+trait SubScriptActor extends Actor {
+  
+  val runner: SubScriptActorRunner = SSARunnerV1Scheduler
+  
   private object Terminator {
     def block = synchronized(wait())
     def release = synchronized(notify())
@@ -26,7 +29,7 @@ trait SubScriptActor extends Actor {
   // Callbacks
   override def aroundPreStart() {
     def script lifecycle = (live || terminate) ; die
-    SubScriptActor.executeScript(_lifecycle())
+    runner.launch([lifecycle])
     super.aroundPreStart()
   } 
   
@@ -56,9 +59,7 @@ trait SubScriptActor extends Actor {
     super.aroundPostStop()
   }
   
-  final def receive: Actor.Receive = {case _ =>}
- 
-  
+  final def receive: Actor.Receive = {case _ =>} 
   
   // SubScript actor convenience methods
   def initActor(node: N_code_eventhandling, _handler: PartialFunction[Any, Unit]) {
@@ -71,51 +72,13 @@ trait SubScriptActor extends Actor {
   }
     
   def sendSynchronizationMessage(lock: AnyRef) {
-    val vm = SubScriptActor.vm
+    val vm = runner.executor
     vm insert SynchronizationMessage(vm.rootNode, lock)    
   }
 
 }
 
-
-object SubScriptActor {
-  
-  private lazy val vm: CommonScriptExecutor = {
-    val _vm = ScriptExecutorFactory.createScriptExecutor(true);
-    
-    _parallelScript()(_vm.anchorNode)
-    _vm addHandler synchMsgHandler
-    
-    new Thread {override def run = {_vm.run}}.start()
-    while (parallelOp == null) wait()
-    
-    _vm
-  }
-  private var parallelOp: CallGraphParentNodeTrait = null
-  
-  private object Stopper {
-    def block   = synchronized(wait())
-    def release = synchronized(notify())
-  }
-  private def script parallelScript = {*Stopper.block*} & {captureParallelOp(here)}
-  private def captureParallelOp(here: CallGraphTreeNode) = synchronized {
-    parallelOp = here.parent.asInstanceOf[CallGraphParentNodeTrait]
-    notify()
-  }
-  
-  val synchMsgHandler: PartialFunction[CallGraphMessage[_ <: CallGraphNodeTrait], Unit] = {
-    case SynchronizationMessage(_, lock) => lock.synchronized(lock.notify())
-  }
-    
-  def executeScript(script: Script[Unit]) = synchronized {
-    val template = getScriptTemplate(script)
-    vm.invokeFromET { vm.activateFrom(parallelOp, template) }
-  }
-  
-  def releaseVm() = Stopper.release
-  
-}
-
-case class SynchronizationMessage(node: CallGraphNodeTrait, lock: AnyRef) extends CallGraphMessage {
-  override def priority = -1
+case class SynchronizationMessage(node: CallGraphNodeTrait, lock: AnyRef) extends CallGraphMessageN {
+  type N = CallGraphNodeTrait
+  override def priority = PRIORITY_InvokeFromET - 1  // After all actors are launched
 }

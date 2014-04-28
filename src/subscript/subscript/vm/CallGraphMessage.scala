@@ -50,7 +50,7 @@ import scala.collection.mutable._
     val PRIORITY_AAActivated                  = 14
     val PRIORITY_CAActivated                  = 15
     val PRIORITY_AAHappened                   = 17
-    val PRIORITY_InvokeFromET                 = Int.MinValue + 1000 // TBD; beware overflow
+    val PRIORITY_InvokeFromET                 = Int.MinValue + 1000 // TBD; beware overflow; must be lower than vast majority of priorities 
   }
 
   trait CallGraphMessage {
