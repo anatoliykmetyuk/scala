@@ -116,6 +116,6 @@ object SubScriptActor {
   
 }
 
-case class SynchronizationMessage(node: CallGraphNodeTrait, lock: AnyRef) extends CallGraphMessage[CallGraphNodeTrait] {
-  priority = -1
+case class SynchronizationMessage(node: CallGraphNodeTrait, lock: AnyRef) extends CallGraphMessage {
+  override def priority = -1
 }

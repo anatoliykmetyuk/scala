@@ -608,7 +608,12 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
     msgLogListModel.addElement(m + " " + msg)
     msgLogListViewScrollPane.verticalScrollBar.value = msgLogListViewScrollPane.verticalScrollBar.maximum
     msgQueueListModel.clear
-    callGraphMessages.foreach(msgQueueListModel.addElement(_)) 
+    
+    // Sorting the list of scriptExecutor messages
+    // before rendering
+    val ord = scriptExecutor.CallGraphMessageOrdering
+    val orderedMessages = callGraphMessages.toList.sorted(ord).reverse
+    orderedMessages.foreach(msgQueueListModel.addElement(_)) 
   }
   def updateDisplay = {
     var s = currentMessage.toString
