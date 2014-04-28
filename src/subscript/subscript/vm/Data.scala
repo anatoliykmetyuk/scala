@@ -93,13 +93,8 @@ case class CommunicationParameter[T<:Any](n: Symbol) extends FormalParameter[T] 
 
 trait ActualParameterTrait[T<:Any] extends FormalParameter[T] {
   def originalValue: T
-  def value: T
   def transfer {}  
   def matches      : Boolean = matches(value)
-  def isInput      : Boolean  
-  def isOutput     : Boolean  
-  def isForcing    : Boolean
-  def isConstrained: Boolean
 }
 abstract class ActualParameter[T<:Any] extends ActualParameterTrait[T] {
   var value=originalValue
