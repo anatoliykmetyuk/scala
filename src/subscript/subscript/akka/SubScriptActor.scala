@@ -20,10 +20,11 @@ trait SubScriptActor extends Actor {
   
   
   // Scripts
-  def _live(): N_call => Unit
+  def _live(): Script[Unit]
   private def script terminate = {*Terminator.block*}
   private def script die       = {if (context ne null) context stop self}
   
+  def script r$(handler: Actor.Receive) = @{initActor(there, handler)}: {. .}
   
   
   // Callbacks
@@ -41,8 +42,8 @@ trait SubScriptActor extends Actor {
     
     var messageWasHandled = false
     callHandlers.synchronized {
-      for (h <- callHandlers if h isDefinedAt msg) {
-        h(msg)
+      for (h <- callHandlers if !messageWasHandled && (h isDefinedAt msg)) {
+        h(msg)  // TBD: check for success
         messageWasHandled = true
       }
     }

@@ -268,7 +268,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         val isCurrentTemplate = currentMessage            != null    && 
                                 n                         != null    && 
                                 n.template                != null    && 
-                                n.template.root.name      == t.root.name      && 
+                                ( n.template.root == null   && t.root == null
+                                ||n.template.root.name      == t.root.name   ) && 
                                 n.template.owner          != null             &&
                                 n.template.owner.getClass == t.owner.getClass && 
                                 n.template.indexInScript  == t.indexInScript

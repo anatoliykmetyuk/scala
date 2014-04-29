@@ -1538,7 +1538,8 @@ self =>
     val any_TypeName  = newTypeName("Any")
 
     def vmNodeOf (tree: Tree): Tree   = tree match { // for @ nodes; these need to know the node type of their operand; very messy...
-      case (Apply(fun, Function(List(ValDef(_,_, nodeType,_)),block)::_)) => nodeType
+      case Apply(fun, Function(List(ValDef(_,_, nodeType,_)),block)::_) => nodeType
+      case Apply(Select(_, fun_name), _) => vmNodeFor(LPAREN_ASTERISK2) // brutally assuming that fun_name is _launch_anchor
       case _ => Ident(any_TypeName)
     }
       

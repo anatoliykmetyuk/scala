@@ -38,7 +38,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
   def script..
      // make a local anchor for launched actor processes, 
      // so that we will be able to kill those here using the || and / operators
-     live = @{launch_anchor=there.asInstanceOf[N_launch_anchor]}: (** {. .} **)
+     live = @{launch_anchor=there}: (** {. .} **)
 
   def execute(debugger: ScriptDebugger) {
     if (debugger!=null) debugger.attach(executor)

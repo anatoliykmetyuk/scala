@@ -175,13 +175,8 @@ trait TemplateRootNode extends TemplateNode {
   setIndexes(0, 0)
 }
 trait TemplateChildNode extends TemplateNode {
-  def root  = {
-    if (parent==null) {
-      println(this)
-    }
-    parent.root
-  }
-  def owner = parent.owner
+  def root  = if (parent==null) null else parent.root
+  def owner = if (parent==null) null else parent.owner
   var parent: TemplateNode = null
 }
 trait TemplateNode_0_Trait extends TemplateNode         {                               override val children: Seq[TemplateChildNode] = Nil}
@@ -219,7 +214,7 @@ case class T_loop()                 extends T_0_ary                             
 case class T_if            (code: () => N_if      => Boolean, child0: TemplateChildNode)                            extends T_1_ary with TemplateCodeHolder[N_if     , Boolean] {type N = N_if                 }
 case class T_if_else       (code: () => N_if_else => Boolean, child0: TemplateChildNode, child1: TemplateChildNode) extends T_1_ary with TemplateCodeHolder[N_if_else, Boolean] {type N = N_if_else            }
 case class T_launch        (child0: TemplateChildNode)                                                              extends T_1_ary                            {type N = N_launch             }
-case class T_launch_anchor (child0: TemplateChildNode)                       extends T_1_ary {type N = N_launch_anchor; override def root=this;}
+case class T_launch_anchor (child0: TemplateChildNode)                       extends T_1_ary {type N = N_launch_anchor}
 case class T_then     (child0: TemplateChildNode, child1: TemplateChildNode) extends T_1_ary {type N = N_then     }
 case class T_then_else(child0: TemplateChildNode, child1: TemplateChildNode,
                                                   child2: TemplateChildNode) extends T_1_ary {type N = N_then_else}
