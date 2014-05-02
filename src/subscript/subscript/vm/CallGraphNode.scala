@@ -244,7 +244,7 @@ abstract class N_atomic_action  extends CallGraphLeafNode with DoCodeHolder[Unit
 
 case class N_code_normal     (template: T_code_normal  ) extends N_atomic_action {type T = T_code_normal  ; def doCode = template.code.apply.apply(this)}
 case class N_code_tiny       (template: T_code_tiny    ) extends N_atomic_action {type T = T_code_tiny    ; def doCode = template.code.apply.apply(this)}
-case class N_code_threaded   (template: T_code_threaded) extends N_atomic_action {type T = T_code_threaded; def doCode = template.code.apply.apply(this)}
+case class N_code_threaded   (template: T_code_threaded) extends N_atomic_action {type T = T_code_threaded; def doCode = try template.code.apply.apply(this) catch {case _: InterruptedException =>}}  // Don't pollute the output
 case class N_code_unsure     (template: T_code_unsure  ) extends N_atomic_action {type T = T_code_unsure  ; def doCode = template.code.apply.apply(this)
   private var _result = UnsureExecutionResult.Success; // TBD: clean this all up; hasSuccess+result is too much
   def result = _result
