@@ -10,9 +10,11 @@ trait SubScriptActor extends Actor {
   
   val runner: SubScriptActorRunner = SSARunnerV1Scheduler
   
-  private object Terminator {
-    def block = synchronized(wait())
-    def release = synchronized(notify())
+  private object Terminator { // TBD: find better name; something with Blocker
+    var executor: EventHandlingCodeFragmentExecutor[N_atomic_action] = null
+    
+    def script block = @{executor = new EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)}: {. .}
+    def release = executor.executeMatching(isMatching=true)
   }
   
   private val callHandlers = ListBuffer[PartialFunction[Any, Unit]]()
@@ -21,10 +23,10 @@ trait SubScriptActor extends Actor {
   
   // Scripts
   def _live(): Script[Unit]
-  private def script terminate = {*Terminator.block*}
+  private def script terminate = Terminator.block
   private def script die       = {if (context ne null) context stop self}
   
-  def script r$(handler: Actor.Receive) = @{initActor(there, handler)}: {. .}
+  def script r$(handler: Actor.Receive) = @{initForReceive(there, handler)}: {. .}
   
   
   // Callbacks
@@ -63,7 +65,7 @@ trait SubScriptActor extends Actor {
   final def receive: Actor.Receive = {case _ =>} 
   
   // SubScript actor convenience methods
-  def initActor(node: N_code_eventhandling, _handler: PartialFunction[Any, Unit]) {
+  def initForReceive(node: N_code_eventhandling, _handler: PartialFunction[Any, Unit]) {
     node.codeExecutor = EventHandlingCodeFragmentExecutor(node, node.scriptExecutor)
     val handler = _handler andThen {_ => node.codeExecutor.executeAA}
     synchronized {callHandlers += handler}
