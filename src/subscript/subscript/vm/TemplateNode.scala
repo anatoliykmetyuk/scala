@@ -202,22 +202,26 @@ case class T_code_eventhandling     (code: () => N_code_eventhandling      => Un
 case class T_code_eventhandling_loop(code: () => N_code_eventhandling_loop => Unit) extends T_atomic_action with TemplateCodeHolder[N_code_eventhandling_loop, Unit] {type N = N_code_eventhandling_loop}
 
 case class T_localvar[V](isVal: Boolean, isLoop: Boolean, localVariable: LocalVariable[V], code: () => N_localvar[V] => V) extends T_0_ary with TemplateCodeHolder[N_localvar[V],V] { type N = N_localvar[V]}
-case class T_privatevar(name: Symbol) extends T_0_ary                    {type N = N_privatevar         }
-case class T_while(code: () => N_while => Boolean) extends T_0_ary with TemplateCodeHolder[N_while, Boolean] {type N = N_while              }
-case class T_break     ()           extends T_0_ary                                  {type N = N_break              }
-case class T_optional_break()       extends T_0_ary                                  {type N = N_optional_break     }
-case class T_optional_break_loop()  extends T_0_ary                                  {type N = N_optional_break_loop}
-case class T_delta()                extends T_0_ary                                  {type N = N_delta              }
-case class T_epsilon()              extends T_0_ary                                  {type N = N_epsilon            }
-case class T_nu()                   extends T_0_ary                                  {type N = N_nu                 }
-case class T_loop()                 extends T_0_ary                                  {type N = N_loop               }
-case class T_if            (code: () => N_if      => Boolean, child0: TemplateChildNode)                            extends T_1_ary with TemplateCodeHolder[N_if     , Boolean] {type N = N_if                 }
-case class T_if_else       (code: () => N_if_else => Boolean, child0: TemplateChildNode, child1: TemplateChildNode) extends T_1_ary with TemplateCodeHolder[N_if_else, Boolean] {type N = N_if_else            }
-case class T_launch        (child0: TemplateChildNode)                                                              extends T_1_ary                            {type N = N_launch             }
-case class T_launch_anchor (child0: TemplateChildNode)                       extends T_1_ary {type N = N_launch_anchor}
-case class T_then     (child0: TemplateChildNode, child1: TemplateChildNode) extends T_1_ary {type N = N_then     }
-case class T_then_else(child0: TemplateChildNode, child1: TemplateChildNode,
-                                                  child2: TemplateChildNode) extends T_1_ary {type N = N_then_else}
+case class T_privatevar(name: Symbol)                  extends T_0_ary {type N = N_privatevar         }
+case class T_break              ()                     extends T_0_ary {type N = N_break              }
+case class T_optional_break     ()                     extends T_0_ary {type N = N_optional_break     }
+case class T_optional_break_loop()                     extends T_0_ary {type N = N_optional_break_loop}
+case class T_delta              ()                     extends T_0_ary {type N = N_delta              }
+case class T_epsilon            ()                     extends T_0_ary {type N = N_epsilon            }
+case class T_nu                 ()                     extends T_0_ary {type N = N_nu                 }
+case class T_loop               ()                     extends T_0_ary {type N = N_loop               }
+case class T_launch        (child0: TemplateChildNode) extends T_1_ary {type N = N_launch             }
+case class T_launch_anchor (child0: TemplateChildNode) extends T_1_ary {type N = N_launch_anchor      }
+
+case class T_while         (code: () => N_while   => Boolean)                            extends T_0_ary with TemplateCodeHolder[N_while  , Boolean] {type N = N_while  }
+case class T_if            (code: () => N_if      => Boolean, child0: TemplateChildNode) extends T_1_ary with TemplateCodeHolder[N_if     , Boolean] {type N = N_if     }
+case class T_if_else       (code: () => N_if_else => Boolean, child0: TemplateChildNode, 
+                                                              child1: TemplateChildNode) extends T_1_ary with TemplateCodeHolder[N_if_else, Boolean] {type N = N_if_else}
+case class T_then                                            (child0: TemplateChildNode, 
+                                                              child1: TemplateChildNode) extends T_1_ary                                             {type N = N_then     }
+case class T_then_else                                       (child0: TemplateChildNode, 
+                                                              child1: TemplateChildNode,
+                                                              child2: TemplateChildNode) extends T_1_ary                                             {type N = N_then_else}
 
 //case class T_0_ary_op(kind: String                                           ) extends T_0_ary  {type N = N_0_ary_op}
 case class T_1_ary_op(kind: String,                child0: TemplateChildNode ) extends T_1_ary {type N = N_1_ary_op; override def kindAsString=kind}
