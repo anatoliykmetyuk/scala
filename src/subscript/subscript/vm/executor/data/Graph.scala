@@ -70,7 +70,13 @@ class Graph(val executor: ScriptExecutor) {
   val rootNode       =     N_launch_anchor(rootTemplate)
   val anchorNode     =     N_call(anchorTemplate)
  
-  connect(parentNode = rootNode, childNode = anchorNode)
+  /**
+   * Must be called before this graph is used.
+   */
+  def init() {
+    rootNode.scriptExecutor = executor
+    connect(parentNode = rootNode, childNode = anchorNode)
+  }
   
   private var nNodes = 0
   def nextNodeIndex = {nNodes = nNodes+1; nNodes}

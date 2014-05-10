@@ -47,7 +47,7 @@ trait SafeMutableState {
   
 }
 
-trait SafeCollection[+A] extends SafeMutableState {self =>
+trait SafeCollection[A] extends SafeMutableState {self =>
   private case class Insert(e: A) extends Operation {def commit() = self insert e}
   private case class Remove(e: A) extends Operation {def commit() = self remove e}
   

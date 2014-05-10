@@ -25,6 +25,9 @@
 */
 
 package subscript.vm
+
+import subscript.vm.executor._
+
 import scala.collection.mutable._
 
   abstract class AAHappenedMode

@@ -26,6 +26,8 @@
 
 package subscript.vm
 
+import subscript.vm.executor._
+
 import scala.collection.mutable._
 
 /*
@@ -82,7 +84,7 @@ trait CallGraphNodeTrait {
   var _scriptExecutor: ScriptExecutor = null
   def scriptExecutor = _scriptExecutor
   def scriptExecutor_=(s: ScriptExecutor) = {
-    index = s.nextNodeIndex()
+    index = s.graph.nextNodeIndex
     _scriptExecutor = s
   }
   

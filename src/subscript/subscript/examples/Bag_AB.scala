@@ -8,6 +8,7 @@ import subscript._
 import subscript.DSL._
 import subscript.Predef._
 import subscript.vm._
+import subscript.vm.executor._
 
 // Subscript sample application: A..B
 //

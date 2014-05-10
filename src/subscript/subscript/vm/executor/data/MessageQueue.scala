@@ -8,13 +8,14 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
   private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
   
   /* Internal state */
-  val collection = PriorityQueue[CallGraphMessage]()(new Ordering[CallGraphMessage] {
+  val ordering = new Ordering[CallGraphMessage] {
     def compare(x: CallGraphMessage, y: CallGraphMessage): Int = {
       var p = x.         priority - y.         priority; if (p != 0) return p 
           p = x.secondaryPriority - y.secondaryPriority; if (p != 0) return p
       return  x. tertiaryPriority - y. tertiaryPriority
     }
-  })
+  }
+  val collection = PriorityQueue[CallGraphMessage]()(ordering)
   
   private var _nMessages = 0
   private def nextMessageID = {_nMessages+=1; _nMessages}

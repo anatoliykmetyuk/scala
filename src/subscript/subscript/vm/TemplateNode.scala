@@ -26,6 +26,8 @@
 
 package subscript.vm
 
+import subscript.vm.executor._
+
 /*
  *  Template Nodes are used to describe abstract syntax trees of the compiled scripts
  */

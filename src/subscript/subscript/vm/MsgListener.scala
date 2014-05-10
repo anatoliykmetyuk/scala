@@ -8,6 +8,8 @@ trait MsgListener {
   def messageDequeued    (m: CallGraphMessage) = {}
   def messageContinuation(m: CallGraphMessage, c: Continuation) = {}
   def messageAwaiting  = {}
+  
+  def attach(publisher: MsgPublusher) {publisher addListener this}
 }
 
 trait MsgPublusher extends MsgListener {

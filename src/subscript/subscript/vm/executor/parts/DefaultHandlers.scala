@@ -6,6 +6,8 @@ import subscript.vm.executor.data._
 
 import subscript.DSL._
 
+import scala.collection.mutable.Buffer
+
 /** To DATA section; don't change */
 trait DefaultHandlers {this: ScriptExecutor with Tracer =>
   import CodeExecutor._

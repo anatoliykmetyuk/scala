@@ -9,6 +9,7 @@ import subscript._
 import subscript.DSL._
 import subscript.Predef._ //tweede keer geimporteerd!!!!!!!!!
 import subscript.vm._
+import subscript.vm.executor._
 
 // Subscript sample application: a parallel recursive implementation of a Bag
 //

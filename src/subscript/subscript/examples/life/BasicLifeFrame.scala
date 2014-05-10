@@ -4,6 +4,7 @@ import scala.swing._
 import scala.swing.event._
 import subscript.DSL._
 import subscript.swing.SimpleSubscriptApplication
+import subscript.vm.executor._
 
 object BasicLifeFrame extends BasicLifeFrameApplication
 class BasicLifeFrameApplication extends SimpleSubscriptApplication {

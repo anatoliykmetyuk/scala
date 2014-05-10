@@ -8,6 +8,9 @@ import subscript.swing._
 import subscript.swing.Scripts._
 import subscript.DSL._
 import subscript.vm._
+import subscript.vm.executor._
+import subscript.vm.MsgListener
+import subscript.vm.MsgPublusher
 
 /*
  * Graphical script debugger
@@ -32,8 +35,15 @@ object GraphicalDebugger2 extends GraphicalDebuggerApp {
 }
 //    
 
-class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugger {
-
+class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
+  
+  private var _scriptExecutor: ScriptExecutor = null
+  def scriptExecutor = _scriptExecutor
+  override def attach(p: MsgPublusher) {
+    super.attach(p)
+    _scriptExecutor = p.asInstanceOf[ScriptExecutor]
+  }
+  
   override def main(args: Array[String]): Unit = {
     var lArgs = args
     if (lArgs.isEmpty) return
@@ -612,7 +622,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
     
     // Sorting the list of scriptExecutor messages
     // before rendering
-    val ord = scriptExecutor.CallGraphMessageOrdering
+    val ord = scriptExecutor.msgQueue.ordering
     val orderedMessages = callGraphMessages.toList.sorted(ord).reverse
     orderedMessages.foreach(msgQueueListModel.addElement(_)) 
   }
@@ -655,19 +665,19 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
 //def   _exitDebugger = _script('exitDebugger) {_seq(  _exitCommand, _at{gui}(_normal{exitConfirmed=confirmExit}), _while{!exitConfirmed})}
   
   */
-  def callGraphMessages = scriptExecutor.callGraphMessages
+  def callGraphMessages = scriptExecutor.msgQueue.collection
   def rootNode          = scriptExecutor.rootNode
   
-  def messageHandled(m: CallGraphMessage): Unit = {
+  override def messageHandled(m: CallGraphMessage): Unit = {
     currentMessage = m
     messageBeingHandled(true) 
     awaitMessageBeingHandled(false)
     currentMessage = null
   }
-  def messageQueued      (m: CallGraphMessage                 ) = logMessage_GUIThread("++", m)
-  def messageDequeued    (m: CallGraphMessage                 ) = logMessage_GUIThread("--", m)
-  def messageContinuation(m: CallGraphMessage, c: Continuation) = logMessage_GUIThread("**", c)
-  def messageAwaiting: Unit = {
+  override def messageQueued      (m: CallGraphMessage                 ) = logMessage_GUIThread("++", m)
+  override def messageDequeued    (m: CallGraphMessage                 ) = logMessage_GUIThread("--", m)
+  override def messageContinuation(m: CallGraphMessage, c: Continuation) = logMessage_GUIThread("**", c)
+  override def messageAwaiting: Unit = {
     if (checkBox_log_Wait .selected) currentMessageTF.text = "Waiting..."
     if (checkBox_step_Wait.selected) callGraphPanel.repaint()
 }

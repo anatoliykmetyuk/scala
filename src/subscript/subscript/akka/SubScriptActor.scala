@@ -3,6 +3,7 @@ package subscript.akka
 import subscript.DSL._
 import scala.collection.mutable.ListBuffer
 import subscript.vm._
+import subscript.vm.executor._
 import akka.actor._
 
 

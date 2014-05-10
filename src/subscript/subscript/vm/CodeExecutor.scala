@@ -25,6 +25,7 @@
 */
 
 package subscript.vm
+import subscript.vm.executor._
 import scala.collection.mutable._
 
 // Executors that execute any call to Scala code in the application:

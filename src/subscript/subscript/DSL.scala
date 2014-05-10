@@ -29,6 +29,7 @@ package subscript
 import scala.language.implicitConversions
 import scala.collection.mutable.LinkedList
 import subscript.vm._
+import subscript.vm.executor._
 
 /*
  * Internal Scala DSL for SubScript.

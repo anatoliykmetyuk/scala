@@ -3,6 +3,7 @@ package subscript.akka
 import subscript.DSL._
 import scala.collection.mutable.ListBuffer
 import subscript.vm._
+import subscript.vm.executor._
 import akka.actor._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -56,9 +57,12 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
   }
 
   def doScriptSteps = {    
+    executor.updateCollections()
     var handledMessage = executor.tryHandleMessage(minimalPriorityForAA = Int.MinValue)
-    while (handledMessage!=null)
+    while (handledMessage!=null) {
+      executor.updateCollections()
       handledMessage = executor.tryHandleMessage(minimalPriorityForAA = Int.MinValue)
+    }
     executor.messageAwaiting
   }
   

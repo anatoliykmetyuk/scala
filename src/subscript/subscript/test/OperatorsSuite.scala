@@ -7,7 +7,8 @@ import org.junit.runner.RunWith
 
 import subscript.DSL._
 import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, UnsureExecutionResult, 
-                     ScriptExecutor, CommonScriptExecutor, SimpleScriptDebugger}
+                     SimpleScriptDebugger}
+import subscript.vm.executor._
 
 /**
  * This class is a test suite for the script operators as implemented in the SubScript VM. 
