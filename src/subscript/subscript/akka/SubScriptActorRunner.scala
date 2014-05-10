@@ -15,7 +15,7 @@ trait SubScriptActorRunner {
   
   def launch(s: Script[_])
   
-  def execute(debugger: ScriptDebugger)
+  def execute(debugger: MsgListener)
   
   def system: ActorSystem
  
@@ -40,7 +40,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
      // so that we will be able to kill those here using the || and / operators
      live = @{launch_anchor=there}: (** {. .} **)
 
-  def execute(debugger: ScriptDebugger) {
+  def execute(debugger: MsgListener) {
     if (debugger!=null) debugger.attach(executor)
     executor.addHandler(synchMsgHandler)
     executor.initializeExecution(_live())

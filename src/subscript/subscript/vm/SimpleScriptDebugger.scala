@@ -33,7 +33,7 @@ object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
   }
 }
 
-class SimpleScriptDebugger extends ScriptDebugger {
+class SimpleScriptDebugger extends MsgListener {
 
   def callGraphMessages = scriptExecutor.callGraphMessages
   def rootNode            = scriptExecutor.rootNode

@@ -64,13 +64,13 @@ object DSL {
   
   def _execute(_script: Script[Unit]): ScriptExecutor = _execute(_script, null, true)
   def _execute(_script: Script[Unit], executor: ScriptExecutor): ScriptExecutor = _execute(_script, null, executor)
-  def _execute(_script: Script[Unit], debugger: ScriptDebugger): ScriptExecutor = _execute(_script, debugger, false)
+  def _execute(_script: Script[Unit], debugger: MsgListener): ScriptExecutor = _execute(_script, debugger, false)
   def _execute(_script: Script[Unit],                           allowDebugger: Boolean): ScriptExecutor = _execute(_script, null, allowDebugger)
-  def _execute(_script: Script[Unit], debugger: ScriptDebugger, allowDebugger: Boolean): ScriptExecutor = {
+  def _execute(_script: Script[Unit], debugger: MsgListener, allowDebugger: Boolean): ScriptExecutor = {
     val executor = ScriptExecutorFactory.createScriptExecutor(allowDebugger && debugger == null)
     _execute(_script, debugger, executor)
   }
-  def _execute(_script: Script[Unit], debugger: ScriptDebugger, executor: ScriptExecutor): ScriptExecutor = {
+  def _execute(_script: Script[Unit], debugger: MsgListener, executor: ScriptExecutor): ScriptExecutor = {
     if (debugger!=null) debugger.attach(executor)
     executor.run(_script)
   }
