@@ -147,7 +147,7 @@ trait CodeExecutorAdapter[CE<:CodeExecutorTrait] extends CodeExecutorTrait {
   }
 }
 class ThreadedCodeFragmentExecutor(n: N_code_threaded, scriptExecutor: ScriptExecutor) extends NormalCodeFragmentExecutor(n, scriptExecutor)  {
-  override def interruptAA: Unit = if (myThread!=null) myThread.interrupt
+  override def interruptAA: Unit = if (myThread!=null) try myThread.interrupt catch {case _: InterruptedException =>}  // Don't pollute the outout
   regardStartAndEndAsSeparateAtomicActions = true
   var myThread: Thread = null
   

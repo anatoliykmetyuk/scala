@@ -50,7 +50,8 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
   def doScriptSteps_loop: Unit = {
     doScriptSteps
     if (executor.hasActiveProcesses) {
-      system.scheduler.scheduleOnce(scheduledTaskDelay)(doScriptSteps_loop)
+      try system.scheduler.scheduleOnce(scheduledTaskDelay)(doScriptSteps_loop)
+      catch {case _: IllegalStateException =>}  // Ignore certain things...
     }
   }
 
