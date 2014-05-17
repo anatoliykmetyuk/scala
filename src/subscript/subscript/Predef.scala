@@ -28,6 +28,9 @@ package subscript
 
 import subscript.vm._
 import subscript.DSL._
+import subscript.vm.executor._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
 // Predefined stuff - pass and some scripts: times, delta, epsilon, nu
 //

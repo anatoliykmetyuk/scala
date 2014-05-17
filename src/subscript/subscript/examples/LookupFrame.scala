@@ -8,6 +8,7 @@ import subscript._
 import subscript.DSL._
 import subscript.Predef._
 import subscript.vm._
+import subscript.vm.executor._
 
 // Subscript sample application: a text entry field with a search button, that simulates the invocation of a background search
 //

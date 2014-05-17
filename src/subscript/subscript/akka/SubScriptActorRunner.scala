@@ -3,6 +3,7 @@ package subscript.akka
 import subscript.DSL._
 import scala.collection.mutable.ListBuffer
 import subscript.vm._
+import subscript.vm.executor._
 import akka.actor._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -15,7 +16,7 @@ trait SubScriptActorRunner {
   
   def launch(s: Script[_])
   
-  def execute(debugger: ScriptDebugger)
+  def execute(debugger: MsgListener)
   
   def system: ActorSystem
  
@@ -40,7 +41,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
      // so that we will be able to kill those here using the || and / operators
      live = @{launch_anchor=there}: (** {. .} **)
 
-  def execute(debugger: ScriptDebugger) {
+  def execute(debugger: MsgListener) {
     if (debugger!=null) debugger.attach(executor)
     executor.addHandler(synchMsgHandler)
     executor.initializeExecution(_live())
@@ -56,9 +57,12 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
   }
 
   def doScriptSteps = {    
+    executor.updateCollections()
     var handledMessage = executor.tryHandleMessage(minimalPriorityForAA = Int.MinValue)
-    while (handledMessage!=null)
+    while (handledMessage!=null) {
+      executor.updateCollections()
       handledMessage = executor.tryHandleMessage(minimalPriorityForAA = Int.MinValue)
+    }
     executor.messageAwaiting
   }
   

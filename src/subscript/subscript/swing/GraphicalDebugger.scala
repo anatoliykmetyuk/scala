@@ -2,12 +2,16 @@ package subscript.swing
 
 import java.awt.{Font, BasicStroke, Stroke, Color => AWTColor}
 import java.awt.geom.AffineTransform
+
 import scala.collection.mutable.ListBuffer
 import scala.swing._
-import subscript.swing._
+
 import subscript.swing.Scripts._
 import subscript.DSL._
 import subscript.vm._
+import subscript.vm.executor._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
 /*
  * Graphical script debugger
@@ -32,8 +36,15 @@ object GraphicalDebugger2 extends GraphicalDebuggerApp {
 }
 //    
 
-class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugger {
-
+class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
+  
+  private var _scriptExecutor: ScriptExecutor = null
+  def scriptExecutor = _scriptExecutor
+  override def attach(p: MsgPublusher) {
+    super.attach(p)
+    _scriptExecutor = p.asInstanceOf[ScriptExecutor]
+  }
+  
   override def main(args: Array[String]): Unit = {
     var lArgs = args
     if (lArgs.isEmpty) return
@@ -267,12 +278,13 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         // Sometime a solution will be found
         val isCurrentTemplate = currentMessage            != null    && 
                                 n                         != null    && 
-                                n.template                != null    && 
-                                ( n.template.root == null   && t.root == null
-                                ||n.template.root.name      == t.root.name   ) && 
-                                n.template.owner          != null             &&
-                                n.template.owner.getClass == t.owner.getClass && 
-                                n.template.indexInScript  == t.indexInScript
+                                n.template                != null    &&
+                                (n.template eq t)
+//                                ( n.template.root == null   && t.root == null
+//                                ||n.template.root.name      == t.root.name   ) && 
+//                                n.template.owner          != null             &&
+//                                n.template.owner.getClass == t.owner.getClass && 
+//                                n.template.indexInScript  == t.indexInScript
                                 
         g.setColor(fillColor(n, lightOrange, isCurrentTemplate)) 
         g fill r
@@ -415,8 +427,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
         
         val s: String = n match {
           case ns: N_script   => ns.template.name.name
-          case no: N_n_ary_op => no.template.kindAsString + (if (no.isIteration) " ..." else "")
-          case _              => n .template.kindAsString
+          case no: N_n_ary_op => no.template.kind + (if (no.isIteration) " ..." else "")
+          case _              => n .template.kind
         }
         val nameFont = n match {
           case _: N_script | _: N_call => smallFont
@@ -612,7 +624,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
     
     // Sorting the list of scriptExecutor messages
     // before rendering
-    val ord = scriptExecutor.CallGraphMessageOrdering
+    val ord = scriptExecutor.msgQueue.ordering
     val orderedMessages = callGraphMessages.toList.sorted(ord).reverse
     orderedMessages.foreach(msgQueueListModel.addElement(_)) 
   }
@@ -655,19 +667,19 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with ScriptDebugge
 //def   _exitDebugger = _script('exitDebugger) {_seq(  _exitCommand, _at{gui}(_normal{exitConfirmed=confirmExit}), _while{!exitConfirmed})}
   
   */
-  def callGraphMessages = scriptExecutor.callGraphMessages
+  def callGraphMessages = scriptExecutor.msgQueue.collection
   def rootNode          = scriptExecutor.rootNode
   
-  def messageHandled(m: CallGraphMessage): Unit = {
+  override def messageHandled(m: CallGraphMessage): Unit = {
     currentMessage = m
     messageBeingHandled(true) 
     awaitMessageBeingHandled(false)
     currentMessage = null
   }
-  def messageQueued      (m: CallGraphMessage                 ) = logMessage_GUIThread("++", m)
-  def messageDequeued    (m: CallGraphMessage                 ) = logMessage_GUIThread("--", m)
-  def messageContinuation(m: CallGraphMessage, c: Continuation) = logMessage_GUIThread("**", c)
-  def messageAwaiting: Unit = {
+  override def messageQueued      (m: CallGraphMessage                 ) = logMessage_GUIThread("++", m)
+  override def messageDequeued    (m: CallGraphMessage                 ) = logMessage_GUIThread("--", m)
+  override def messageContinuation(m: CallGraphMessage, c: Continuation) = logMessage_GUIThread("**", c)
+  override def messageAwaiting: Unit = {
     if (checkBox_log_Wait .selected) currentMessageTF.text = "Waiting..."
     if (checkBox_step_Wait.selected) callGraphPanel.repaint()
 }

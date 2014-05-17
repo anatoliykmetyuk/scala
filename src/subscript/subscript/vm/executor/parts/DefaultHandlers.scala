@@ -1,406 +1,23 @@
-/*
-    This file is part of Subscript - an extension of the Scala language 
-                                     with constructs from Process Algebra.
+package subscript.vm.executor.parts
 
-    Subscript is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License and the 
-    GNU Lesser General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-    
-    Subscript consists partly of a "virtual machine". This is a library; 
-    Subscript applications may distribute this library under the 
-    GNU Lesser General Public License, rather than under the 
-    GNU General Public License. This way your applications need not 
-    be made Open Source software, in case you don't want to.
+import subscript.vm._
+import subscript.vm.executor._
+import subscript.vm.executor.data._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
-    Subscript is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+import subscript.DSL._
 
-    You may have received a copy of the GNU General Public License
-    and the GNU Lesser General Public License along with Subscript.
-    If not, see <http://www.gnu.org/licenses/>
-*/
+import scala.collection.mutable.Buffer
 
-package subscript.vm
-import scala.collection.mutable._
-import scala.collection.mutable.ListBuffer
-
-/*
- * Factory for script executors. Produces a CommonScriptExecutor
- */
-object ScriptExecutorFactory {
-  var scriptDebuggerQueue = new scala.collection.mutable.Queue[ScriptDebugger]
-  def addScriptDebugger(sd: ScriptDebugger) = {
-    //println("addScriptDebugger: "+sd.getClass.getCanonicalName)
-    scriptDebuggerQueue += sd
-  }
-  def createScriptExecutor(allowDebugger: Boolean) = {
-    val se = new CommonScriptExecutor
-    if (allowDebugger && !scriptDebuggerQueue.isEmpty) {
-      val h = scriptDebuggerQueue.head
-      //println("createScriptExecutor: "+se+ " Debugger: "+h.getClass.getCanonicalName)
-      scriptDebuggerQueue = scriptDebuggerQueue.tail
-      h.attach(se)
-    }
-    //else println("createScriptExecutor: "+se+" allowDebugger: "+allowDebugger+" scriptDebuggerQueue.isEmpty: "+scriptDebuggerQueue.isEmpty)
-    se
-  }
-}
-
-/*
- * Trait for Script executors
- */
-trait ScriptExecutor extends MessagePriorities
-{
+/** To DATA section; don't change */
+trait DefaultHandlers {this: ScriptExecutor with Tracer =>
+  import CodeExecutor._
+  import Graph._
+  import MessageHandlers._
   
-  def rootNode: N_launch_anchor
-  
-  //val anchorNode: N_call
-  def hasSuccess: Boolean
-  def initializeExecution(s: CallGraphNode._scriptType[_])
-  def run(s: CallGraphNode._scriptType[_]): ScriptExecutor
-  def insert(sga: CallGraphMessage)
-  
-  /*
-   * Call graph message ordering
-   */
-  val CallGraphMessageOrdering = 
-	  new Ordering[CallGraphMessage] {
-    def compare(x: CallGraphMessage, y: CallGraphMessage): Int = {
-	      var p = x.         priority - y.         priority; if (p != 0) return p 
-	          p = x.secondaryPriority - y.secondaryPriority; if (p != 0) return p
-	      return  x. tertiaryPriority - y. tertiaryPriority
-        }
-	}
-  
-  /*
-   * methods for enqueueing and dequeueing callGraphMessages
-   *
-   * TBD: the callGraphMessages queue should become synchronized for 
-   *      AAExecutionFinished, AAToBeReexecuted and Deactivation messages, as these may be inserted
-   *      asynchronously by a CodeExecutor (for threaded code, gui thread code and event handling code)
-   *      Also, it would become faster if it has internally separate queues for each priority level
-   * 
-   */
-  // TBD: AAToBeReexecuted messages should be FIFO
-  var callGraphMessageCount = 0
-  val callGraphMessages = new PriorityQueue[CallGraphMessage]()(CallGraphMessageOrdering)
-  def queueCallGraphMessage(m: CallGraphMessage) = {
-    callGraphMessages.synchronized {
-      callGraphMessages += m
-      callGraphMessageCount += 1
-      //if (callGraphMessageCount != callGraphMessages.length) {
-      //  println("queue: "+callGraphMessageCount+" != " + callGraphMessages.length)
-      //}
-    }
-  }
-  
-  /**
-   * Dequeue a call graph message.
-   * If minimalPriorityForAA > Int.MinValue 
-   *     the message should have priority  > PRIORITY.AAToBeExecuted
-   *                          or priority == PRIORITY.AAToBeExecuted (so the message is an AAToBeExecuted) 
-   *                           and then the node should have priority >= minimalPriorityForAA
-   */
-  def dequeueCallGraphMessage(minimalPriorityForAA: Int): CallGraphMessage = {
-    callGraphMessages.synchronized {
-      if (callGraphMessages.isEmpty) return null
-      if (minimalPriorityForAA > Int.MinValue) {
-        val h = callGraphMessages.head
-        if (h.priority <= PRIORITY_AAToBeExecuted) {
-          h match {
-            case aatbe@AAToBeExecuted(n: N_atomic_action) if (n.priority >= minimalPriorityForAA) =>
-            case _ => return null
-          }
-        }
-      }
-      callGraphMessageCount -= 1
-      val result = callGraphMessages.dequeue
-      //if (callGraphMessageCount != callGraphMessages.length) {
-      //  println("dequeue: "+callGraphMessageCount+" != " + callGraphMessages.length)
-      //}
-      result
-    }
-  }
-  def launch(n: CallGraphNodeTrait, aScript: CallGraphNode._scriptType[_])
-  
-  /*
-   * methods supporting debuggers
-   */
-  var scriptDebugger: ScriptDebugger = null;
-  def messageHandled     (m: CallGraphMessage                 ) = if (scriptDebugger!=null) scriptDebugger.messageHandled (m)
-  def messageQueued      (m: CallGraphMessage                 ) = if (scriptDebugger!=null) scriptDebugger.messageQueued  (m)
-  def messageDequeued    (m: CallGraphMessage                 ) = if (scriptDebugger!=null) scriptDebugger.messageDequeued(m)
-  def messageContinuation(m: CallGraphMessage, c: Continuation) = if (scriptDebugger!=null) scriptDebugger.messageContinuation(m, c)
-  def messageAwaiting                                           = if (scriptDebugger!=null) scriptDebugger.messageAwaiting
-  
-  /*
-   * Message index and node index generators
-   */
-  var nMessages = 0
-  def nextMessageID() = {nMessages+=1; nMessages}
-
-  var nNodes = 0
-  def nextNodeIndex() = {nNodes = nNodes+1; nNodes}
-  
-  /*
-   * Simple tracing and error tracking
-   */
-  var doTrace = false
-  def trace(s: String) = if (doTrace) println(s)
-  def error(s: String) {throw new Exception(s)}
-  
-  def traceAttribute(name: String, value: Any) = println(f"$name%41s: $value")
-  def traceAttributes(n: N_n_ary_op, str: String) = {
-    println(s"$str:")
-    traceAttribute("activationMode", n.activationMode)
-    traceAttribute("hadFullBreak", n.hadFullBreak)
-    traceAttribute("nActivatedMandatoryChildren", n.nActivatedMandatoryChildren)
-    traceAttribute("nActivatedMandatoryChildrenWithSuccess", n.nActivatedMandatoryChildrenWithSuccess)
-    traceAttribute("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
-    traceAttribute("nActivatedOptionalChildren", n.nActivatedOptionalChildren)
-    traceAttribute("nActivatedOptionalChildrenWithSuccess", n.nActivatedOptionalChildrenWithSuccess)
-    traceAttribute("nActivatedOptionalChildrenWithoutSuccess", n.nActivatedOptionalChildrenWithoutSuccess)
-    traceAttribute("indexChild_marksOptionalPart", n.indexChild_marksOptionalPart)
-    traceAttribute("indexChild_marksPause", n.indexChild_marksPause)
-    traceAttribute("aaActivated", n.aaActivated)
-    traceAttribute("aaActivated_optional", n.aaActivated_optional)
-  }
-
-}
-
-/*
- * Common script executor
- * 
- * TBD
- *   clean up
- *   operators such as % ! -  ~
- *   communication
- *   networks and pipes
- *   match & for operands
- *   exception handling 
- */
-
-class CommonScriptExecutor extends ScriptExecutor {
-  
-  var waitsForMessage = false
- 
-  // send out a success when in an And-like context
-  def doNeutral(n: CallGraphNodeTrait) =
-    if (n.getLogicalKind_n_ary_op_ancestor!=LogicalKind.Or) {
-         insert(Success(n))
-    }
-  // .. ... for and while operate on the closest ancestor node that has an n_ary operator
-  def setIteration_n_ary_op_ancestor(n: CallGraphNodeTrait) = {
-    val a = n.n_ary_op_ancestor
-    if (a!=null) a.isIteration = true
-  }
-
-  // connect a parent and a child node in the graph
-  def connect(parentNode: CallGraphParentNodeTrait, childNode: CallGraphTreeNode) {
-    childNode.parent = parentNode
-    childNode.scriptExecutor = parentNode.scriptExecutor
-    parentNode.appendChild(childNode)
-    parentNode.nActivatedChildren += 1
-  }
-  // disconnect a child node from its parent
-  def disconnect(childNode: CallGraphNodeTrait) {
-    childNode match {
-      case cn: CallGraphTreeNode => val parentNode = cn.parent
-                                    if (parentNode==null) return;
-                                    parentNode.children -= cn
-       case _ =>
-    }
-  }
- 
-
-  // insert a message in the queue
-  def insert(m: CallGraphMessage) = {
-    m.index = nextMessageID()
-    messageQueued(m)
-    queueCallGraphMessage(m)
-    // AA nodes keep track of associated "to be executed" messages.
-    // This way, if such a node is excluded by another process, it will be able to get such a message out of the queue;
-    // then that message may be garbage collected and the link to the node will be gone, so that the node may also 
-    // be garbage collected
-    m match {
-      case maa@AAToBeExecuted  (n: N_atomic_action) => n.msgAAToBeExecuted = maa
-      case maa@AAToBeReexecuted(n: N_atomic_action) => n.msgAAToBeExecuted = maa
-      case _ =>
-    }
-    
-    // Notify this
-    synchronized { notify() }
-  }
-  // remove a message from the queue
-  def remove(m: CallGraphMessage) = {
-    messageDequeued(m)
-    //scriptGraphMessages -= m  is not allowed...FTTB we will ignore this message, by checking the canceled flag in the executor
-    m match {
-      case maa@AAToBeExecuted  (n: CallGraphNodeTrait) => n.asInstanceOf[N_atomic_action].msgAAToBeExecuted = null
-      case maa@AAToBeReexecuted(n: CallGraphNodeTrait) => n.asInstanceOf[N_atomic_action].msgAAToBeExecuted = null
-      case _ =>
-    }
-  }
-  def insertDeactivation(n:CallGraphNodeTrait,c:CallGraphNodeTrait) = insert(Deactivation(n, c, false))
-  // insert a continuation message
-  def insertContinuation(message: CallGraphMessage, child: CallGraphTreeNode = null): Unit = {
-    val n = message.node.asInstanceOf[ N_n_ary_op]
-    var c = n.continuation 
-    
-    // Continuations are merged with already existing ones
-    // TBD: make separate priorities of continuations...
-    // e.g. a continuation for AAActivated should not be merged (probably) with one for AAHappened
-    if (c==null) {
-      c = new Continuation(n)
-    }
-    if (c.childNode==null) // should be improved
-    {
-      c.childNode = 
-        if (child!=null) child
-        else message match {
-          case Break(an,c,m) => c
-          case Success(an,c) => c
-          case _ => message.node
-        }
-    }
-    message match {
-      case a@ Activation  (node: CallGraphNodeTrait) => c.activation = a
-      case a@Deactivation (node: CallGraphNodeTrait,
-                          child: CallGraphNodeTrait, excluded: Boolean) => c.deactivations ::= a
-      case a@Success      (node: CallGraphNodeTrait,
-                          child: CallGraphNodeTrait)  => c.success = a
-      case a@Break        (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait, 
-                 activationMode: ActivationMode.ActivationModeType)  => c.break = a
-      case a@AAActivated  (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait) =>  c.aaActivated = a
-      case a@CAActivated  (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait) =>  c.caActivated = a
-      case a@AAHappened   (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait, _) =>  c.aaHappeneds ::= a
-    }
-    if (n.continuation==null) {
-        n.continuation = c
-       insert (c)
-    }
-    else {
-      messageContinuation(message, c)
-    }
-  }
-  // insert a continuation message for a unary operator
-  def insertContinuation1(message: CallGraphMessage): Unit = {
-    val n = message.node.asInstanceOf[N_1_ary_op]
-    var c = n.continuation
-    if (c==null) {
-      c = new Continuation1(n)
-      n.continuation = c
-      queueCallGraphMessage(c)
-    }
-    queueCallGraphMessage(Continuation1(n))
-  }
-  
-  def hasSuccess     = rootNode.hasSuccess
-  
-  var aaHappenedCount = 0; // count for happened atomic actions; TBD: use for determining success
-  
-  /*
-   * A root node is at the top of the script call graph.
-   * Directly below that is an anchor node, i.e. a script call node; 
-   * below it the callee script will pend, i.e. the script that has been called from Scala.
-   */
-  val anchorTemplate =     T_call("<root>", null)
-  val rootTemplate   = new T_launch_anchor(anchorTemplate) {override def owner=CommonScriptExecutor.this}
-  val rootNode       =     N_launch_anchor(rootTemplate)
-  private val anchorNode     =     N_call(anchorTemplate)
-  anchorTemplate.parent = rootTemplate
-  
-  rootNode.scriptExecutor = this 
-  connect(parentNode = rootNode, childNode = anchorNode)
-  
-  // launch a script from a piece of Scala code; 
-  def launch(n: CallGraphNodeTrait, aScript: CallGraphNode._scriptType[_]) {
-    val launchAnchor       = CallGraphNode.getLowestLaunchAnchorAncestor(n) // could be rootNode
-    val callAnchorTemplate =     T_call("<launched>", null)
-    val callAnchorNode     =     N_call(callAnchorTemplate)
-    connect(parentNode = launchAnchor, childNode = callAnchorNode)
-    // callAnchorTemplate.parent = launchAnchor.template // would not be mutual...
-    aScript(callAnchorNode)
-    activateFrom(callAnchorNode, callAnchorNode.t_callee, Some(0))
-  }
-  
-  /*
-   * activate a new node from the given parent node using the given template.
-   * The optional pass is relevant in case the parent is an n_ary operator
-   */
-  def activateFrom(parent: CallGraphParentNodeTrait, template: TemplateNode, pass: Option[Int] = None): CallGraphTreeNode = {
-    val n = createNode(template)
-    n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)
-    connect(parentNode = parent, childNode = n)
-    // ?? probably delete the following line
-    //n match {case ns: N_script => val pc = ns.parent.asInstanceOf[N_call]; what to do with this}
-    insert(Activation(n))
-    n
-  }
-
-  /*
-   * Create a node according to the given template
-   */
-  def createNode(template: TemplateNode): CallGraphTreeNode = {
-   val result =
-    template match {
-      case t @ T_optional_break         (                          ) => N_optional_break(t)
-      case t @ T_optional_break_loop    (                          ) => N_optional_break_loop(t)
-      case t @ T_loop                   (                          ) => N_loop          (t)
-      case t @ T_break                  (                          ) => N_break         (t)
-      case t @ T_delta                  (                          ) => N_delta         (t)
-      case t @ T_epsilon                (                          ) => N_epsilon       (t)
-      case t @ T_nu                     (                          ) => N_nu            (t)
-      case t @ T_call                   (        _,    _           ) => N_call          (t)
-      case t @ T_privatevar             (              name        ) => N_privatevar    (t)
-      case t @ T_localvar               (_,_,lv:LocalVariable[_],_ ) => N_localvar      (t)
-      case t @ T_code_normal            (              _           ) => N_code_normal   (t)
-      case t @ T_code_unsure            (              _           ) => N_code_unsure   (t)
-      case t @ T_code_tiny              (              _           ) => N_code_tiny     (t)
-      case t @ T_code_threaded          (              _           ) => N_code_threaded (t)
-      case t @ T_code_eventhandling     (              _           ) => N_code_eventhandling     (t)
-      case t @ T_code_eventhandling_loop(              _           ) => N_code_eventhandling_loop(t)
-      case t @ T_while                  (              _           ) => N_while         (t)
-      case t @ T_launch                 (              _           ) => N_launch        (t)
-      case t @ T_launch_anchor          (              _           ) => N_launch_anchor (t)
-      case t @ T_1_ary_op               (kind: String, _           ) => N_1_ary_op      (t)
-      case t @ T_annotation             (              _, _        ) => N_annotation    (t)
-      case t @ T_if                     (              _, _        ) => N_if            (t)
-      case t @ T_if_else                (              _, _, _     ) => N_if_else       (t)
-      case t @ T_then                   (              _, _        ) => N_then          (t)
-      case t @ T_then_else              (              _, _, _     ) => N_then_else     (t)
-      case t @ T_n_ary_op               (kind: String, children@ _*) => N_n_ary_op (t, T_n_ary_op.isLeftMerge(kind))
-      case t @ T_script(_, kind: String, name: Symbol, child0: TemplateNode) => N_script(t)
-      case _ => null 
-    }
-    result.codeExecutor = defaultCodeFragmentExecutorFor(result)
-    result
-  }
-  /*
-   * The default code executor for a given node.
-   */
-  def defaultCodeFragmentExecutorFor(node: CallGraphNodeTrait): CodeExecutorTrait = {
-    node match {
-      case n@N_code_normal  (_) => new   NormalCodeFragmentExecutor(n, this)
-      case n@N_code_unsure  (_) => new   UnsureCodeFragmentExecutor(n, this)
-      case n@N_code_threaded(_) => new ThreadedCodeFragmentExecutor(n, this)
-      case _                    => new          TinyCodeExecutor(node, this)
-    }
-  }
-  /*
-   * Methods for executing code
-   */
-  def executeCode[R](n: DoCodeHolder[R]) : R                  = executeCode(n, ()=>n.doCode)
-  def executeCode[R](n: DoCodeHolder[R], code: =>()=>R   ): R = {n.codeExecutor.doCodeExecution(code)}
-  def executeCodeIfDefined(n: CallGraphNodeTrait, code: =>()=>Unit): Unit = {if (code!=null) executeCode(n.asInstanceOf[DoCodeHolder[Unit]], code)} // TBD: get rid of cast
+  import msgQueue._
+  import graph.activateFrom
   
   /*
    * Handle a deactivation message. 
@@ -607,9 +224,9 @@ class CommonScriptExecutor extends ScriptExecutor {
     CommunicationMatchingMessage.activatedCommunicatorCalls.clear()
   }
         
-	// a communication may become active when
-	// all mandatory positions for partners at the same instance may be filled
-	// partners should have compatible parameters, be active in parallel, and obey network topology
+  // a communication may become active when
+  // all mandatory positions for partners at the same instance may be filled
+  // partners should have compatible parameters, be active in parallel, and obey network topology
   def tryCommunication(freshCall: N_call, freshCallRole: CommunicatorRole): Boolean = {
     val communication = freshCallRole.communication
     
@@ -626,7 +243,7 @@ class CommonScriptExecutor extends ScriptExecutor {
           }
           return true
         }
-	    var i = partners.length // TBD: make it a List[List[N_call]]
+      var i = partners.length // TBD: make it a List[List[N_call]]
         if (i == communication.communicatorRoles.length) {  
            val nc = N_communication(communication.template)
            // set nc.partners vv and make it activate
@@ -638,12 +255,12 @@ class CommonScriptExecutor extends ScriptExecutor {
            return true
         }
         else {
-	      val role = communication.communicatorRoles(i)
-	      val nodes = if (role==freshCallRole) List(freshCall)
-	                else  role.communicator.instances
+        val role = communication.communicatorRoles(i)
+        val nodes = if (role==freshCallRole) List(freshCall)
+                  else  role.communicator.instances
           var j = 0
           while (j < nodes.length) {
-	        val node = role.communicator.instances(j)
+          val node = role.communicator.instances(j)
             j += 1
             if (canCommunicateWithPartners(node)) {
               if (tryCommunicationWithPartners(node::partners)) {
@@ -651,13 +268,13 @@ class CommonScriptExecutor extends ScriptExecutor {
               }
             }
           }
-	      return false
-	    }
+        return false
+      }
     }
     // TBD: first try comms that may still grow (having multipicities other than One)
     return tryCommunicationWithPartners(Nil)
   }
-	          
+            
 
   /*
    * Handle an AAHappened message
@@ -685,41 +302,41 @@ class CommonScriptExecutor extends ScriptExecutor {
     message.node match {
        case n@N_1_ary_op(t: T_1_ary)    => insertContinuation1(message) //don't return; just put the continuations in place
        case n@N_n_ary_op(t: T_n_ary, _) => insertContinuation (message) //don't return; just put the continuations in place, mainly used for left merge operators
-	                                                                   
-	        // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
-	        var nodesToBeSuspended: Buffer[CallGraphNodeTrait] = null
-	        var nodesToBeExcluded : Buffer[CallGraphNodeTrait] = null
-			if (T_n_ary_op.isSuspending(n.template)) {
-		      val s = message.child
-		      if (s.aaHappenedCount==1) {
-		        t.kind match {
-		          case "#" | "#%#"   => nodesToBeSuspended = n.children - s 
-		          case "#%"          => nodesToBeExcluded  = n.children.filter(_.index < s.index) 
-		                                nodesToBeSuspended = n.children.filter(_.index > s.index)
-		          case "#/" | "#/#/" => nodesToBeSuspended = n.children.filter(_.index < s.index) 
-		        }
-		      }
-			}
-			else {
-	          t.kind match {
-		          case ";" | "|;" 
-		           | "||;" | "|;|" 
-		           | "+"   | "|+"  => nodesToBeExcluded = n.children.filter(_.index != message.child.index)
-		                         // after (*), do: nodesToBeExcluded = n.children -- message.aaHappeneds.map( (as:AAHappened) => as.child)  
-		                  
-		          case "/" | "|/" 
-		             | "|/|"       => nodesToBeExcluded = n.children.filter(_.index < message.child.index)
-		                              // after (*), do: 
-		                              // val minIndex = message.child.index
-		                              // nodesToBeExcluded = n.children -- message.aaHappeneds.map( (as:AAHappened) => as.child)
-		          case _ =>
-	          }
-	        }
-		    // do exclusions and suspensions
-		    if (nodesToBeExcluded !=null) nodesToBeExcluded .foreach((n) => insert(Exclude(message.node, n)))
-		    if (nodesToBeSuspended!=null) nodesToBeSuspended.foreach((n) => insert(Suspend(n)))
-       case _ =>	    
-	  }
+                                                                     
+          // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
+          var nodesToBeSuspended: Buffer[CallGraphNodeTrait] = null
+          var nodesToBeExcluded : Buffer[CallGraphNodeTrait] = null
+      if (T_n_ary_op.isSuspending(n.template)) {
+          val s = message.child
+          if (s.aaHappenedCount==1) {
+            t.kind match {
+              case "#" | "#%#"   => nodesToBeSuspended = n.children - s 
+              case "#%"          => nodesToBeExcluded  = n.children.filter(_.index < s.index) 
+                                    nodesToBeSuspended = n.children.filter(_.index > s.index)
+              case "#/" | "#/#/" => nodesToBeSuspended = n.children.filter(_.index < s.index) 
+            }
+          }
+      }
+      else {
+            t.kind match {
+              case ";" | "|;" 
+               | "||;" | "|;|" 
+               | "+"   | "|+"  => nodesToBeExcluded = n.children.filter(_.index != message.child.index)
+                             // after (*), do: nodesToBeExcluded = n.children -- message.aaHappeneds.map( (as:AAHappened) => as.child)  
+                      
+              case "/" | "|/" 
+                 | "|/|"       => nodesToBeExcluded = n.children.filter(_.index < message.child.index)
+                                  // after (*), do: 
+                                  // val minIndex = message.child.index
+                                  // nodesToBeExcluded = n.children -- message.aaHappeneds.map( (as:AAHappened) => as.child)
+              case _ =>
+            }
+          }
+        // do exclusions and suspensions
+        if (nodesToBeExcluded !=null) nodesToBeExcluded .foreach((n) => insert(Exclude(message.node, n)))
+        if (nodesToBeSuspended!=null) nodesToBeSuspended.foreach((n) => insert(Suspend(n)))
+       case _ =>      
+    }
     
     // message.child may be null now
     message.node.forEachParent(p => insert(AAHappened(p, message.node, message.mode)))
@@ -736,10 +353,10 @@ class CommonScriptExecutor extends ScriptExecutor {
   def handleBreak(message: Break): Unit = {
       message.node match {
         case nn: N_n_ary_op =>
-	        if (nn.activationMode!=ActivationMode.Inactive) {
-	            nn.activationMode = message.activationMode
-	        }
-	        insertContinuation(message)
+          if (nn.activationMode!=ActivationMode.Inactive) {
+              nn.activationMode = message.activationMode
+          }
+          insertContinuation(message)
         case _ => message.node.forEachParent(p => insert(Break(p, message.node, message.activationMode)))
       }
   }
@@ -769,7 +386,7 @@ class CommonScriptExecutor extends ScriptExecutor {
     }
     n match {
       case cc: N_call => cc.stopPending
-      case aa: N_atomic_action =>
+      case aa: N_atomic_action[_] =>
         aa.codeExecutor.cancelAA
         if (aa.msgAAToBeExecuted != null) {
           remove(message) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
@@ -783,7 +400,7 @@ class CommonScriptExecutor extends ScriptExecutor {
              case _ =>
     }
   }
-	
+  
   /*
    * Handle a continuation message for an unary node
    */
@@ -1008,28 +625,28 @@ class CommonScriptExecutor extends ScriptExecutor {
     }
 
     var nextActivationTemplateIndex = 0
-	var nextActivationPass = 0
-	if (activateNextOrEnded) {
-	  // old: childNode = if (T_n_ary.isLeftMerge(n.template.kind)) n.lastActivatedChild else message.childNode ; now done before
-	  nextActivationTemplateIndex = childNode.template.indexAsChild+1
-	  nextActivationPass = childNode.pass 
-	  
-	  message.node.activationMode = ActivationMode.Active
-	  
-	  if (n.hadFullBreak) activationEnded = true
-	  else if (nextActivationTemplateIndex==message.node.template.children.size) {
-	    if (message.node.isIteration) {
-	      nextActivationTemplateIndex = 0
-	      nextActivationPass += 1
-	      activateNext = true
-	    }
-	    else {
-	      activationEnded = true
-	    }
-	  }
-	  else {
-	    activateNext = true
-	  }  
+  var nextActivationPass = 0
+  if (activateNextOrEnded) {
+    // old: childNode = if (T_n_ary.isLeftMerge(n.template.kind)) n.lastActivatedChild else message.childNode ; now done before
+    nextActivationTemplateIndex = childNode.template.indexAsChild+1
+    nextActivationPass = childNode.pass 
+    
+    message.node.activationMode = ActivationMode.Active
+    
+    if (n.hadFullBreak) activationEnded = true
+    else if (nextActivationTemplateIndex==message.node.template.children.size) {
+      if (message.node.isIteration) {
+        nextActivationTemplateIndex = 0
+        nextActivationPass += 1
+        activateNext = true
+      }
+      else {
+        activationEnded = true
+      }
+    }
+    else {
+      activateNext = true
+    }  
     }
     
     // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
@@ -1039,7 +656,7 @@ class CommonScriptExecutor extends ScriptExecutor {
 
       case "/" | "|/" 
         | "|/|"        => // deactivate to the right when one has finished successfully
-        				      // TBD: something goes wrong here; LookupFrame2 does not "recover" from a Cancel search
+                      // TBD: something goes wrong here; LookupFrame2 does not "recover" from a Cancel search
                           message.deactivations match {
                             case d::tail => if (d.child.hasSuccess && !d.excluded) {
                               nodesToBeExcluded = n.children.filter(_.index>d.child.index)
@@ -1068,16 +685,16 @@ class CommonScriptExecutor extends ScriptExecutor {
             case ";" => shouldSucceed = activationEnded || activationEndedOptionally
             case "/" => shouldSucceed = message.success != null ||
                                         message.aaHappeneds.exists(_.child.index<n.rightmostChildThatEndedInSuccess_index) || 
-		                                n.nActivatedChildrenWithSuccess > 0
+                                    n.nActivatedChildrenWithSuccess > 0
             case _ =>
-		          T_n_ary_op.getLogicalKind(n.template.kind) match {
-		            case LogicalKind.None =>
-		            case LogicalKind.And  => shouldSucceed = !activateNext &&
-		                                                     n.nActivatedMandatoryChildrenWithoutSuccess == 0
-		            case LogicalKind.Or   => shouldSucceed = n.nActivatedChildrenWithSuccess > 0
+              T_n_ary_op.getLogicalKind(n.template.kind) match {
+                case LogicalKind.None =>
+                case LogicalKind.And  => shouldSucceed = !activateNext &&
+                                                         n.nActivatedMandatoryChildrenWithoutSuccess == 0
+                case LogicalKind.Or   => shouldSucceed = n.nActivatedChildrenWithSuccess > 0
                   }
       }
-	}
+  }
     if (doTrace) {
       traceAttributes(n, "Finally")
       traceAttribute("activateNext", activateNext)
@@ -1111,10 +728,7 @@ class CommonScriptExecutor extends ScriptExecutor {
     // decide on deactivation of n
     
   }
-  
-  
-  type MessageHandler = PartialFunction[CallGraphMessage, Unit]
-  
+    
   val defaultHandler: MessageHandler = {
       case a@ Activation        (_) => handleActivation   (a)
       case a@Continuation       (_) => handleContinuation (a)
@@ -1136,64 +750,5 @@ class CommonScriptExecutor extends ScriptExecutor {
     }
   val communicationHandler: MessageHandler = {
     case InvokeFromET(_, payload) => payload()
-  }
-  
-  private val messageHandlers = ListBuffer[MessageHandler](defaultHandler, communicationHandler)
-  def addHandler(h: MessageHandler)    = messageHandlers.synchronized { messageHandlers += h }
-  def removeHandler(h: MessageHandler) = messageHandlers.synchronized { messageHandlers -= h }
-  
-  def invokeFromET(f: => Unit) = insert(InvokeFromET(rootNode, () => f))
-  
-  /*
-   * message dispatcher; not really OO, but all real activity should be at the executors; other things should be passive
-   */
-  def handle(message: CallGraphMessage):Unit =
-    for (h <- messageHandlers if h isDefinedAt message) h(message)
-  
-  /**
-   * Initialize this for executing the given script.
-   */
-  def initializeExecution(s: CallGraphNode._scriptType[_]) = {
-    s(anchorNode)
-    activateFrom(anchorNode, anchorNode.t_callee)
-  }
-  def hasActiveProcesses = !rootNode.children.isEmpty
-  /*
-   * Main method of BasicExecutioner
-   * Handle all messages until there is nothing more to do:
-   * 
-   * ...
-   * If the message queue is not empty
-   *   dequeue the first one and handle it
-   * else if the root node still has child nodes: do a synchronized wait
-   * else break
-   *   
-   * TBD: check for deadlock situations in case of unmatching communications.
-   * The condition for the synchronized wait should be tightened 
-   */
-  def run(s: CallGraphNode._scriptType[_]): ScriptExecutor = {
-    initializeExecution(s)
-    while (hasActiveProcesses) { // main execution loop
-      if (tryHandleMessage(Int.MinValue)==null) awaitMessages
-    }
-    this
-  }
-  def tryHandleMessage(minimalPriorityForAA: Int): CallGraphMessage = {
-    val m = dequeueCallGraphMessage(minimalPriorityForAA)
-    if (m == null) return null
-    messageHandled(m)
-    handle(m)
-    m
-  }
-  def awaitMessages = {
-    messageAwaiting
-    synchronized { // TBD: there should also be a synchronized call in the CodeExecutors
-      waitsForMessage = true
-      if (callGraphMessageCount==0) // looks stupid, but event may have happened&notify() may have been called during tracing
-          wait() // for an event to happen 
-      waitsForMessage = false
-    }
-    // note: there may also be deadlock because of unmatching communications
-    // so there should preferably be a check for the existence of waiting event handling actions
-  }
+  }  
 }
