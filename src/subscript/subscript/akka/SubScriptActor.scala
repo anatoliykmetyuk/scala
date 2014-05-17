@@ -4,6 +4,8 @@ import subscript.DSL._
 import scala.collection.mutable.ListBuffer
 import subscript.vm._
 import subscript.vm.executor._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 import akka.actor._
 
 

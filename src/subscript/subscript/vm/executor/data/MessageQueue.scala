@@ -3,6 +3,8 @@ package subscript.vm.executor.data
 import scala.collection.mutable.PriorityQueue
 import subscript.vm._
 import subscript.vm.executor._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
 class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] with MsgPublusher with MessagePriorities {self =>
   private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
@@ -42,7 +44,7 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
       val h = collection.head
       if (h.priority <= PRIORITY_AAToBeExecuted) {
         h match {
-          case aatbe@AAToBeExecuted(n: N_atomic_action) if (n.priority >= minimalPriorityForAA) =>
+          case aatbe@AAToBeExecuted(n: N_atomic_action[_]) if (n.priority >= minimalPriorityForAA) =>
           case _ => return null
         }
       }
@@ -148,8 +150,8 @@ trait TrackToBeExecuted extends MessageQueue {
     // then that message may be garbage collected and the link to the node will be gone, so that the node may also 
     // be garbage collected
     m match {
-      case maa@AAToBeExecuted  (n: N_atomic_action) => n.msgAAToBeExecuted = if (track) maa else null
-      case maa@AAToBeReexecuted(n: N_atomic_action) => n.msgAAToBeExecuted = if (track) maa else null
+      case maa@AAToBeExecuted  (n: N_atomic_action[_]) => n.msgAAToBeExecuted = if (track) maa else null
+      case maa@AAToBeReexecuted(n: N_atomic_action[_]) => n.msgAAToBeExecuted = if (track) maa else null
       case _ =>
     }
   }

@@ -2,15 +2,16 @@ package subscript.swing
 
 import java.awt.{Font, BasicStroke, Stroke, Color => AWTColor}
 import java.awt.geom.AffineTransform
+
 import scala.collection.mutable.ListBuffer
 import scala.swing._
-import subscript.swing._
+
 import subscript.swing.Scripts._
 import subscript.DSL._
 import subscript.vm._
 import subscript.vm.executor._
-import subscript.vm.MsgListener
-import subscript.vm.MsgPublusher
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
 /*
  * Graphical script debugger
@@ -277,12 +278,13 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         // Sometime a solution will be found
         val isCurrentTemplate = currentMessage            != null    && 
                                 n                         != null    && 
-                                n.template                != null    && 
-                                ( n.template.root == null   && t.root == null
-                                ||n.template.root.name      == t.root.name   ) && 
-                                n.template.owner          != null             &&
-                                n.template.owner.getClass == t.owner.getClass && 
-                                n.template.indexInScript  == t.indexInScript
+                                n.template                != null    &&
+                                (n.template eq t)
+//                                ( n.template.root == null   && t.root == null
+//                                ||n.template.root.name      == t.root.name   ) && 
+//                                n.template.owner          != null             &&
+//                                n.template.owner.getClass == t.owner.getClass && 
+//                                n.template.indexInScript  == t.indexInScript
                                 
         g.setColor(fillColor(n, lightOrange, isCurrentTemplate)) 
         g fill r
@@ -425,8 +427,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         
         val s: String = n match {
           case ns: N_script   => ns.template.name.name
-          case no: N_n_ary_op => no.template.kindAsString + (if (no.isIteration) " ..." else "")
-          case _              => n .template.kindAsString
+          case no: N_n_ary_op => no.template.kind + (if (no.isIteration) " ..." else "")
+          case _              => n .template.kind
         }
         val nameFont = n match {
           case _: N_script | _: N_call => smallFont

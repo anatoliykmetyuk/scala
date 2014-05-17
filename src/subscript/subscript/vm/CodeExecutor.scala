@@ -57,7 +57,7 @@ case class TinyCodeExecutor(n: CallGraphNodeTrait, scriptExecutor: ScriptExecuto
     code
     }
 }
-abstract class AACodeFragmentExecutor[N<:N_atomic_action](_n: N, _scriptExecutor: ScriptExecutor) extends CodeExecutorTrait  {
+abstract class AACodeFragmentExecutor[N<:N_atomic_action[_]](_n: N, _scriptExecutor: ScriptExecutor) extends CodeExecutorTrait  {
   
   // Executor for Atomic Actions. These require some communication with the ScriptExecutor, to make sure that 
   // graph messages such as AAHappened en Success are properly sent.
@@ -103,7 +103,7 @@ abstract class AACodeFragmentExecutor[N<:N_atomic_action](_n: N, _scriptExecutor
 
 }
 
-class NormalCodeFragmentExecutor[N<:N_atomic_action](n: N, scriptExecutor: ScriptExecutor) extends AACodeFragmentExecutor[N](n, scriptExecutor)  {
+class NormalCodeFragmentExecutor[N<:N_atomic_action[_]](n: N, scriptExecutor: ScriptExecutor) extends AACodeFragmentExecutor[N](n, scriptExecutor)  {
   //without the next two definitions the compiler would give the following error messages; TBD: get rid of these
   // class NormalCodeFragmentExecutor needs to be abstract, since: 
   //   method scriptExecutor in trait CodeExecutorTrait of type => subscript.vm.ScriptExecutor is not defined 
@@ -201,7 +201,7 @@ class SwingCodeExecutorAdapter[CE<:CodeExecutorTrait] extends CodeExecutorAdapte
     result
   }
 }
-case class EventHandlingCodeFragmentExecutor[N<:N_atomic_action](_n: N, _scriptExecutor: ScriptExecutor) extends AACodeFragmentExecutor(_n, _scriptExecutor)  {
+case class EventHandlingCodeFragmentExecutor[N<:N_atomic_action[_]](_n: N, _scriptExecutor: ScriptExecutor) extends AACodeFragmentExecutor(_n, _scriptExecutor)  {
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = executeMatching(true) // dummy method needed because of a flaw in the class hierarchy
   def executeMatching(isMatching: Boolean): Unit = {  // not to be called by scriptExecutor, but by application code
     n.setSuccess(isMatching)

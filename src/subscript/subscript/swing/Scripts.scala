@@ -78,7 +78,7 @@ object Scripts {
    * An extension on scala.swing.Reactor that supports event handling scripts in Subscript
    * Allows an event handling script to subscribe and unsubscribe to events
    */
-  abstract class ScriptReactor[N<:N_atomic_action] extends Reactor {
+  abstract class ScriptReactor[N<:N_atomic_action[_]] extends Reactor {
     def publisher:Publisher
     var executor: EventHandlingCodeFragmentExecutor[N] = _
     def execute = executeMatching(true)
@@ -122,7 +122,7 @@ object Scripts {
    * A Reactor that has a swing Component as a Publisher. 
    * This automatically enables and disables the component
    */
-  abstract class EnablingReactor[N<:N_atomic_action](publisher:Publisher with Component, autoEnableComponent: Boolean = true) extends ScriptReactor[N] {
+  abstract class EnablingReactor[N<:N_atomic_action[_]](publisher:Publisher with Component, autoEnableComponent: Boolean = true) extends ScriptReactor[N] {
     override def enabled_=(b:Boolean) = {
       super.enabled_=(b)
       if (autoEnableComponent) publisher.enabled = b
@@ -134,21 +134,21 @@ object Scripts {
   // In principle this should be cleaned up, but it is not yet clear how that can be done.
   
   // a ComponentReactor for any events
-  case class AnyEventReactor[N<:N_atomic_action](comp:Component) extends EnablingReactor[N](comp) {
+  case class AnyEventReactor[N<:N_atomic_action[_]](comp:Component) extends EnablingReactor[N](comp) {
     def publisher = comp
     val listenedEvent: Event = null
     override def canDisableOnUnsubscribe = false
     private var myReaction: PartialFunction[Event,Unit] = {case e => currentEvent=e; execute; currentEvent=null}
     override def reaction: PartialFunction[Event,Unit] = myReaction
   }
-  case class WindowClosingReactor[N<:N_atomic_action](w:Window) extends ScriptReactor[N] {
+  case class WindowClosingReactor[N<:N_atomic_action[_]](w:Window) extends ScriptReactor[N] {
     def publisher = w
     val listenedEvent: WindowClosing = null
     override def canDisableOnUnsubscribe = false
     private var myReaction: PartialFunction[Event,Unit] = {case e: WindowClosing => currentEvent=e; execute; currentEvent=null}
     override def reaction: PartialFunction[Event,Unit] = myReaction
   }
-  case class SliderStateChangedReactor[N<:N_atomic_action](s:Slider) extends ScriptReactor[N] {
+  case class SliderStateChangedReactor[N<:N_atomic_action[_]](s:Slider) extends ScriptReactor[N] {
     def publisher = s
     val listenedEvent: ValueChanged = null
     override def canDisableOnUnsubscribe = false
@@ -159,38 +159,38 @@ object Scripts {
   /*
    * A Reactor that has a swing Component as a Publisher. 
    */
-  abstract class ComponentReactor[N<:N_atomic_action](comp:Component) extends ScriptReactor[N] {
+  abstract class ComponentReactor[N<:N_atomic_action[_]](comp:Component) extends ScriptReactor[N] {
     def publisher = comp
     override def canDisableOnUnsubscribe = false
   }
   
   // TBD: compact these classes someventhandlingow...
-  case class MouseClickedReactor[N<:N_atomic_action](comp:Component, forClicksCount: Int = 0) extends ComponentReactor[N](comp) {
+  case class MouseClickedReactor[N<:N_atomic_action[_]](comp:Component, forClicksCount: Int = 0) extends ComponentReactor[N](comp) {
     val listenedEvent: MouseClicked = null
     private var myReaction: PartialFunction[Event,Unit] = {case e: MouseClicked =>
       if (forClicksCount==0 
       ||  forClicksCount==e.clicks) {currentEvent=e; execute; currentEvent=null}}
     override def reaction: PartialFunction[Event,Unit] = myReaction
   }
-  case class MousePressedReactor[N<:N_atomic_action](comp:Component) extends ComponentReactor[N](comp) {
+  case class MousePressedReactor[N<:N_atomic_action[_]](comp:Component) extends ComponentReactor[N](comp) {
     val listenedEvent: MousePressed = null
     private var myReaction: PartialFunction[Event,Unit] = {case e: MousePressed =>
       currentEvent=e; execute; currentEvent=null}
     override def reaction: PartialFunction[Event,Unit] = myReaction
   }
-  case class MouseReleasedReactor[N<:N_atomic_action](comp:Component) extends ComponentReactor[N](comp) {
+  case class MouseReleasedReactor[N<:N_atomic_action[_]](comp:Component) extends ComponentReactor[N](comp) {
     val listenedEvent: MouseReleased = null
     private var myReaction: PartialFunction[Event,Unit] = {case e: MouseReleased =>
       currentEvent=e; execute; currentEvent=null}
     override def reaction: PartialFunction[Event,Unit] = myReaction
   }
-  case class MouseMovedReactor[N<:N_atomic_action](comp:Component) extends ComponentReactor[N](comp) {
+  case class MouseMovedReactor[N<:N_atomic_action[_]](comp:Component) extends ComponentReactor[N](comp) {
     val listenedEvent: MouseMoved = null
     private var myReaction: PartialFunction[Event,Unit] = {case e: MouseMoved =>
       currentEvent=e; execute; currentEvent=null}
     override def reaction: PartialFunction[Event,Unit] = myReaction
   }
-  case class MouseDraggedReactor[N<:N_atomic_action](comp:Component) extends ComponentReactor[N](comp) {
+  case class MouseDraggedReactor[N<:N_atomic_action[_]](comp:Component) extends ComponentReactor[N](comp) {
     val listenedEvent: MouseDragged = null
     private var myReaction: PartialFunction[Event,Unit] = {case e: MouseDragged =>
       currentEvent=e; execute; currentEvent=null}
@@ -201,7 +201,7 @@ object Scripts {
    * A EnablingReactor for clicked events on a button
    * TBD: a way to consume clicked events on the button
    */
-  case class ClickedReactor[N<:N_atomic_action](button:AbstractButton) extends EnablingReactor[N](button) {
+  case class ClickedReactor[N<:N_atomic_action[_]](button:AbstractButton) extends EnablingReactor[N](button) {
     val wasFocusable = button.focusable
     override def enabled_=(b:Boolean) = {
       super.enabled_=(b)
@@ -219,7 +219,7 @@ object Scripts {
   /*
    * A Reactor for key typed events
    */
-  case class KeyTypedReactor[N<:N_atomic_action](publisher:Publisher, keyCode: FormalConstrainedParameter[Char]) extends ScriptReactor[N] {
+  case class KeyTypedReactor[N<:N_atomic_action[_]](publisher:Publisher, keyCode: FormalConstrainedParameter[Char]) extends ScriptReactor[N] {
     val listenedEvent = null
     override def reaction = myReaction
     private val myReaction: PartialFunction[Event,Unit] = {
@@ -239,7 +239,7 @@ object Scripts {
   /*
    * A Reactor for virtual key press events
    */
-  case class VKeyTypedReactor[N<:N_atomic_action](publisher:Publisher, keyValue: FormalConstrainedParameter[Key.Value]) extends ScriptReactor[N] {
+  case class VKeyTypedReactor[N<:N_atomic_action[_]](publisher:Publisher, keyValue: FormalConstrainedParameter[Key.Value]) extends ScriptReactor[N] {
     val listenedEvent = null
     override def reaction = myReaction
     private val myReaction: PartialFunction[Event,Unit] = {
@@ -254,7 +254,7 @@ object Scripts {
     }
   }
 
-  case class KeyTypedEventReactor[N<:N_atomic_action](publisher:Publisher, keyTypedEvent: FormalConstrainedParameter[KeyTyped]) extends ScriptReactor[N] {
+  case class KeyTypedEventReactor[N<:N_atomic_action[_]](publisher:Publisher, keyTypedEvent: FormalConstrainedParameter[KeyTyped]) extends ScriptReactor[N] {
     val listenedEvent = null
     override def reaction = myReaction
     private val myReaction: PartialFunction[Event,Unit] = {
@@ -266,7 +266,7 @@ object Scripts {
     }
     override def unsubscribe: Unit = {publisher1.reactions -= reaction}
   }
-  case class KeyTypedEventsReactor[N<:N_atomic_action](publisher:Publisher) extends ScriptReactor[N] {
+  case class KeyTypedEventsReactor[N<:N_atomic_action[_]](publisher:Publisher) extends ScriptReactor[N] {
     val listenedEvent = null
     override def reaction = myReaction
     private val myReaction: PartialFunction[Event,Unit] = {case e: KeyTyped =>

@@ -124,11 +124,11 @@ import scala.collection.mutable._
 	case class AAHappened         (node: CallGraphNodeTrait, 
 	                              child: CallGraphNodeTrait, mode: AAHappenedMode) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_AAHappened}
 	case class AAExecutionFinished(node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_AAExecutionFinished}
-	case class AAToBeExecuted     (node: N_atomic_action   ) extends CallGraphMessageN {type N = N_atomic_action; def priority = PRIORITY_AAToBeExecuted
+	case class AAToBeExecuted     (node: N_atomic_action[_]   ) extends CallGraphMessageN {type N = N_atomic_action[_]; def priority = PRIORITY_AAToBeExecuted
 	  override def secondaryPriority =  node.priority 
 	  override def tertiaryPriority  = -node.index // oldest nodes first 
     }
-	case class AAToBeReexecuted   (node: N_atomic_action) extends CallGraphMessageN {type N = N_atomic_action; def priority = PRIORITY_AAToBeReexecuted
+	case class AAToBeReexecuted   (node: N_atomic_action[_]) extends CallGraphMessageN {type N = N_atomic_action[_]; def priority = PRIORITY_AAToBeReexecuted
 	  override def secondaryPriority = -index // oldest messages first, so that retries are FIFO  
 	}
 	case object CommunicationMatchingMessage extends CallGraphMessageN {

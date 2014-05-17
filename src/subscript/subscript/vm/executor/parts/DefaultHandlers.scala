@@ -3,6 +3,8 @@ package subscript.vm.executor.parts
 import subscript.vm._
 import subscript.vm.executor._
 import subscript.vm.executor.data._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
 import subscript.DSL._
 
@@ -384,7 +386,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     }
     n match {
       case cc: N_call => cc.stopPending
-      case aa: N_atomic_action =>
+      case aa: N_atomic_action[_] =>
         aa.codeExecutor.cancelAA
         if (aa.msgAAToBeExecuted != null) {
           remove(message) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...

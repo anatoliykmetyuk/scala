@@ -3,6 +3,8 @@ package subscript.vm.executor.parts
 import subscript.vm._
 import subscript.vm.executor._
 import subscript.vm.executor.data._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 
 import subscript.DSL._
 
