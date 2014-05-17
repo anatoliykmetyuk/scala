@@ -28,6 +28,22 @@ package subscript.vm
 import subscript.vm.executor._
 import scala.collection.mutable._
 
+object CodeExecutor {
+  def defaultCodeFragmentExecutorFor(node: CallGraphNodeTrait, scriptExecutor: ScriptExecutor): CodeExecutorTrait = {
+    node match {
+      case n@N_code_normal  (_) => new   NormalCodeFragmentExecutor(n, scriptExecutor)
+      case n@N_code_unsure  (_) => new   UnsureCodeFragmentExecutor(n, scriptExecutor)
+      case n@N_code_threaded(_) => new ThreadedCodeFragmentExecutor(n, scriptExecutor)
+      case _                    => new          TinyCodeExecutor(node, scriptExecutor)
+    }
+  }
+  
+  def executeCode[R](n: DoCodeHolder[R]) : R                  = executeCode(n, ()=>n.doCode)
+  def executeCode[R](n: DoCodeHolder[R], code: =>()=>R   ): R = {n.codeExecutor.doCodeExecution(code)}
+  def executeCodeIfDefined(n: CallGraphNodeTrait, code: =>()=>Unit): Unit = {if (code!=null) executeCode(n.asInstanceOf[DoCodeHolder[Unit]], code)} // TBD: get rid of cast
+  
+}
+
 // Executors that execute any call to Scala code in the application:
 // code fragments, script calls, parameter checks, tests in if and while, annotations
 trait CodeExecutor // to make an empty class file so that ant will not get confused
