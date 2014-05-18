@@ -41,7 +41,7 @@ class SimpleScriptDebugger extends MsgListener {
 
   private var _scriptExecutor: ScriptExecutor = null
   def scriptExecutor = _scriptExecutor
-  override def attach(p: MsgPublusher) {
+  override def attach(p: MsgPublisher) {
     super.attach(p)
     _scriptExecutor = p.asInstanceOf[ScriptExecutor]
   }

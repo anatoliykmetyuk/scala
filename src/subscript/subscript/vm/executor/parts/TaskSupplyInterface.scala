@@ -15,7 +15,7 @@ trait TaskSupplyInterface {this: ScriptExecutor =>
     val launchAnchor       = CallGraphNode.getLowestLaunchAnchorAncestor(n) // could be rootNode
     val callAnchorTemplate =     T_call("<launched>", null)
     val callAnchorNode     =     N_call(callAnchorTemplate)
-    Graph.connect(parentNode = launchAnchor, childNode = callAnchorNode)
+    CallGraph.connect(parentNode = launchAnchor, childNode = callAnchorNode)
     // callAnchorTemplate.parent = launchAnchor.template // would not be mutual...
     aScript(callAnchorNode)
     graph.activateFrom(callAnchorNode, callAnchorNode.t_callee, Some(0))

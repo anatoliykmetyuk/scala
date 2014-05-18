@@ -6,7 +6,7 @@ import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
 
-class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] with MsgPublusher with MessagePriorities {self =>
+class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] with MsgPublisher with MessagePriorities {self =>
   private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
   
   /* Internal state */

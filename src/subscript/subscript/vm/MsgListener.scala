@@ -9,10 +9,10 @@ trait MsgListener {
   def messageContinuation(m: CallGraphMessage, c: Continuation) = {}
   def messageAwaiting  = {}
   
-  def attach(publisher: MsgPublusher) {publisher addListener this}
+  def attach(publisher: MsgPublisher) {publisher addListener this}
 }
 
-trait MsgPublusher extends MsgListener {
+trait MsgPublisher extends MsgListener {
   private val listeners = ListBuffer[MsgListener]()
   def addListener   (l: MsgListener) = listeners += l
   def removeListener(l: MsgListener) = listeners -= l

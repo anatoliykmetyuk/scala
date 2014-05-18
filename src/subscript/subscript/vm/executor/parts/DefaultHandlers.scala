@@ -13,7 +13,7 @@ import scala.collection.mutable.Buffer
 /** To DATA section; don't change */
 trait DefaultHandlers {this: ScriptExecutor with Tracer =>
   import CodeExecutor._
-  import Graph._
+  import CallGraph._
   import MessageHandlers._
   
   import msgQueue._

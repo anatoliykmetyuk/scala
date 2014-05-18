@@ -5,8 +5,8 @@ import subscript.vm._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
 
-class Graph(val executor: ScriptExecutor) {
-  import Graph._
+class CallGraph(val executor: ScriptExecutor) {
+  import CallGraph._
   private   val anchorTemplate =     T_call("<root>", null)
   private   val rootTemplate   = new T_launch_anchor(anchorTemplate) {override def owner = executor}
   
@@ -26,7 +26,7 @@ class Graph(val executor: ScriptExecutor) {
   
   // Graph
   def activateFrom(parent: CallGraphParentNodeTrait, template: TemplateNode, pass: Option[Int] = None): CallGraphTreeNode = {
-    import Graph._
+    import CallGraph._
     val n = createNode(template, executor)
     n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)
     connect(parentNode = parent, childNode = n)
@@ -37,7 +37,7 @@ class Graph(val executor: ScriptExecutor) {
   }
 }
 
-object Graph {
+object CallGraph {
   def connect(parentNode: CallGraphParentNodeTrait, childNode: CallGraphTreeNode) {
     childNode.parent = parentNode
     childNode.scriptExecutor = parentNode.scriptExecutor

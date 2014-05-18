@@ -26,13 +26,13 @@ object ScriptExecutorFactory {
   }
 }
 
-trait ScriptExecutor extends MsgPublusher with TaskSupplyInterface with Tracer with OldApi {
+trait ScriptExecutor extends MsgPublisher with TaskSupplyInterface with Tracer with OldApi {
   // Internal state
   // TBD: change restriction from `subscript` to `vm`
   val stateAccessLock = new Object
   val msgQueue        = new MessageQueue   (stateAccessLock) with MQExtras with TrackToBeExecuted
   val msgHandlers     = new MessageHandlers(stateAccessLock)
-  val graph           = new Graph(this)
+  val graph           = new CallGraph(this)
   
   def hasSuccess: Boolean = graph.rootNode.hasSuccess
   def hasActiveProcesses = !graph.rootNode.children.isEmpty
