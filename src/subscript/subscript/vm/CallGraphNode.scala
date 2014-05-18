@@ -26,6 +26,11 @@
 
 package subscript.vm
 
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
+import subscript.vm.model.template.TemplateNode.Child
+import subscript.vm.executor._
+
 import scala.collection.mutable._
 
 /*
@@ -82,7 +87,7 @@ trait CallGraphNodeTrait {
   var _scriptExecutor: ScriptExecutor = null
   def scriptExecutor = _scriptExecutor
   def scriptExecutor_=(s: ScriptExecutor) = {
-    index = s.nextNodeIndex()
+    index = s.graph.nextNodeIndex
     _scriptExecutor = s
   }
   
@@ -233,8 +238,8 @@ trait CallGraphTreeParentNode    extends CallGraphTreeNode    with CallGraphPare
 trait CallGraphNonTreeParentNode extends CallGraphNonTreeNode with CallGraphParentNodeTrait {}
 
 // name not 100% appropriate: many "AA"'s are not really atomic, and N_code_tiny is not a real action
-abstract class N_atomic_action  extends CallGraphLeafNode with DoCodeHolder[Unit] {
-  type T <: T_atomic_action
+abstract class N_atomic_action[Node]  extends CallGraphLeafNode with DoCodeHolder[Unit] {
+  type T <: T_atomic_action[Node]
   override def asynchronousAllowed: Boolean = true
   var msgAAToBeExecuted: CallGraphMessage = null
   var priority = 0 // < 0 is low, > 0 is high
@@ -242,10 +247,10 @@ abstract class N_atomic_action  extends CallGraphLeafNode with DoCodeHolder[Unit
 
 // The case classes for the bottom node types
 
-case class N_code_normal     (template: T_code_normal  ) extends N_atomic_action {type T = T_code_normal  ; def doCode = template.code.apply.apply(this)}
-case class N_code_tiny       (template: T_code_tiny    ) extends N_atomic_action {type T = T_code_tiny    ; def doCode = template.code.apply.apply(this)}
-case class N_code_threaded   (template: T_code_threaded) extends N_atomic_action {type T = T_code_threaded; def doCode = try template.code.apply.apply(this) catch {case _: InterruptedException =>}}  // Don't pollute the output
-case class N_code_unsure     (template: T_code_unsure  ) extends N_atomic_action {type T = T_code_unsure  ; def doCode = template.code.apply.apply(this)
+case class N_code_normal     (template: T_code_normal  ) extends N_atomic_action[N_code_normal  ] {type T = T_code_normal  ; def doCode = template.code(this)}
+case class N_code_tiny       (template: T_code_tiny    ) extends N_atomic_action[N_code_tiny    ] {type T = T_code_tiny    ; def doCode = template.code(this)}
+case class N_code_threaded   (template: T_code_threaded) extends N_atomic_action[N_code_threaded] {type T = T_code_threaded; def doCode = try template.code(this) catch {case _: InterruptedException =>}}  // Don't pollute the output
+case class N_code_unsure     (template: T_code_unsure  ) extends N_atomic_action[N_code_unsure  ] {type T = T_code_unsure  ; def doCode = template.code(this)
   private var _result = UnsureExecutionResult.Success; // TBD: clean this all up; hasSuccess+result is too much
   def result = _result
   def result_=(value: UnsureExecutionResult.UnsureExecutionResultType): Unit = {
@@ -255,8 +260,8 @@ case class N_code_unsure     (template: T_code_unsure  ) extends N_atomic_action
   def fail   = result = UnsureExecutionResult.Failure
   def ignore = result = UnsureExecutionResult.Ignore
 }
-case class N_code_eventhandling         (template: T_code_eventhandling     ) extends N_atomic_action {type T = T_code_eventhandling     ; def doCode = template.code.apply.apply(this)}
-case class N_code_eventhandling_loop    (template: T_code_eventhandling_loop) extends N_atomic_action {type T = T_code_eventhandling_loop; def doCode = template.code.apply.apply(this)
+case class N_code_eventhandling         (template: T_code_eventhandling     ) extends N_atomic_action[N_code_eventhandling] {type T = T_code_eventhandling     ; def doCode = template.code(this)}
+case class N_code_eventhandling_loop    (template: T_code_eventhandling_loop) extends N_atomic_action[N_code_eventhandling_loop] {type T = T_code_eventhandling_loop; def doCode = template.code(this)
   private var _result = LoopingExecutionResult.Success; 
   def result = _result
   def result_=(value: LoopingExecutionResult.LoopingExecutionResultType): Unit = {
@@ -270,11 +275,11 @@ case class N_code_eventhandling_loop    (template: T_code_eventhandling_loop) ex
 }
 case class N_localvar[V](template: T_localvar[V]) extends CallGraphLeafNode with DoCodeHolder[V] {
   type T = T_localvar[V]
-  def doCode = template.code.apply.apply(this)
+  def doCode = template.code(this)
   override def passToBeUsedToGetVariableNamed(thatName: Symbol): Int = if (template.isLoop&&template.localVariable.name==thatName) pass-1 else pass // used in: var i=0...(i+1)
 }
 case class N_privatevar         (template: T_privatevar         ) extends CallGraphLeafNode                                  {type T = T_privatevar         }
-case class N_while              (template: T_while              ) extends CallGraphLeafNode with DoCodeHolder[Boolean]       {type T = T_while              ; def doCode = template.code.apply.apply(this)}
+case class N_while              (template: T_while              ) extends CallGraphLeafNode with DoCodeHolder[Boolean]       {type T = T_while              ; def doCode = template.code(this)}
 case class N_break              (template: T_break              ) extends CallGraphLeafNode                                  {type T = T_break              }
 case class N_optional_break     (template: T_optional_break     ) extends CallGraphLeafNode                                  {type T = T_optional_break     }
 case class N_optional_break_loop(template: T_optional_break_loop) extends CallGraphLeafNode                                  {type T = T_optional_break_loop}
@@ -283,14 +288,14 @@ case class N_epsilon            (template: T_epsilon            ) extends CallGr
 case class N_nu                 (template: T_nu                 ) extends CallGraphLeafNode                                  {type T = T_nu                 }
 case class N_loop               (template: T_loop               ) extends CallGraphLeafNode                                  {type T = T_loop               }
 case class N_1_ary_op           (template: T_1_ary_op           ) extends CallGraphTreeParentNode                            {type T = T_1_ary_op           ; var continuation: Continuation1 = null}
-case class N_if                 (template: T_if                 ) extends CallGraphTreeParentNode with DoCodeHolder[Boolean] {type T = T_if                 ; def doCode = template.code.apply.apply(this)}
-case class N_if_else            (template: T_if_else            ) extends CallGraphTreeParentNode with DoCodeHolder[Boolean] {type T = T_if_else            ; def doCode = template.code.apply.apply(this)}
+case class N_if                 (template: T_if                 ) extends CallGraphTreeParentNode with DoCodeHolder[Boolean] {type T = T_if                 ; def doCode = template.code(this)}
+case class N_if_else            (template: T_if_else            ) extends CallGraphTreeParentNode with DoCodeHolder[Boolean] {type T = T_if_else            ; def doCode = template.code(this)}
 case class N_launch             (template: T_launch             ) extends CallGraphLeafNode                                  {type T = T_launch             }
 
-case class N_annotation[CN<:CallGraphNodeTrait,CT<:TemplateChildNode] (template: T_annotation[CN,CT]) extends CallGraphTreeParentNode with DoCodeHolder[Unit] {
+case class N_annotation[CN<:CallGraphNodeTrait,CT<:Child] (template: T_annotation[CN,CT]) extends CallGraphTreeParentNode with DoCodeHolder[Unit] {
   type T = T_annotation[CN,CT]
   def there:CN=children.head.asInstanceOf[CN]
-  def doCode = template.code.apply.apply(this)
+  def doCode = template.code(this)
 }
 
 // the following 4 types may have multiple children active synchronously
@@ -382,7 +387,7 @@ case class N_call(template: T_call) extends CallGraphTreeParentNode with DoCodeH
   var t_callee    : T_script     = null
   var t_commcallee: T_commscript = null
   def doCode = {
-    template.code.apply.apply(this)
+    template.code(this)
 //    v(this)
   }
   def communicator: Communicator = if (t_commcallee==null) null else t_commcallee.communicator

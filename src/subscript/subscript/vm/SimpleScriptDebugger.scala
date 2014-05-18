@@ -1,5 +1,9 @@
 package subscript.vm
 
+import subscript.vm.executor._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
+
 /*
  * Simple text based script debugger
  * 
@@ -33,9 +37,16 @@ object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
   }
 }
 
-class SimpleScriptDebugger extends ScriptDebugger {
+class SimpleScriptDebugger extends MsgListener {
 
-  def callGraphMessages = scriptExecutor.callGraphMessages
+  private var _scriptExecutor: ScriptExecutor = null
+  def scriptExecutor = _scriptExecutor
+  override def attach(p: MsgPublisher) {
+    super.attach(p)
+    _scriptExecutor = p.asInstanceOf[ScriptExecutor]
+  }
+  
+  def callGraphMessages = scriptExecutor.msgQueue.collection
   def rootNode            = scriptExecutor.rootNode
   
   // some tracing stuff
@@ -83,7 +94,7 @@ class SimpleScriptDebugger extends ScriptDebugger {
   }
   
   
-  def messageHandled(m: CallGraphMessage): Unit = {
+  override def messageHandled(m: CallGraphMessage): Unit = {
         trace(1,">> ",m)
         m match {
           case AAToBeExecuted(_) =>
@@ -92,8 +103,8 @@ class SimpleScriptDebugger extends ScriptDebugger {
           case _ =>  
         }
   }
-  def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m)
-  def messageDequeued    (m: CallGraphMessage                ) = trace(2, "-- ", m)
-  def messageContinuation(m: CallGraphMessage, c: Continuation) = trace(2, "** ", c)
-  def messageAwaiting: Unit = {traceTree; traceMessages}
+  override def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m)
+  override def messageDequeued    (m: CallGraphMessage                ) = trace(2, "-- ", m)
+  override def messageContinuation(m: CallGraphMessage, c: Continuation) = trace(2, "** ", c)
+  override def messageAwaiting: Unit = {traceTree; traceMessages}
 }

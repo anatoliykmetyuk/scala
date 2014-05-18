@@ -3,6 +3,9 @@ package subscript.akka
 import subscript.DSL._
 import scala.collection.mutable.ListBuffer
 import subscript.vm._
+import subscript.vm.executor._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
 import akka.actor._
 
 
@@ -11,7 +14,7 @@ trait SubScriptActor extends Actor {
   val runner: SubScriptActorRunner = SSARunnerV1Scheduler
   
   private object Terminator { // TBD: find better name; something with Blocker
-    var executor: EventHandlingCodeFragmentExecutor[N_atomic_action] = null
+    var executor: EventHandlingCodeFragmentExecutor[N_code_eventhandling] = null
     
     def script block = @{executor = new EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)}: {. .}
     def release = executor.executeMatching(isMatching=true)

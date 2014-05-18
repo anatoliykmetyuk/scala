@@ -4,8 +4,9 @@ import org.junit.runner.RunWith
 
 import subscript.Predef._
 import subscript.DSL._
-import subscript.vm.{TemplateChildNode, N_code_unsure, CallGraphNodeTrait, UnsureExecutionResult, 
-                     ScriptExecutor, CommonScriptExecutor, SimpleScriptDebugger}
+import subscript.vm.{N_code_unsure, CallGraphNodeTrait, UnsureExecutionResult, 
+                     SimpleScriptDebugger}
+import subscript.vm.executor._
 
 class TestC {
     

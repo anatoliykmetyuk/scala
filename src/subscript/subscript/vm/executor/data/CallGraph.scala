@@ -1,0 +1,97 @@
+package subscript.vm.executor.data
+
+import subscript.vm.executor._
+import subscript.vm._
+import subscript.vm.model.template._
+import subscript.vm.model.template.concrete._
+
+class CallGraph(val executor: ScriptExecutor) {
+  import CallGraph._
+  private   val anchorTemplate =     T_call("<root>", null)
+  private   val rootTemplate   = new T_launch_anchor(anchorTemplate) {override def owner = executor}
+  
+  val rootNode       =     N_launch_anchor(rootTemplate)
+  val anchorNode     =     N_call(anchorTemplate)
+ 
+  /**
+   * Must be called before this graph is used.
+   */
+  def init() {
+    rootNode.scriptExecutor = executor
+    connect(parentNode = rootNode, childNode = anchorNode)
+  }
+  
+  private var nNodes = 0
+  def nextNodeIndex = {nNodes = nNodes+1; nNodes}
+  
+  // Graph
+  def activateFrom(parent: CallGraphParentNodeTrait, template: TemplateNode, pass: Option[Int] = None): CallGraphTreeNode = {
+    import CallGraph._
+    val n = createNode(template, executor)
+    n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)
+    connect(parentNode = parent, childNode = n)
+    // ?? probably delete the following line
+    //n match {case ns: N_script => val pc = ns.parent.asInstanceOf[N_call]; what to do with this}
+    executor.msgQueue insert Activation(n)
+    n
+  }
+}
+
+object CallGraph {
+  def connect(parentNode: CallGraphParentNodeTrait, childNode: CallGraphTreeNode) {
+    childNode.parent = parentNode
+    childNode.scriptExecutor = parentNode.scriptExecutor
+    parentNode.appendChild(childNode)
+    parentNode.nActivatedChildren += 1
+  }  
+  
+  def disconnect(childNode: CallGraphNodeTrait) {
+    childNode match {
+      case cn: CallGraphTreeNode => val parentNode = cn.parent
+                                    if (parentNode==null) return;
+                                    parentNode.children -= cn
+       case _ =>
+    }
+  }
+  
+  def setIteration_n_ary_op_ancestor(n: CallGraphNodeTrait) = {
+    val a = n.n_ary_op_ancestor
+    if (a!=null) a.isIteration = true
+  }
+  
+  def createNode(template: TemplateNode, scriptExecutor: ScriptExecutor): CallGraphTreeNode = {
+   val result =
+    template match {
+      case t @ T_optional_break         (                          ) => N_optional_break(t)
+      case t @ T_optional_break_loop    (                          ) => N_optional_break_loop(t)
+      case t @ T_loop                   (                          ) => N_loop          (t)
+      case t @ T_break                  (                          ) => N_break         (t)
+      case t @ T_delta                  (                          ) => N_delta         (t)
+      case t @ T_epsilon                (                          ) => N_epsilon       (t)
+      case t @ T_nu                     (                          ) => N_nu            (t)
+      case t @ T_call                   (        _,    _           ) => N_call          (t)
+      case t @ T_privatevar             (              name        ) => N_privatevar    (t)
+      case t @ T_localvar               (_,_,lv:LocalVariable[_],_ ) => N_localvar      (t)
+      case t @ T_code_normal            (              _           ) => N_code_normal   (t)
+      case t @ T_code_unsure            (              _           ) => N_code_unsure   (t)
+      case t @ T_code_tiny              (              _           ) => N_code_tiny     (t)
+      case t @ T_code_threaded          (              _           ) => N_code_threaded (t)
+      case t @ T_code_eventhandling     (              _           ) => N_code_eventhandling     (t)
+      case t @ T_code_eventhandling_loop(              _           ) => N_code_eventhandling_loop(t)
+      case t @ T_while                  (              _           ) => N_while         (t)
+      case t @ T_launch                 (              _           ) => N_launch        (t)
+      case t @ T_launch_anchor          (              _           ) => N_launch_anchor (t)
+      case t @ T_1_ary_op               (kind: String, _           ) => N_1_ary_op      (t)
+      case t @ T_annotation             (              _, _        ) => N_annotation    (t)
+      case t @ T_if                     (              _, _        ) => N_if            (t)
+      case t @ T_if_else                (              _, _, _     ) => N_if_else       (t)
+      case t @ T_then                   (              _, _        ) => N_then          (t)
+      case t @ T_then_else              (              _, _, _     ) => N_then_else     (t)
+      case t @ T_n_ary_op               (kind: String, children@ _*) => N_n_ary_op (t, T_n_ary_op.isLeftMerge(kind))
+      case t @ T_script(_, kind: String, name: Symbol, child0: TemplateNode) => N_script(t)
+      case _ => null 
+    }
+    result.codeExecutor = CodeExecutor.defaultCodeFragmentExecutorFor(result, scriptExecutor)
+    result
+  }
+}
