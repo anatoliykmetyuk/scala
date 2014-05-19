@@ -22,6 +22,8 @@ trait SubScriptActorRunner {
  
   def executor: CommonScriptExecutor
   
+  def doScriptSteps
+  
 }
 
 object SSARunnerV1Scheduler extends SubScriptActorRunner {
@@ -43,7 +45,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
 
   def execute(debugger: MsgListener) {
     if (debugger!=null) debugger.attach(executor)
-    executor.addHandler(synchMsgHandler)
+//    executor.addHandler(synchMsgHandler)
     executor.initializeExecution(_live())
     doScriptSteps_loop
   }
@@ -66,8 +68,8 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
     executor.messageAwaiting
   }
   
-  val synchMsgHandler: PartialFunction[CallGraphMessage, Unit] = {
-    case SynchronizationMessage(_, lock) => lock.synchronized(lock.notify())
-  }
+//  val synchMsgHandler: PartialFunction[CallGraphMessage, Unit] = {
+//    case SynchronizationMessage(_, lock) => lock.synchronized(lock.notify())
+//  }
 
 }
