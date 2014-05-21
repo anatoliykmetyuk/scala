@@ -166,17 +166,17 @@ self =>
       new MarkupParser(this, preserveWS = true)
     }
 
-    def scriptLiteral() : Tree = {
+    def scriptLiteral(doInBrackets: Boolean) : Tree = {
       val wasInSubScript_script     = in.isInSubScript_script
       val wasInSubScript_nativeCode = in.isInSubScript_nativeCode
       in.isInSubScript_script = true
       in.isInSubScript_header = false
       in.isInSubScript_nativeCode = false
-      var result: Tree = null
-      inBrackets{
-        val se = scriptExpr
-        result = makeScriptHeaderAndLocalsAndBody("<lambda>", se, Nil)
-      }
+      var se: Tree = null
+      if (doInBrackets)
+            inBrackets{se = scriptExpr}
+      else             se = scriptExpr
+      val result = makeScriptHeaderAndLocalsAndBody("<lambda>", se, Nil)
       in.isInSubScript_script     = wasInSubScript_script
       in.isInSubScript_nativeCode = wasInSubScript_nativeCode
       result
@@ -587,6 +587,10 @@ self =>
     }
 
     def expectedMsgTemplate(exp: String, fnd: String) = s"$exp expected but $fnd found."
+    def expectedKWIdentMsg(kw: TermName): String = {
+      val s = if (in.token==IDENTIFIER) s"${in.token} (${in.name})" else in.token.toString()
+      expectedMsgTemplate(kw.toString(), s)
+    }
     def expectedMsg(token: Token): String = expectedMsgTemplate(token2string(token), token2string(in.token))
 
     /** Consume one token of the specified type, or signal an error if it is not there. */
@@ -610,6 +614,14 @@ self =>
       if (in.token == token) in.nextToken()
       offset
     }
+    def acceptIdent(kw: TermName): Offset = {
+      val offset = in.offset
+      if ( IDENTIFIER != in.token
+      ||   kw         != in.name) syntaxErrorOrIncomplete(expectedKWIdentMsg(kw), skipIt = false)
+      else in.nextToken()
+      offset
+    }
+
 
     /** {{{
      *  semi = nl {nl} | `;`
@@ -717,7 +729,8 @@ self =>
       case _              => false
       }
 
-    def isStatSeqEnd                     = isTokenAClosingBrace(in.token)             || in.token == EOF
+    def isStatSeqEnd                     = isTokenAClosingBrace(in.token)             || in.token == EOF  ||
+                                            (in.isInSubScript_script && in.name==nme.ARROW2kw)
     def isCaseDefEnd                     = in.token == RBRACE || in.token == CASE     || in.token == EOF
     def isStatSep(token: Token): Boolean =    token == NEWLINE ||   token == NEWLINES ||    token == SEMI
     def isStatSep              : Boolean = isStatSep(in.token)
@@ -1319,7 +1332,10 @@ self =>
     val      at_Name  = newTermName("at")
     val   value_Name  = newTermName("value")
     val   there_Name  = newTermName("there")
+    val     tmp_Name  = newTermName("$tmp")
     val    tmp1_Name  = newTermName("$tmp1")
+    val MsgSCRIPT_Name: TermName = newTermName("r$")
+
     val            bind_inParam_Name  = newTermName(scala.reflect.NameTransformer.encode("~"))
     val           bind_outParam_Name  = newTermName(scala.reflect.NameTransformer.encode("~?"))
     val   bind_constrainedParam_Name  = newTermName(scala.reflect.NameTransformer.encode("~??"))
@@ -1575,6 +1591,7 @@ self =>
          | DOT                      
          | DOT2                     
          | DOT3                     
+         | LESS2                   
          | LPAREN                   
          | LPAREN_PLUS_RPAREN       
          | LPAREN_MINUS_RPAREN      
@@ -1704,7 +1721,7 @@ self =>
     
     // These are maps from Name to pairs of Tree and Boolean. Here's what Boolean means:
     // 1) true - Tree IS a type definition that can be used out-of-the-box
-    // 2) flase - Tree is NOT a type definition. It is a value, for which this local variable is declared,
+    // 2) false - Tree is NOT a type definition. It is a value, for which this local variable is declared,
     //            but who's type is still unknown.
     var scriptLocalVariables              = new scala.collection.mutable.HashMap[Name,(Tree, Boolean)] // should be in a context stack; now the scope becomes too big 
     var scriptLocalValues                 = new scala.collection.mutable.HashMap[Name,(Tree, Boolean)]
@@ -2321,7 +2338,7 @@ self =>
     def simpleScriptTerm (isNegated: Boolean = false): Tree = atPos(in.offset) {
       val currentToken = in.token
       currentToken match {
-      case IF =>
+      case IF => // TBD: precedence changed; move just below ";"
         def parseIf = atPos(in.skipToken()) {
           val startPos = r2p(in.offset, in.offset, in.lastOffset max in.offset)
           val cond  = simpleNativeValueExpr()
@@ -2373,6 +2390,12 @@ self =>
         if (isOutputParam) makeActualOutputParameter(p, paramConstraint)
         else             makeActualAdaptingParameter(p, paramConstraint)
 
+      case LESS2 => in.nextToken(); 
+                    val result = makeMessageHandler(if (in.token==CASE) scriptMsgCaseClauses()
+                                                    else           List(scriptMsgCaseClause()))
+                    accept(GREATER2)
+                    result
+
       case IDENTIFIER | BACKQUOTED_IDENT | THIS | SUPER => 
         val p = path(thisOK = true, typeOK = false); // scriptSimpleExprRest(t, canApply = canApply)
 	    if (in.token==LPAREN && in.offset==in.lastOffset) { // !!!! no space acceptable before "("
@@ -2391,6 +2414,54 @@ self =>
     }
     }
     
+    // Call a script r$(m)
+    // with m = usual pf with each case appended: ([scriptExpr] if such an expr given, else null)
+    //
+    // r$ is a method (presumably in SubScriptActor) that accepts a pf and sets it up for msg reception:
+    //
+    //   def script r$(handler: PartialFunction[Any, Script[Any]]) 
+    //   = var s:Script[Any]=null
+    //     @{initForReceive(there, handler)}: {. s=handlerResult; Debug.info(s"$this.r$$") .}
+    //     if (s != null) s
+    //
+    // Note: we also do transformations for <<....>> here.
+    // Probably different method required for general partial script closures...
+    
+    case class ScriptMsgCase(offset: Offset, pat:Tree, guard:Tree, scriptCaseBlock: Tree, scriptCaseScriptBlock:Tree)
+    
+    def makeMessageHandler(scriptMsgCases: List[ScriptMsgCase]): Tree = {
+      val offset        = scriptMsgCases.head.offset
+      val caseClauses   = scriptMsgCases.map(makeMsgScriptCaseDef(_)) 
+      val m             = Match(EmptyTree, caseClauses)
+      
+      atPos(offset) {ScriptApply(Ident(MsgSCRIPT_Name), List(m))} // r$(m)   
+    }
+        
+    def makeMsgScriptCaseDef(smct:ScriptMsgCase): CaseDef = { 
+      // append the script lambda to the normal case def; null if absent
+      val scriptLambdaValue: Tree = if  (smct.scriptCaseScriptBlock==null) newLiteral(null)
+                                    else smct.scriptCaseScriptBlock
+                        
+      val caseBlock = makeBlock(List(smct.scriptCaseBlock, scriptLambdaValue))
+      // construct the usual case def
+      atPos(smct.offset){makeCaseDef(smct.pat, smct.guard, caseBlock)}
+    }
+    def scriptMsgCaseClause(): ScriptMsgCase = 
+      new ScriptMsgCase(in.offset, pattern(), guard(), scriptCaseBlock(), scriptCaseScriptBlock())
+
+    /** {{{
+     *  CaseClauses ::= CaseClause {CaseClause}
+     *  CaseClause  ::= case Pattern [Guard] `=>' Block
+     *  }}}
+     */
+    def scriptMsgCaseClauses(): List[ScriptMsgCase] = caseSeparated { scriptMsgCaseClause() }
+
+    def scriptCaseScriptBlock(): Tree = if (in.token==IDENTIFIER 
+                                        &&  in.name ==nme.ARROW2kw) atPos(acceptIdent(nme.ARROW2kw))(scriptLiteral(doInBrackets=false)) else null
+    def scriptCaseBlock(): Tree       = if (in.token==    ARROW   ) atPos(accept     (    ARROW   ))(block()) else EmptyTree
+
+
+
     def scriptBlockExpr(): Tree = {
       in.isInSubScript_nativeCode = true
       val startBrace = in.token
@@ -2653,7 +2724,9 @@ self =>
       val start = in.offset
       val base  = opstack
 
-      def loop(top: Tree): Tree = if (!isIdent) top else {
+      def loop(top: Tree): Tree = if (!isIdent
+          || in.isInSubScript_script && in.name==nme.ARROW2kw // forbid "==>" inside scripts; needed for closures
+          ) top else {
         pushOpInfo(reduceExprStack(base, top))
         newLineOptWhenFollowing(isExprIntroToken)
         if (isExprIntro)
@@ -2684,7 +2757,7 @@ self =>
       else simpleExpr()
     }
     def xmlLiteral(): Tree
-    def scriptLiteral(): Tree
+    def scriptLiteral(doInBrackets: Boolean): Tree
 
     /** {{{
      *  SimpleExpr    ::= new (ClassTemplate | TemplateBody)
@@ -2704,7 +2777,7 @@ self =>
       val t =
         if (isLiteral) literal()
         else in.token match {
-          case LBRACKET => canApply = false; scriptLiteral()
+          case LBRACKET => canApply = false; scriptLiteral(doInBrackets=true)
           case XMLSTART => xmlLiteral()
           case IDENTIFIER | BACKQUOTED_IDENT | THIS | SUPER
                       => path(thisOK = true, typeOK = false)

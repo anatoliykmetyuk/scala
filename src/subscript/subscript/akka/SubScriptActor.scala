@@ -44,8 +44,12 @@ trait SubScriptActor extends Actor {
   def _live(): Script[Unit]
   private def script terminate = Terminator.block
   private def script die       = {if (context ne null) context stop self}
+  private var handlerResult: Script[Any]=null
   
-  def script r$(handler: Actor.Receive) = @{initForReceive(there, handler)}: {. Debug.info(s"$this.r$$") .}
+  def script r$(handler: PartialFunction[Any, Script[Any]]) 
+  = var s:Script[Any]=null
+    @{initForReceive(there, handler)}: {. s=handlerResult; Debug.info(s"$this.r$$") .}
+    if (s != null) s
   
   
   // Callbacks
@@ -91,12 +95,12 @@ trait SubScriptActor extends Actor {
   final def receive: Actor.Receive = {case _ =>} 
   
   // SubScript actor convenience methods
-  def initForReceive(node: N_code_eventhandling, _handler: PartialFunction[Any, Unit]) {
+  def initForReceive(node: N_code_eventhandling, handler: PartialFunction[Any, Script[Any]]) {
     node.codeExecutor = EventHandlingCodeFragmentExecutor(node, node.scriptExecutor)
-    val handler = _handler andThen {_ => node.codeExecutor.executeAA}
-    synchronized {callHandlers += handler}
+    val handlerWithExecuteAA = handler andThen {hr => {handlerResult = hr; node.codeExecutor.executeAA}}
+    synchronized {callHandlers += handlerWithExecuteAA}
     node.onDeactivate {
-      synchronized {callHandlers -= handler}
+      synchronized {callHandlers -= handlerWithExecuteAA}
     }
   }
     

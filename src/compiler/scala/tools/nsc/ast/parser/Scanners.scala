@@ -422,7 +422,9 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-        case '<' => // is XMLSTART?
+       case '>' => if (isInSubScript_expression) {nextChar(); if (ch=='>') {nextChar(); token = GREATER2; return} else putChar('>')}; getOperatorRest()
+       case '<' => if (isInSubScript_expression) {nextChar(); if (ch=='<') {nextChar(); token =    LESS2; return} else putChar('<')} 
+          // is XMLSTART?
           def fetchLT() = {
             val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
             nextChar()
@@ -465,8 +467,8 @@ trait Scanners extends ScannersCommon {
             getOperatorRest()
           }
         case '~' | '@' | '#' | '%' |
-             '+' | '-' | /*'<' | */
-             '>' | ':' | '=' | '&' |
+             '+' | '-' | /* '>' | '<' | */
+             ':' | '=' | '&' |
              '|' | '\\' =>
           putChar(ch)
           nextChar()
@@ -565,9 +567,9 @@ trait Scanners extends ScannersCommon {
               case '*' => nextChar(); token = LBRACE_ASTERISK
               case '^' => nextChar(); token = LBRACE_CARET
               case '.' => nextChar(); token = LBRACE_DOT
-                          if  (ch=='.') {nextChar(); 
-                            if(ch=='.') {nextChar(); token = LBRACE_DOT3 }
-                            else {syntaxError("'.' expected")}
+                          if  (ch=='.'
+                          &&   lookaheadReader.ch == '.') {
+                               nextChar(); nextChar(); token = LBRACE_DOT3
                           }
               case  _  =>
             }
@@ -1242,6 +1244,8 @@ trait Scanners extends ScannersCommon {
     case RBRACE_CARET             => "^}"
     case DOT2                     => ".."
     case DOT3                     => "..."
+    case LESS2                    => "<<"
+    case GREATER2                 => ">>"
     case LPAREN_PLUS_RPAREN       => "(+)"
     case LPAREN_MINUS_RPAREN      => "(-)"
     case LPAREN_PLUS_MINUS_RPAREN => "(+-)"
