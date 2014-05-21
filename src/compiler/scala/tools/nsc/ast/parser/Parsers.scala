@@ -729,9 +729,8 @@ self =>
       case _              => false
       }
 
-    def isStatSeqEnd                     = isTokenAClosingBrace(in.token)             || in.token == EOF  ||
-                                            (in.isInSubScript_script && in.name==nme.ARROW2kw)
-    def isCaseDefEnd                     = in.token == RBRACE || in.token == CASE     || in.token == EOF
+    def isStatSeqEnd                     = isTokenAClosingBrace(in.token)             || in.token == EOF  || in.token == ARROW2 || in.token == GREATER2
+    def isCaseDefEnd                     = in.token == RBRACE || in.token == CASE     || in.token == EOF  || in.token == ARROW2 || in.token == GREATER2
     def isStatSep(token: Token): Boolean =    token == NEWLINE ||   token == NEWLINES ||    token == SEMI
     def isStatSep              : Boolean = isStatSep(in.token)
 
@@ -2391,8 +2390,10 @@ self =>
         else             makeActualAdaptingParameter(p, paramConstraint)
 
       case LESS2 => in.nextToken(); 
+                    in.start_SubScript_partialScript // instruct scanner to see ==> and >>
                     val result = makeMessageHandler(if (in.token==CASE) scriptMsgCaseClauses()
                                                     else           List(scriptMsgCaseClause()))
+                    in.end_SubScript_partialScript
                     accept(GREATER2)
                     result
 
@@ -2427,7 +2428,7 @@ self =>
     // Note: we also do transformations for <<....>> here.
     // Probably different method required for general partial script closures...
     
-    case class ScriptMsgCase(offset: Offset, pat:Tree, guard:Tree, scriptCaseBlock: Tree, scriptCaseScriptBlock:Tree)
+    case class ScriptMsgCase(offset: Offset, pat:Tree, guard:Tree, scriptCaseBlock: Tree, scriptCaseScript:Tree)
     
     def makeMessageHandler(scriptMsgCases: List[ScriptMsgCase]): Tree = {
       val offset        = scriptMsgCases.head.offset
@@ -2439,16 +2440,17 @@ self =>
         
     def makeMsgScriptCaseDef(smct:ScriptMsgCase): CaseDef = { 
       // append the script lambda to the normal case def; null if absent
-      val scriptLambdaValue: Tree = if  (smct.scriptCaseScriptBlock==null) newLiteral(null)
-                                    else smct.scriptCaseScriptBlock
+      val scriptLambdaValue: Tree = if  (smct.scriptCaseScript==EmptyTree) newLiteral(null)
+                                    else smct.scriptCaseScript
                         
       val caseBlock = makeBlock(List(smct.scriptCaseBlock, scriptLambdaValue))
       // construct the usual case def
       atPos(smct.offset){makeCaseDef(smct.pat, smct.guard, caseBlock)}
     }
-    def scriptMsgCaseClause(): ScriptMsgCase = 
-      new ScriptMsgCase(in.offset, pattern(), guard(), scriptCaseBlock(), scriptCaseScriptBlock())
-
+    def scriptMsgCaseClause(): ScriptMsgCase = {
+      new ScriptMsgCase(in.offset, pattern(), guard(), scriptCaseBlock(), scriptCaseScript())
+    }
+    
     /** {{{
      *  CaseClauses ::= CaseClause {CaseClause}
      *  CaseClause  ::= case Pattern [Guard] `=>' Block
@@ -2456,9 +2458,16 @@ self =>
      */
     def scriptMsgCaseClauses(): List[ScriptMsgCase] = caseSeparated { scriptMsgCaseClause() }
 
-    def scriptCaseScriptBlock(): Tree = if (in.token==IDENTIFIER 
-                                        &&  in.name ==nme.ARROW2kw) atPos(acceptIdent(nme.ARROW2kw))(scriptLiteral(doInBrackets=false)) else null
-    def scriptCaseBlock(): Tree       = if (in.token==    ARROW   ) atPos(accept     (    ARROW   ))(block()) else EmptyTree
+    def scriptCaseBlock( ): Tree = if (in.token==ARROW ) atPos(accept(ARROW ))(block()) else EmptyTree
+    def scriptCaseScript(): Tree = if (in.token==ARROW2) {
+                                      in.start_SubScript_partialScript_caseScript; 
+                                      atPos(accept(ARROW2)){
+                                        val sl = scriptLiteral(doInBrackets=false)
+                                        in.  end_SubScript_partialScript_caseScript
+                                        sl
+                                      }
+                                   }
+                                   else EmptyTree
 
 
 
@@ -2724,9 +2733,7 @@ self =>
       val start = in.offset
       val base  = opstack
 
-      def loop(top: Tree): Tree = if (!isIdent
-          || in.isInSubScript_script && in.name==nme.ARROW2kw // forbid "==>" inside scripts; needed for closures
-          ) top else {
+      def loop(top: Tree): Tree = if (!isIdent) top else {
         pushOpInfo(reduceExprStack(base, top))
         newLineOptWhenFollowing(isExprIntroToken)
         if (isExprIntro)

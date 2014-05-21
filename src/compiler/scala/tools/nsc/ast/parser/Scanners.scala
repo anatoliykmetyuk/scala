@@ -106,11 +106,22 @@ trait Scanners extends ScannersCommon {
   abstract class Scanner extends CharArrayReader with TokenData with ScannerData with ScannerCommon {
     private def isDigit(c: Char) = java.lang.Character isDigit c
     
-    var prevWasInSubScript_script = false
-    var isInSubScript_script      = false
-    var isInSubScript_header      = false
-    var isInSubScript_nativeCode  = false
-    def isInSubScript_expression  = isInSubScript_script && !isInSubScript_header && !isInSubScript_nativeCode
+    var prevWasInSubScript_script   = false
+    var isInSubScript_script        = false
+    var isInSubScript_header        = false
+    var isInSubScript_nativeCode    = false
+    def isInSubScript_expression  = isInSubScript_script && 
+                                   !isInSubScript_header && 
+                                   !isInSubScript_nativeCode && 
+                                  (!isInSubScript_partialScript || isInSubScript_partialScript_caseScript)
+    
+    var sepRegions_SubScript_partialScript = -1
+    var isInSubScript_partialScript            = false
+    var isInSubScript_partialScript_caseScript = false
+    def start_SubScript_partialScript            = {isInSubScript_partialScript            =  true}
+    def   end_SubScript_partialScript            = {isInSubScript_partialScript            = false}
+    def start_SubScript_partialScript_caseScript = {isInSubScript_partialScript_caseScript =  true}
+    def   end_SubScript_partialScript_caseScript = {isInSubScript_partialScript_caseScript = false}
 
     private var openComments = 0
     protected def putCommentChar(): Unit = nextChar()
@@ -422,8 +433,17 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-       case '>' => if (isInSubScript_expression) {nextChar(); if (ch=='>') {nextChar(); token = GREATER2; return} else putChar('>')}; getOperatorRest()
-       case '<' => if (isInSubScript_expression) {nextChar(); if (ch=='<') {nextChar(); token =    LESS2; return} else putChar('<')} 
+       case '=' => if (isInSubScript_partialScript) {
+                      val lookahead = lookaheadReader; lookahead.nextChar()
+                      if (lookahead.ch == '=') {lookahead.nextChar()
+                       if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = ARROW2; return} 
+                      }
+                   }
+                   getOperatorRest()
+       case '>' => if (isInSubScript_partialScript) {nextChar(); 
+                                                     if (ch=='>') {nextChar(); token = GREATER2; return} else putChar('>')}
+                   getOperatorRest()
+       case '<' => if (isInSubScript_expression   ) {nextChar(); if (ch=='<') {nextChar(); token =    LESS2; return} else putChar('<')} 
           // is XMLSTART?
           def fetchLT() = {
             val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
@@ -467,8 +487,8 @@ trait Scanners extends ScannersCommon {
             getOperatorRest()
           }
         case '~' | '@' | '#' | '%' |
-             '+' | '-' | /* '>' | '<' | */
-             ':' | '=' | '&' |
+             '+' | '-' | /* '>' | '<' |'=' |  */
+             ':'| '&' |
              '|' | '\\' =>
           putChar(ch)
           nextChar()
@@ -639,7 +659,7 @@ trait Scanners extends ScannersCommon {
     /** Can token start a statement? */
     def inFirstOfStat(token: Token) = token match {
       case EOF | CATCH | ELSE | EXTENDS | FINALLY | FORSOME | MATCH | WITH | YIELD |
-           COMMA | SEMI | NEWLINE | NEWLINES | DOT | COLON | EQUALS | ARROW | LARROW |
+           COMMA | SEMI | NEWLINE | NEWLINES | DOT | COLON | EQUALS | ARROW | LARROW | ARROW2 | 
            SUBTYPE | VIEWBOUND | SUPERTYPE | HASH | RPAREN | RBRACKET | RBRACE | LBRACKET =>
         false
       case _ =>
@@ -1246,6 +1266,7 @@ trait Scanners extends ScannersCommon {
     case DOT3                     => "..."
     case LESS2                    => "<<"
     case GREATER2                 => ">>"
+    case ARROW2                   => "==>"
     case LPAREN_PLUS_RPAREN       => "(+)"
     case LPAREN_MINUS_RPAREN      => "(-)"
     case LPAREN_PLUS_MINUS_RPAREN => "(+-)"
