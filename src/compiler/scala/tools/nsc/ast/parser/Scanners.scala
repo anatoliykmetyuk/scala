@@ -659,7 +659,7 @@ trait Scanners extends ScannersCommon {
     /** Can token start a statement? */
     def inFirstOfStat(token: Token) = token match {
       case EOF | CATCH | ELSE | EXTENDS | FINALLY | FORSOME | MATCH | WITH | YIELD |
-           COMMA | SEMI | NEWLINE | NEWLINES | DOT | COLON | EQUALS | ARROW | LARROW | ARROW2 | 
+           COMMA | SEMI | NEWLINE | NEWLINES | DOT | COLON | EQUALS | ARROW | LARROW | ARROW2 | GREATER2 | 
            SUBTYPE | VIEWBOUND | SUPERTYPE | HASH | RPAREN | RBRACKET | RBRACE | LBRACKET =>
         false
       case _ =>

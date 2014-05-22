@@ -44,11 +44,16 @@ trait SubScriptActor extends Actor {
   def _live(): Script[Unit]
   private def script terminate = Terminator.block
   private def script die       = {if (context ne null) context stop self}
-  private var handlerResult: Script[Any]=null
   
   def script r$(handler: PartialFunction[Any, Script[Any]]) 
   = var s:Script[Any]=null
-    @{initForReceive(there, handler)}: {. s=handlerResult; Debug.info(s"$this.r$$") .}
+    @{val here = there.parent.asInstanceOf[CallGraphTreeNode] // Bug: here is not yet known; is needed to access local variable s
+      there.codeExecutor = EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)
+      val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.codeExecutor.executeAA}}
+                          synchronized {callHandlers += handlerWithExecuteAA}
+      there.onDeactivate {synchronized {callHandlers -= handlerWithExecuteAA}}
+    }: 
+    {. Debug.info(s"$this.r$$") .}
     if (s != null) s
   
   
@@ -94,15 +99,6 @@ trait SubScriptActor extends Actor {
   
   final def receive: Actor.Receive = {case _ =>} 
   
-  // SubScript actor convenience methods
-  def initForReceive(node: N_code_eventhandling, handler: PartialFunction[Any, Script[Any]]) {
-    node.codeExecutor = EventHandlingCodeFragmentExecutor(node, node.scriptExecutor)
-    val handlerWithExecuteAA = handler andThen {hr => {handlerResult = hr; node.codeExecutor.executeAA}}
-    synchronized {callHandlers += handlerWithExecuteAA}
-    node.onDeactivate {
-      synchronized {callHandlers -= handlerWithExecuteAA}
-    }
-  }
     
   //def sendSynchronizationMessage(lock: AnyRef) {
   //  val vm = runner.executor
