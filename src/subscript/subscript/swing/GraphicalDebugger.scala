@@ -101,28 +101,31 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   //"Exclude     "
   
   
-  val checkBox_step_Activation   = new CheckBox {text = "Act" ; selected = true}
-  val checkBox_step_Deactivation = new CheckBox {text = "Dea" ; selected = true}
-  val checkBox_step_Continuation = new CheckBox {text = "Cnt" ; selected = true}
-  val checkBox_step_AAHappened   = new CheckBox {text = "AAH" ; selected = true}
-  val checkBox_step_Success      = new CheckBox {text = "Scs" ; selected = true}
-  val checkBox_step_Break        = new CheckBox {text = "Brk" ; selected = true}
-  val checkBox_step_Exclude      = new CheckBox {text = "Exc" ; selected = true}
-  val checkBox_step_Wait         = new CheckBox {text = "Idle"; selected = true}
+  val checkBox_step_Activation     = new CheckBox {text = "Act" ; selected = true}
+  val checkBox_step_Deactivation   = new CheckBox {text = "Dea" ; selected = true}
+  val checkBox_step_AAToBeExecuted = new CheckBox {text = "AAT" ; selected = true}
+  val checkBox_step_Continuation   = new CheckBox {text = "Cnt" ; selected = true}
+  val checkBox_step_AAHappened     = new CheckBox {text = "AAH" ; selected = true}
+  val checkBox_step_Success        = new CheckBox {text = "Scs" ; selected = true}
+  val checkBox_step_Break          = new CheckBox {text = "Brk" ; selected = true}
+  val checkBox_step_Exclude        = new CheckBox {text = "Exc" ; selected = true}
+  val checkBox_step_Wait           = new CheckBox {text = "Idle"; selected = true}
 
-  val checkBox_log_Activation   = new CheckBox {text = "Act" ; selected = true}
-  val checkBox_log_Deactivation = new CheckBox {text = "Dea" ; selected = true}
-  val checkBox_log_Continuation = new CheckBox {text = "Cnt" ; selected = true}
-  val checkBox_log_AAHappened   = new CheckBox {text = "AAH" ; selected = true}
-  val checkBox_log_Success      = new CheckBox {text = "Scs" ; selected = true}
-  val checkBox_log_Break        = new CheckBox {text = "Brk" ; selected = true}
-  val checkBox_log_Exclude      = new CheckBox {text = "Exc" ; selected = true}
-  val checkBox_log_Wait         = new CheckBox {text = "Idle"; selected = true}
+  val checkBox_log_Activation      = new CheckBox {text = "Act" ; selected = true}
+  val checkBox_log_Deactivation    = new CheckBox {text = "Dea" ; selected = true}
+  val checkBox_log_AAToBeExecuted  = new CheckBox {text = "AAT" ; selected = true}
+  val checkBox_log_Continuation    = new CheckBox {text = "Cnt" ; selected = true}
+  val checkBox_log_AAHappened      = new CheckBox {text = "AAH" ; selected = true}
+  val checkBox_log_Success         = new CheckBox {text = "Scs" ; selected = true}
+  val checkBox_log_Break           = new CheckBox {text = "Brk" ; selected = true}
+  val checkBox_log_Exclude         = new CheckBox {text = "Exc" ; selected = true}
+  val checkBox_log_Wait            = new CheckBox {text = "Idle"; selected = true}
 
   val buttonsPanel = new BoxPanel(Orientation.Vertical) {
     contents += new Label("Step:")
     contents += checkBox_step_Activation  
     contents += checkBox_step_Deactivation
+    contents += checkBox_step_AAToBeExecuted  
     contents += checkBox_step_Continuation
     contents += checkBox_step_AAHappened   
     contents += checkBox_step_Success     
@@ -133,6 +136,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     contents += new Label("Log:")
     contents += checkBox_log_Activation  
     contents += checkBox_log_Deactivation
+    contents += checkBox_log_AAToBeExecuted  
     contents += checkBox_log_Continuation
     contents += checkBox_log_AAHappened     
     contents += checkBox_log_Success     
@@ -142,7 +146,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   }
   val callGraphPanel = new Panel {
     background = AWTColor.white
-    preferredSize  = new Dimension(2000,2000)
+    preferredSize  = new Dimension(3000,2000)
     override def paint(g: Graphics2D) {
         g.setColor(AWTColor.white)
         g.fillRect(0, 0, size.width, size.height)
@@ -153,7 +157,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   }
   val templateTreesPanel = new Panel {
     background = AWTColor.white
-    preferredSize  = new Dimension(2000,800)
+    preferredSize  = new Dimension(4600,900)
     override def paint(g: Graphics2D) {
         g.setColor(AWTColor.white)
         g.fillRect(0, 0, size.width, size.height)
@@ -270,7 +274,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
                  else currentMessage.node
         val n = n1.asInstanceOf[CallGraphNode]
         val nameFont = t match {
-          case _:T_call => smallFont
+          case _:T_call | _:T_script => smallFont
           case _        => normalFont
         }
 
@@ -573,13 +577,14 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   def shouldStep: Boolean =
     currentMessage match {
-      case Activation(_)       => checkBox_step_Activation  .selected
-      case Deactivation(_,_,_) => checkBox_step_Deactivation.selected
-      case AAHappened(_,_,_)   => checkBox_step_AAHappened  .selected
-      case Success(_,_)        => checkBox_step_Success     .selected
-      case Break(_,_,_)        => checkBox_step_Break       .selected
-      case Exclude(_,_)        => checkBox_step_Exclude     .selected
-      case c:Continuation      => checkBox_step_Continuation.selected && !interestingContinuationInternals(c).isEmpty
+      case Activation(_)       => checkBox_step_Activation    .selected
+      case Deactivation(_,_,_) => checkBox_step_Deactivation  .selected
+      case AAToBeExecuted(_)   => checkBox_step_AAToBeExecuted.selected
+      case AAHappened(_,_,_)   => checkBox_step_AAHappened    .selected
+      case Success(_,_)        => checkBox_step_Success       .selected
+      case Break(_,_,_)        => checkBox_step_Break         .selected
+      case Exclude(_,_)        => checkBox_step_Exclude       .selected
+      case c:Continuation      => checkBox_step_Continuation  .selected && !interestingContinuationInternals(c).isEmpty
       case _                   => false    
     }
   
@@ -601,13 +606,14 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   def logMessage_GUIThread(m: String, msg: CallGraphMessage) {
     
       if (msg match {
-        case Activation(_)       => checkBox_log_Activation  .selected
-        case Deactivation(_,_,_) => checkBox_log_Deactivation.selected
-        case AAHappened(_,_,_)   => checkBox_log_AAHappened  .selected
-        case Success(_,_)        => checkBox_log_Success     .selected
-        case Break(_,_,_)        => checkBox_log_Break       .selected
-        case Exclude(_,_)        => checkBox_log_Exclude     .selected
-        case c:Continuation      => checkBox_log_Continuation.selected
+        case Activation(_)       => checkBox_log_Activation    .selected
+        case Deactivation(_,_,_) => checkBox_log_Deactivation  .selected
+        case AAToBeExecuted(_)   => checkBox_log_AAToBeExecuted.selected
+        case AAHappened(_,_,_)   => checkBox_log_AAHappened    .selected
+        case Success(_,_)        => checkBox_log_Success       .selected
+        case Break(_,_,_)        => checkBox_log_Break         .selected
+        case Exclude(_,_)        => checkBox_log_Exclude       .selected
+        case c:Continuation      => checkBox_log_Continuation  .selected
         case _                   => false
       }) {    
         var runnable = new Runnable {
@@ -630,7 +636,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     orderedMessages.foreach(msgQueueListModel.addElement(_)) 
   }
   def updateDisplay = {
-    var s = currentMessage.toString
+    var s = if (currentMessage==null) "." else currentMessage.toString
     if (s.length>50) s = s.substring(0, 50) + "..."
     currentMessageTF.text = s
     logMessage (">>", currentMessage)
@@ -642,8 +648,9 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   def script..
      live       = {*awaitMessageBeingHandled(true)*}
-                  if (shouldStep) ( @{gui(there)}: {!updateDisplay!} stepCommand 
-                                 || if(autoCheckBox.selected) {*waitForStepTimeout*} else (-) )
+                  ( if shouldStep then @{gui(there)}: {!updateDisplay!} stepCommand
+                                    || if autoCheckBox.selected then {*waitForStepTimeout*} else (-)
+                  )
                   {messageBeingHandled(false)}
                   ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
                || exitDebugger

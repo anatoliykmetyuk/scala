@@ -130,6 +130,10 @@ object Tokens extends Tokens {
   final val IF_QMARK                 = 131
   final val DOT2                     = 132
   final val DOT3                     = 133
+  final val LESS2                    = 134
+  final val GREATER2                 = 135
+  final val ARROW2                   = 136
+  final val CURLYARROW2              = 137
   
   final val LBRACE_DOT               = 140
   final val LBRACE_DOT3              = 141
@@ -154,6 +158,10 @@ object Tokens extends Tokens {
   final val LPAREN_ASTERISK2         = 165
   final val RPAREN_ASTERISK          = 166
   final val RPAREN_ASTERISK2         = 167
+
+  final val DO_THEN                  = 170 // only for generating code
+  final val DO_ELSE                  = 171 // only for generating code
+  final val DO_THEN_ELSE             = 172 // only for generating code
   
   final val scriptBracePairs = Map (
     LBRACE          -> RBRACE         ,

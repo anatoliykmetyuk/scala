@@ -99,9 +99,10 @@ def script..
 
       speedKeyInput    = times(10) 
                        + val c:Any=(pass_up1(here)+'0') key(chr(c)) setSpeed(char2Value(c)) // TBD: make here an implicit parameter
-                              
-   speedButtonInput = if (speed>minSpeed) speedDecButton
-                    + if (speed<maxSpeed) speedIncButton
+                          
+                       // Note: first "("...")" pair is needed because else the ifs would be nested
+   speedButtonInput = (if speed>minSpeed then speedDecButton)
+                    + (if speed<maxSpeed then speedIncButton)
     
      speedDecButton = minSpeedButton setSpeed,minSpeed + slowerButton setSpeed(speed-1)
      speedIncButton = maxSpeedButton setSpeed,maxSpeed + fasterButton setSpeed(speed+1)

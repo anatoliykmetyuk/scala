@@ -21,7 +21,7 @@ object PingPong {
 
     def script..
       live = receivePing ...
-      receivePing = r$({case msg @ "ping" => println(msg); sender ! "pong"})
+      receivePing = << msg @ "ping" => println(msg); sender ! "pong" >>
   }
  
   class Ping(target: ActorRef) extends SubScriptActor {
@@ -29,7 +29,8 @@ object PingPong {
     def script..
       live = times(3) sendPing receivePong
       sendPing = {target ! "ping"}
-      receivePong = r$({case msg @ "pong" => println(msg)})
+      receivePong = << msg @ "pong" => println(msg) >>
+      
   }
  
  

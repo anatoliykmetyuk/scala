@@ -106,11 +106,22 @@ trait Scanners extends ScannersCommon {
   abstract class Scanner extends CharArrayReader with TokenData with ScannerData with ScannerCommon {
     private def isDigit(c: Char) = java.lang.Character isDigit c
     
-    var prevWasInSubScript_script = false
-    var isInSubScript_script      = false
-    var isInSubScript_header      = false
-    var isInSubScript_nativeCode  = false
-    def isInSubScript_expression  = isInSubScript_script && !isInSubScript_header && !isInSubScript_nativeCode
+    var prevWasInSubScript_script   = false
+    var isInSubScript_script        = false
+    var isInSubScript_header        = false
+    var isInSubScript_nativeCode    = false
+    def isInSubScript_expression  = isInSubScript_script && 
+                                   !isInSubScript_header && 
+                                   !isInSubScript_nativeCode && 
+                                  (!isInSubScript_partialScript || isInSubScript_partialScript_caseScript)
+    
+    var sepRegions_SubScript_partialScript = -1
+    var isInSubScript_partialScript            = false
+    var isInSubScript_partialScript_caseScript = false
+    def start_SubScript_partialScript            = {isInSubScript_partialScript            =  true}
+    def   end_SubScript_partialScript            = {isInSubScript_partialScript            = false}
+    def start_SubScript_partialScript_caseScript = {isInSubScript_partialScript_caseScript =  true}
+    def   end_SubScript_partialScript_caseScript = {isInSubScript_partialScript_caseScript = false}
 
     private var openComments = 0
     protected def putCommentChar(): Unit = nextChar()
@@ -208,14 +219,20 @@ trait Scanners extends ScannersCommon {
       token = idtoken
       if (idtoken == IDENTIFIER) {
         val idx = name.start - kwOffset
+        
         if (idx >= 0 && idx < kwArray.length) {
-          token = kwArray(idx)
-          if (token == IDENTIFIER 
-          && allowIdent   != name 
-          && nme.SCRIPTkw != name  // Note: only used in SubScript; do not warn
-          && nme.BREAKkw  != name  // Note: only used in SubScript; do not warn
-          && emitIdentifierDeprecationWarnings)
-            deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
+          token = kwArray(idx) 
+          if (token == IDENTIFIER) { 
+            if (allowIdent  != name 
+            && nme.SCRIPTkw != name  // Note: only used in SubScript; do not warn
+            && nme.BREAKkw  != name  // Note: only used in SubScript; do not warn
+            && emitIdentifierDeprecationWarnings)
+              deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
+          }
+        }
+        if (isInSubScript_script && name.toString=="then") {
+          //println(s"token was: $token idtoken=$idtoken cbuf.toString=${cbuf.toString}")
+          token = THEN
         }
       }
     }
@@ -422,7 +439,25 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-        case '<' => // is XMLSTART?
+       case '~' => if (isInSubScript_partialScript) {
+                      val lookahead = lookaheadReader; lookahead.nextChar()
+                      if (lookahead.ch == '~') {lookahead.nextChar()
+                       if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYARROW2; return} 
+                      }
+                   }
+                   getOperatorRest()
+       case '=' => if (isInSubScript_partialScript) {
+                      val lookahead = lookaheadReader; lookahead.nextChar()
+                      if (lookahead.ch == '=') {lookahead.nextChar()
+                       if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = ARROW2; return} 
+                      }
+                   }
+                   getOperatorRest()
+       case '>' => if (isInSubScript_partialScript) {nextChar(); 
+                                                     if (ch=='>') {nextChar(); token = GREATER2; return} else putChar('>')}
+                   getOperatorRest()
+       case '<' => if (isInSubScript_expression   ) {nextChar(); if (ch=='<') {nextChar(); token =    LESS2; return} else putChar('<')} 
+          // is XMLSTART?
           def fetchLT() = {
             val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
             nextChar()
@@ -464,9 +499,10 @@ trait Scanners extends ScannersCommon {
             putChar(chOld)
             getOperatorRest()
           }
-        case '~' | '@' | '#' | '%' |
-             '+' | '-' | /*'<' | */
-             '>' | ':' | '=' | '&' |
+        case '@' | '#' | '%' |
+             '+' | '-' | 
+             // '~' |  '>' | '<' | '=' |  
+             ':'| '&' |
              '|' | '\\' =>
           putChar(ch)
           nextChar()
@@ -565,9 +601,9 @@ trait Scanners extends ScannersCommon {
               case '*' => nextChar(); token = LBRACE_ASTERISK
               case '^' => nextChar(); token = LBRACE_CARET
               case '.' => nextChar(); token = LBRACE_DOT
-                          if  (ch=='.') {nextChar(); 
-                            if(ch=='.') {nextChar(); token = LBRACE_DOT3 }
-                            else {syntaxError("'.' expected")}
+                          if  (ch=='.'
+                          &&   lookaheadReader.ch == '.') {
+                               nextChar(); nextChar(); token = LBRACE_DOT3
                           }
               case  _  =>
             }
@@ -637,7 +673,7 @@ trait Scanners extends ScannersCommon {
     /** Can token start a statement? */
     def inFirstOfStat(token: Token) = token match {
       case EOF | CATCH | ELSE | EXTENDS | FINALLY | FORSOME | MATCH | WITH | YIELD |
-           COMMA | SEMI | NEWLINE | NEWLINES | DOT | COLON | EQUALS | ARROW | LARROW |
+           COMMA | SEMI | NEWLINE | NEWLINES | DOT | COLON | EQUALS | ARROW | LARROW | ARROW2 | GREATER2 | 
            SUBTYPE | VIEWBOUND | SUPERTYPE | HASH | RPAREN | RBRACKET | RBRACE | LBRACKET =>
         false
       case _ =>
@@ -1227,30 +1263,35 @@ trait Scanners extends ScannersCommon {
     case XMLSTART      => "$XMLSTART$<"
       
     // SubScript tokens:  
-    case IF_QMARK                 => "if?"   
-    case LBRACE_DOT               => "{."   
-    case LBRACE_DOT3              => "{..."
-    case LBRACE_QMARK             => "{?"
-    case LBRACE_EMARK             => "{!"
-    case LBRACE_ASTERISK          => "{*"
-    case LBRACE_CARET             => "{^"
-    case RBRACE_DOT               => ".}"
-    case RBRACE_DOT3              => "...}"
-    case RBRACE_QMARK             => "?}"
-    case RBRACE_EMARK             => "!}"
-    case RBRACE_ASTERISK          => "*}"
-    case RBRACE_CARET             => "^}"
-    case DOT2                     => ".."
-    case DOT3                     => "..."
-    case LPAREN_PLUS_RPAREN       => "(+)"
-    case LPAREN_MINUS_RPAREN      => "(-)"
-    case LPAREN_PLUS_MINUS_RPAREN => "(+-)"
-    case LPAREN_SEMI_RPAREN       => "(;)"
-    case LPAREN_ASTERISK          => "(*"
-    case LPAREN_ASTERISK2         => "(**"
-    case RPAREN_ASTERISK          => "*)"
-    case RPAREN_ASTERISK2         => "**)"
+    case IF_QMARK                 => "'if?'"   
+    case LBRACE_DOT               => "'{.'"   
+    case LBRACE_DOT3              => "'{...'"
+    case LBRACE_QMARK             => "'{?'"
+    case LBRACE_EMARK             => "'{!'"
+    case LBRACE_ASTERISK          => "'{*'"
+    case LBRACE_CARET             => "'{^'"
+    case RBRACE_DOT               => "'.}'"
+    case RBRACE_DOT3              => "'...}"
+    case RBRACE_QMARK             => "'?}'"
+    case RBRACE_EMARK             => "'!}'"
+    case RBRACE_ASTERISK          => "'*}'"
+    case RBRACE_CARET             => "'^}'"
+    case DOT2                     => "'..'"
+    case DOT3                     => "'...'"
+    case LESS2                    => "'<<'"
+    case GREATER2                 => "'>>'"
+    case ARROW2                   => "'==>'"
+    case LPAREN_PLUS_RPAREN       => "'(+)'"
+    case LPAREN_MINUS_RPAREN      => "'(-)'"
+    case LPAREN_PLUS_MINUS_RPAREN => "'(+-)'"
+    case LPAREN_SEMI_RPAREN       => "'(;)'"
+    case LPAREN_ASTERISK          => "'(*'"
+    case LPAREN_ASTERISK2         => "'(**'"
+    case RPAREN_ASTERISK          => "'*)'"
+    case RPAREN_ASTERISK2         => "'**)'"
     
+    case THEN                     => "'then'"
+      
     case _ =>
       (token2name get token) match {
         case Some(name) => "'" + name + "'"
