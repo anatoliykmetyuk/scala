@@ -4,12 +4,11 @@ package subscript.test
 
 import org.junit._
 import org.junit.runner.RunWith
-
 import subscript.DSL._
-import subscript.vm.{N_code_unsure, CallGraphNodeTrait, UnsureExecutionResult, 
-                     SimpleScriptDebugger}
+import subscript.vm.{N_code_unsure, SimpleScriptDebugger}
 import subscript.vm.executor._
 import subscript.vm.model.template.TemplateNode.Child
+import subscript.vm.model.callgraph._
 
 /**
  * This class is a test suite for the script operators as implemented in the SubScript VM. 
@@ -256,7 +255,7 @@ class OperatorsSuite {
   // try to accept the token from the input (if any); match it to the current atom.
   def tryAccept(where: N_code_unsure, atom: Char) {
     if (inputStream.isEmpty || !expectedAtoms.contains(inputStream.head)) {
-       where.result = UnsureExecutionResult.Failure; 
+       where.result = ExecutionResult.Failure; 
        if (expectedAtomsAtEndOfInput== None) {
            expectedAtomsAtEndOfInput = Some(expectedAtoms)
            scriptSuccessAtEndOfInput = Some(executor.hasSuccess)
@@ -266,7 +265,7 @@ class OperatorsSuite {
        }
     }
     else if (inputStream.head==atom) {inputStream = inputStream.drop(1); acceptedAtoms += atom}
-    else                             {where.result = UnsureExecutionResult.Ignore}
+    else                             {where.result = ExecutionResult.Ignore}
     
     //println("<<<tryAccept: "+where+" inputStream "+ (if (inputStream.isEmpty) "Empty" else ("head = "+inputStream.head))+"  has success = "+where.hasSuccess)
   } 

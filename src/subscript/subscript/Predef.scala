@@ -31,6 +31,8 @@ import subscript.DSL._
 import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
+import subscript.vm.model.callgraph._
+import subscript.vm.model.callgraph.generic._
 
 // Predefined stuff - pass and some scripts: times, delta, epsilon, nu
 //

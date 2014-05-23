@@ -4,11 +4,13 @@ import subscript.vm.model.template._
 import subscript.vm._
 import subscript.DSL._
 import TemplateNode.Child
+import subscript.vm.model.callgraph._
+import subscript.vm.model.callgraph.generic._
 
 /**
  * Annotation
  */
-case class T_annotation[CN<:CallGraphNodeTrait,CT<:Child](
+case class T_annotation[CN<:CallGraphNode,CT<:Child](
     override val code: N_annotation[CN,CT] => Unit,
     override val child0: Child
 ) extends T_1_ary with TemplateCodeHolder[N_annotation[CN,CT], Unit]

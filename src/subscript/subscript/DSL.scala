@@ -29,11 +29,18 @@ package subscript
 import scala.language.implicitConversions
 import scala.collection.mutable.LinkedList
 
+// VM
 import subscript.vm._
 import subscript.vm.executor._
+
+// Template
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
 import TemplateNode.Child
+
+// Call graph
+import subscript.vm.model.callgraph._
+import subscript.vm.model.callgraph.generic._
 
 /*
  * Internal Scala DSL for SubScript.
@@ -96,11 +103,11 @@ object DSL {
   def _eventhandling0     (cf: => Unit) = T_code_eventhandling     ((_here:N_code_eventhandling     ) => cf)
   def _eventhandling_loop0(cf: => Unit) = T_code_eventhandling_loop((_here:N_code_eventhandling_loop) => cf)
 
-  implicit def _call      (calleeName: String, cf: => Script[Unit]) = T_call(calleeName, n=>cf)
+  implicit def _call      (calleeName: String, cf: => Script[Unit]) = T_call(calleeName, n=>{cf(n); cf})
   
   implicit def valueToActualValueParameter[T<:Any](value: T) = new ActualValueParameter(value)
 
-  def _at[N<:CallGraphNodeTrait,T<:Child](_cf:N=>Unit)  
+  def _at[N<:CallGraphNode,T<:Child](_cf:N=>Unit)  
   = (_child: T) => T_annotation[N,T]((here:N_annotation[N,T]) => _cf(here.there), _child)
  
   def _declare[T](name: Symbol) = new LocalVariable[T](name)

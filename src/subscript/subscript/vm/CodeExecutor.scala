@@ -25,11 +25,14 @@
 */
 
 package subscript.vm
-import subscript.vm.executor._
+
 import scala.collection.mutable._
+import subscript.vm.executor._
+import subscript.vm.model.callgraph._
+import subscript.vm.model.template.TemplateCodeHolder
 
 object CodeExecutor {
-  def defaultCodeFragmentExecutorFor(node: CallGraphNodeTrait, scriptExecutor: ScriptExecutor): CodeExecutorTrait = {
+  def defaultCodeFragmentExecutorFor(node: CallGraphNode, scriptExecutor: ScriptExecutor): CodeExecutorTrait = {
     node match {
       case n@N_code_normal  (_) => new   NormalCodeFragmentExecutor(n, scriptExecutor)
       case n@N_code_unsure  (_) => new   UnsureCodeFragmentExecutor(n, scriptExecutor)
@@ -38,9 +41,15 @@ object CodeExecutor {
     }
   }
   
-  def executeCode[R](n: DoCodeHolder[R]) : R                  = executeCode(n, ()=>n.doCode)
-  def executeCode[R](n: DoCodeHolder[R], code: =>()=>R   ): R = {n.codeExecutor.doCodeExecution(code)}
-  def executeCodeIfDefined(n: CallGraphNodeTrait, code: =>()=>Unit): Unit = {if (code!=null) executeCode(n.asInstanceOf[DoCodeHolder[Unit]], code)} // TBD: get rid of cast
+  def executeCode[N <: CallGraphNode, R](n: N): R = {
+    val template = n.template.asInstanceOf[TemplateCodeHolder[N, R]]
+    executeCode(n, template.code(n))
+  }
+  def executeCode[N <: CallGraphNode, R](n: N, c: => R): R =
+    n.codeExecutor.doCodeExecution(c)
+ 
+  def executeCodeIfDefined[N <: CallGraphNode, R](n: N, code: ()=>R): R = 
+    if (code!=null) executeCode(n, code()) else null.asInstanceOf[R]
   
 }
 
@@ -54,24 +63,20 @@ trait CodeExecutorTrait {
   
   def asynchronousAllowed: Boolean
   
-  def doCodeExecution[R](code: ()=>R): R = {
-    code.apply // for Atomic Actions, if, while, tiny, script calls etc, and also for onActivate etc
-  }
+  def doCodeExecution[R](code: => R): R = code
   private def shouldNotBeCalledHere = throw new Exception("Illegal Call")
   def executeAA     : Unit                                      = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
   def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit  = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
   def afterExecuteAA: Unit                                      = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
   def interruptAA   : Unit                                      = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
-  def n: CallGraphNodeTrait
+  def n: CallGraphNode
   def scriptExecutor: ScriptExecutor
   def cancelAA = canceled=true 
 }
-case class TinyCodeExecutor(n: CallGraphNodeTrait, scriptExecutor: ScriptExecutor) extends CodeExecutorTrait  { // TBD: for while, {!!}, @:, script call
+case class TinyCodeExecutor(n: CallGraphNode, scriptExecutor: ScriptExecutor) extends CodeExecutorTrait  { // TBD: for while, {!!}, @:, script call
   val asynchronousAllowed = false
   override def interruptAA   : Unit  = {} // TBD: clean up class/trait hierarchy so that this def can be ditched
-  override def doCodeExecution[R](code: ()=>R): R = super.doCodeExecution{
-    code
-    }
+  override def afterExecuteAA: Unit  = {}
 }
 abstract class AACodeFragmentExecutor[N<:N_atomic_action[_]](_n: N, _scriptExecutor: ScriptExecutor) extends CodeExecutorTrait  {
   
@@ -89,14 +94,12 @@ abstract class AACodeFragmentExecutor[N<:N_atomic_action[_]](_n: N, _scriptExecu
   override def cancelAA = super.cancelAA; interruptAA
   def naa = n.asInstanceOf[N]
   def doCodeExecution(lowLevelCodeExecutor: CodeExecutorTrait): Unit = lowLevelCodeExecutor.doCodeExecution{
-    ()=>
-      n.setSuccess(true)
+      n.hasSuccess = true
       n.isExecuting = true
-      try {
-        // naa.template.code.apply.apply(naa) don't get this to work, so use a match statement:
-        n.doCode // may affect n.hasSuccess
-      } 
-      finally {n.isExecuting = false}
+      
+      try     CodeExecutor executeCode n
+      finally n.isExecuting = false
+      
       executionFinished
   }
   def aaHappened(mode:AAHappenedMode) = scriptExecutor.insert(AAHappened  (n,null,mode)) 
@@ -123,7 +126,7 @@ class NormalCodeFragmentExecutor[N<:N_atomic_action[_]](n: N, scriptExecutor: Sc
   //without the next two definitions the compiler would give the following error messages; TBD: get rid of these
   // class NormalCodeFragmentExecutor needs to be abstract, since: 
   //   method scriptExecutor in trait CodeExecutorTrait of type => subscript.vm.ScriptExecutor is not defined 
-  //   method n in trait CodeExecutorTrait of type => subscript.vm.CallGraphNodeTrait[_ <: subscript.vm.TemplateNode] is not defined	CodeExecutor.scala	/subscript/src/subscript/vm	line 54	Scala Problem
+  //   method n in trait CodeExecutorTrait of type => subscript.vm.CallGraphNode[_ <: subscript.vm.TemplateNode] is not defined	CodeExecutor.scala	/subscript/src/subscript/vm	line 54	Scala Problem
   
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = {
     if (regardStartAndEndAsSeparateAtomicActions) aaHappened(DurationalCodeFragmentStarted)
@@ -144,8 +147,7 @@ class UnsureCodeFragmentExecutor(n: N_code_unsure, scriptExecutor: ScriptExecuto
     if (n.hasSuccess) {
        aaHappened(AtomicCodeFragmentExecuted); succeeded; deactivate
     }
-    else if (n.result==UnsureExecutionResult.Ignore){ // allow for deactivating result
-      n.result=UnsureExecutionResult.Success
+    else if (n.result==ExecutionResult.Ignore){ // allow for deactivating result
       toBeReexecuted
     }
     else { 
@@ -189,7 +191,7 @@ class SwingCodeExecutorAdapter[CE<:CodeExecutorTrait] extends CodeExecutorAdapte
   }
   override def afterExecuteAA: Unit = adaptee.afterExecuteAA  // TBD: clean up class/trait hierarchy so that this def can be ditched
   override def    interruptAA: Unit = adaptee.interruptAA     // TBD: clean up class/trait hierarchy so that this def can be ditched
-  override def doCodeExecution[R](code: ()=>R): R = {
+  override def doCodeExecution[R](code: =>R): R = {
     
     // we need here the default value for R (false, 0, null or a "Unit")
     // for some strange reason, the following line would go wrong:
@@ -220,10 +222,10 @@ class SwingCodeExecutorAdapter[CE<:CodeExecutorTrait] extends CodeExecutorAdapte
 case class EventHandlingCodeFragmentExecutor[N<:N_atomic_action[_]](_n: N, _scriptExecutor: ScriptExecutor) extends AACodeFragmentExecutor(_n, _scriptExecutor)  {
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = executeMatching(true) // dummy method needed because of a flaw in the class hierarchy
   def executeMatching(isMatching: Boolean): Unit = {  // not to be called by scriptExecutor, but by application code
-    n.setSuccess(isMatching)
+    n.hasSuccess = isMatching
     if (isMatching) 
     {
-      n.doCode // may affect n.hasSuccess
+      CodeExecutor executeCode n
     }
     if (n.hasSuccess)  // probably this test can be ditched
     {
@@ -243,9 +245,9 @@ case class EventHandlingCodeFragmentExecutor[N<:N_atomic_action[_]](_n: N, _scri
         case eh:N_code_eventhandling_loop =>
              aaHappened(AtomicCodeFragmentExecuted)
              eh.result match {
-                case LoopingExecutionResult.Success       => 
-                case LoopingExecutionResult.Break         => succeeded
-                case LoopingExecutionResult.OptionalBreak => succeeded; deactivate
+                case ExecutionResult.Success       => 
+                case ExecutionResult.Break         => succeeded
+                case ExecutionResult.OptionalBreak => succeeded; deactivate
              }
       }
   }

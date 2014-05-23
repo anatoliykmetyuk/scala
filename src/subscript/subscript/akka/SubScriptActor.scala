@@ -7,6 +7,7 @@ import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
 import akka.actor._
+import subscript.vm.model.callgraph.CallGraphNode
 
 
 trait SubScriptActor extends Actor {
@@ -84,7 +85,7 @@ trait SubScriptActor extends Actor {
 
 }
 
-case class SynchronizationMessage(node: CallGraphNodeTrait, lock: AnyRef) extends CallGraphMessageN {
-  type N = CallGraphNodeTrait
+case class SynchronizationMessage(node: CallGraphNode, lock: AnyRef) extends CallGraphMessageN {
+  type N = CallGraphNode
   override def priority = PRIORITY_InvokeFromET - 1  // After all actors are launched
 }

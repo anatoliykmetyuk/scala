@@ -34,6 +34,7 @@ import subscript.DSL._
 import subscript.Predef._
 import subscript.vm._
 import subscript.vm.executor._
+import subscript.vm.model.callgraph._
 
 
 /*
@@ -57,15 +58,15 @@ object Scripts {
 
   import scala.language.implicitConversions
   
-  def gui1[N<:CallGraphNodeTrait](there:N) = {there.adaptExecutor(new SwingCodeExecutorAdapter[CodeExecutorTrait])}
-  def gui [N<:Any](there:N)                = {there.asInstanceOf[CallGraphNodeTrait]adaptExecutor(new SwingCodeExecutorAdapter[CodeExecutorTrait])}
+  def gui1[N<:CallGraphNode](there:N) = {there.adaptExecutor(new SwingCodeExecutorAdapter[CodeExecutorTrait])}
+  def gui [N<:Any](there:N)                = {there.asInstanceOf[CallGraphNode]adaptExecutor(new SwingCodeExecutorAdapter[CodeExecutorTrait])}
   // note that in some cases the type of the "there" parameter is inferred as Any.
   // This is for the time being a workaround:
   // only at the typing phase a refinement call is resoled into either a script call or a method call (=> code fragment)
   // so only then the type of there should be determined.
   // this would require some rework of the compiler: generating code for @...: should only be done in the typer phase
   
-//def gui1[N<:CallGraphNodeTrait[_]](implicit n:N) = {n.adaptExecutor(new SwingCodeExecutorAdapter[CodeExecutorTrait])}             
+//def gui1[N<:CallGraphNode[_]](implicit n:N) = {n.adaptExecutor(new SwingCodeExecutorAdapter[CodeExecutorTrait])}             
 
   /*
    * A registry for the ScriptExecutor for which the most recent GUI event had been consumed

@@ -12,6 +12,7 @@ import subscript.vm._
 import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
+import subscript.vm.model.callgraph._
 
 /*
  * Graphical script debugger
@@ -173,7 +174,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   val lightRed    = new AWTColor(255, 220, 220)
   val lightPurple = new AWTColor(255, 220, 255)
   
-  def fillColor(n: CallGraphNodeTrait, defaultColor: AWTColor, allowOverride: Boolean) = 
+  def fillColor(n: CallGraphNode, defaultColor: AWTColor, allowOverride: Boolean) = 
          if (allowOverride && n.isExecuting ) lightPurple  
     else if (allowOverride && n.isActionBusy) lightRed 
     else                                      defaultColor
@@ -217,9 +218,9 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
 
     def getScriptTemplates: List[T_script] = {
       val lb = new ListBuffer[T_script]
-      def getScriptTemplates(n: CallGraphNodeTrait): Unit = {
+      def getScriptTemplates(n: CallGraphNode): Unit = {
         n match {case ns: N_script                    => if (!lb.exists(_.name.name==ns.template.name.name)) lb += ns.template case _ =>}
-        n match {case pn: CallGraphParentNodeTrait 
+        n match {case pn: CallGraphNode 
                                                       =>pn.forEachChild{getScriptTemplates(_)} case _ =>}
       } 
       getScriptTemplates(rootNode)
@@ -264,10 +265,10 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
 
         val r = new Rectangle(boxLeft, boxTop, boxWidth, BOX_H)
         //val n = if  (currentMessage==null||currentMessage.node==null) null 
-        //        else currentMessage.node.asInstanceOf[CallGraphNodeTrait]    strange NPE's
+        //        else currentMessage.node.asInstanceOf[CallGraphNode]    strange NPE's
         val n1 = if  (currentMessage==null) null 
                  else currentMessage.node
-        val n = n1.asInstanceOf[CallGraphNodeTrait]
+        val n = n1.asInstanceOf[CallGraphNode]
         val nameFont = t match {
           case _:T_call => smallFont
           case _        => normalFont
@@ -353,8 +354,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
           case _ => "Break"
         }
       }
-      def drawEdge(p: CallGraphNodeTrait, pwx: Double, pwy: Int, 
-                   c: CallGraphNodeTrait, cwx: Double, cwy: Int): Unit = {
+      def drawEdge(p: CallGraphNode, pwx: Double, pwy: Int, 
+                   c: CallGraphNode, cwx: Double, cwy: Int): Unit = {
         
         val pHCenter = (pwx*GRID_W).toInt + BOX_W/2 + hOffset
         val pBottom  =  pwy*GRID_H        + BOX_H   + vOffset
@@ -383,7 +384,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         g.setStroke(normalStroke)
         g.setColor (AWTColor.black)
       }
-      def drawContinuationTexts(n: CallGraphNodeTrait, boxRight: Int, boxTop: Int) = {
+      def drawContinuationTexts(n: CallGraphNode, boxRight: Int, boxTop: Int) = {
         val x = boxRight + 3
         var y = boxTop
         n match {
@@ -397,13 +398,13 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
           }
         }
       }
-	  def drawTree[T <: TemplateNode](n: CallGraphNodeTrait, xGrid: Double, yGrid: Int): (Double, Double) = {
+	  def drawTree[T <: TemplateNode](n: CallGraphNode, xGrid: Double, yGrid: Int): (Double, Double) = {
         var resultW = 0d // drawn width of this subtree
         var childHCs = new ListBuffer[Double]
         
-        val isCurrentNode = currentMessage != null && currentMessage.node.asInstanceOf[CallGraphNodeTrait].index == n.index
+        val isCurrentNode = currentMessage != null && currentMessage.node.asInstanceOf[CallGraphNode].index == n.index
 	    n match {
-	      case p:CallGraphParentNodeTrait => 
+	      case p:CallGraphNode => 
 	        val pcl=p.children.length
 	        if (pcl==0) {
 	          resultW = 1
@@ -445,7 +446,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
             case dm: Deactivation =>
               n match {
                 case nn: N_n_ary_op if(dm.child!=null) => // will get Continuation
-                case pn: CallGraphParentNodeTrait if (pn.children.length>0) =>
+                case pn: CallGraphNode if (pn.children.length>0) =>
                 case _ => // strike through with an "X"
                   g.drawLine(boxLeft, boxTop   , boxRight, boxBottom)
                   g.drawLine(boxLeft, boxBottom, boxRight, boxTop   )
@@ -470,8 +471,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
 	      case _ =>
         }
 	    n match {
-	      case p:CallGraphParentNodeTrait => 
-	        (p.children zip childHCs).foreach{ c_hc: (CallGraphNodeTrait, Double) =>
+	      case p:CallGraphNode if !p.children.isEmpty => 
+	        (p.children zip childHCs).foreach{ c_hc: (CallGraphNode, Double) =>
 	          drawEdge(n, thisX, yGrid, c_hc._1, c_hc._2, yGrid+1)
 	        }
 	      case _ =>

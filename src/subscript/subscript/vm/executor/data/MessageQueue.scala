@@ -5,6 +5,7 @@ import subscript.vm._
 import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
+import subscript.vm.model.callgraph._
 
 class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] with MsgPublisher with MessagePriorities {self =>
   private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
@@ -69,12 +70,12 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
  */
 trait MQExtras {this: MessageQueue =>
   
-  def doNeutral(n: CallGraphNodeTrait) =
+  def doNeutral(n: CallGraphNode) =
     if (n.getLogicalKind_n_ary_op_ancestor!=LogicalKind.Or) insert(Success(n))
   
-  def insertDeactivation(n:CallGraphNodeTrait,c:CallGraphNodeTrait) = insert(Deactivation(n, c, false))
+  def insertDeactivation(n:CallGraphNode,c:CallGraphNode) = insert(Deactivation(n, c, false))
   
-  def insertContinuation(message: CallGraphMessage, child: CallGraphTreeNode = null): Unit = {
+  def insertContinuation(message: CallGraphMessage, child: CallGraphNode = null): Unit = {
     val n = message.node.asInstanceOf[ N_n_ary_op]
     var c = n.continuation 
     
@@ -95,20 +96,20 @@ trait MQExtras {this: MessageQueue =>
         }
     }
     message match {
-      case a@ Activation  (node: CallGraphNodeTrait) => c.activation = a
-      case a@Deactivation (node: CallGraphNodeTrait,
-                          child: CallGraphNodeTrait, excluded: Boolean) => c.deactivations ::= a
-      case a@Success      (node: CallGraphNodeTrait,
-                          child: CallGraphNodeTrait)  => c.success = a
-      case a@Break        (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait, 
+      case a@ Activation  (node: CallGraphNode) => c.activation = a
+      case a@Deactivation (node: CallGraphNode,
+                          child: CallGraphNode, excluded: Boolean) => c.deactivations ::= a
+      case a@Success      (node: CallGraphNode,
+                          child: CallGraphNode)  => c.success = a
+      case a@Break        (node: CallGraphNode, 
+                          child: CallGraphNode, 
                  activationMode: ActivationMode.ActivationModeType)  => c.break = a
-      case a@AAActivated  (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait) =>  c.aaActivated = a
-      case a@CAActivated  (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait) =>  c.caActivated = a
-      case a@AAHappened   (node: CallGraphNodeTrait, 
-                          child: CallGraphNodeTrait, _) =>  c.aaHappeneds ::= a
+      case a@AAActivated  (node: CallGraphNode, 
+                          child: CallGraphNode) =>  c.aaActivated = a
+      case a@CAActivated  (node: CallGraphNode, 
+                          child: CallGraphNode) =>  c.caActivated = a
+      case a@AAHappened   (node: CallGraphNode, 
+                          child: CallGraphNode, _) =>  c.aaHappeneds ::= a
     }
     if (n.continuation==null) {
        n.continuation = c

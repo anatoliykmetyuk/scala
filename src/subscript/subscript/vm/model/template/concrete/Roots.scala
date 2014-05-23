@@ -4,6 +4,8 @@ import subscript.vm.model.template._
 import subscript.vm._
 import subscript.DSL._
 import TemplateNode.Child
+import subscript.vm.model.callgraph._
+import subscript.vm.model.callgraph.generic._
 
 
 // Local launches and calls

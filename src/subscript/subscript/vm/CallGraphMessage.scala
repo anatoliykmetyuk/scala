@@ -27,8 +27,8 @@
 package subscript.vm
 
 import subscript.vm.executor._
-
 import scala.collection.mutable._
+import subscript.vm.model.callgraph._
 
   abstract class AAHappenedMode
   case object AtomicCodeFragmentExecuted    extends AAHappenedMode
@@ -58,7 +58,7 @@ import scala.collection.mutable._
 
   trait CallGraphMessage {
   
-    type N <: CallGraphNodeTrait
+    type N <: CallGraphNode
     
     var index = -1
 	def node: N
@@ -75,7 +75,7 @@ import scala.collection.mutable._
   // various kinds of messages sent around in the script call graph
   abstract class CallGraphMessageN extends CallGraphMessage with MessagePriorities
   
-	case class Activation   (node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Activation}
+	case class Activation   (node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Activation}
 	case class Continuation (node:  N_n_ary_op)        extends CallGraphMessageN {
 	  type N = N_n_ary_op; 
 	  def priority = PRIORITY_Continuation
@@ -88,7 +88,7 @@ import scala.collection.mutable._
 	  var aaActivated: AAActivated = null
 	  var caActivated: CAActivated = null
 	  var aaHappeneds : List[AAHappened] = Nil
-	  var childNode  : CallGraphNodeTrait = null
+	  var childNode  : CallGraphNode = null
 	  
 	  override def toString = {
 	    var strs = new ListBuffer[String]
@@ -106,24 +106,24 @@ import scala.collection.mutable._
 	  }
 	}
 	case class Continuation1      (node: N_1_ary_op) extends CallGraphMessageN {type N = N_1_ary_op; def priority = PRIORITY_Continuation}
-	case class Deactivation       (node: CallGraphNodeTrait, 
-	                              child: CallGraphNodeTrait, excluded: Boolean) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Deactivation}
-	case class Suspend            (node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Suspend}
-	case class Resume             (node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Resume}
-	case class Exclude          (parent: CallGraphNodeTrait, 
-	                               node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Exclude}
-	case class Success            (node: CallGraphNodeTrait, 
-	                              child: CallGraphNodeTrait = null) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Success}
-	case class Break              (node: CallGraphNodeTrait, 
-	                              child: CallGraphNodeTrait, activationMode: ActivationMode.ActivationModeType) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_Break}
-	case class AAActivated        (node: CallGraphNodeTrait, 
-	                              child: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_AAActivated}
-	case class CAActivated        (node: CallGraphNodeTrait, 
-	                              child: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_CAActivated} // for immediate handling
+	case class Deactivation       (node: CallGraphNode, 
+	                              child: CallGraphNode, excluded: Boolean) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Deactivation}
+	case class Suspend            (node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Suspend}
+	case class Resume             (node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Resume}
+	case class Exclude          (parent: CallGraphNode, 
+	                               node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Exclude}
+	case class Success            (node: CallGraphNode, 
+	                              child: CallGraphNode = null) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Success}
+	case class Break              (node: CallGraphNode, 
+	                              child: CallGraphNode, activationMode: ActivationMode.ActivationModeType) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Break}
+	case class AAActivated        (node: CallGraphNode, 
+	                              child: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_AAActivated}
+	case class CAActivated        (node: CallGraphNode, 
+	                              child: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_CAActivated} // for immediate handling
 	case class CAActivatedTBD     (node: N_call            ) extends CallGraphMessageN {type N = N_call; def priority = PRIORITY_CAActivatedTBD} // for late handling
-	case class AAHappened         (node: CallGraphNodeTrait, 
-	                              child: CallGraphNodeTrait, mode: AAHappenedMode) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_AAHappened}
-	case class AAExecutionFinished(node: CallGraphNodeTrait) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_AAExecutionFinished}
+	case class AAHappened         (node: CallGraphNode, 
+	                              child: CallGraphNode, mode: AAHappenedMode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_AAHappened}
+	case class AAExecutionFinished(node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_AAExecutionFinished}
 	case class AAToBeExecuted     (node: N_atomic_action[_]   ) extends CallGraphMessageN {type N = N_atomic_action[_]; def priority = PRIORITY_AAToBeExecuted
 	  override def secondaryPriority =  node.priority 
 	  override def tertiaryPriority  = -node.index // oldest nodes first 
@@ -132,9 +132,9 @@ import scala.collection.mutable._
 	  override def secondaryPriority = -index // oldest messages first, so that retries are FIFO  
 	}
 	case object CommunicationMatchingMessage extends CallGraphMessageN {
-	  type N = CallGraphNodeTrait
+	  type N = CallGraphNode
 	  def priority = PRIORITY_CommunicationMatchingMessage 
-	  def node:CallGraphNodeTrait = null
+	  def node:CallGraphNode = null
 	  def activatedCommunicatorCalls = scala.collection.mutable.ArrayBuffer.empty[N_call]
 	}
 	// TBD: AAActivated etc to inherit from 1 trait; params: 1 node, many children
@@ -148,5 +148,5 @@ import scala.collection.mutable._
 	// i.e. 
 	// ->..?p:Int? loops and matches all sent integers like <-*1  <-*3
 	
-	case class InvokeFromET(node: CallGraphNodeTrait, payload: () => Unit) extends CallGraphMessageN {type N = CallGraphNodeTrait; def priority = PRIORITY_InvokeFromET}
+	case class InvokeFromET(node: CallGraphNode, payload: () => Unit) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_InvokeFromET}
 	
