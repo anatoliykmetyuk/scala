@@ -145,7 +145,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   }
   val callGraphPanel = new Panel {
     background = AWTColor.white
-    preferredSize  = new Dimension(2000,2000)
+    preferredSize  = new Dimension(3000,2000)
     override def paint(g: Graphics2D) {
         g.setColor(AWTColor.white)
         g.fillRect(0, 0, size.width, size.height)
@@ -156,7 +156,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   }
   val templateTreesPanel = new Panel {
     background = AWTColor.white
-    preferredSize  = new Dimension(2000,800)
+    preferredSize  = new Dimension(4600,900)
     override def paint(g: Graphics2D) {
         g.setColor(AWTColor.white)
         g.fillRect(0, 0, size.width, size.height)
@@ -635,7 +635,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     orderedMessages.foreach(msgQueueListModel.addElement(_)) 
   }
   def updateDisplay = {
-    var s = currentMessage.toString
+    var s = if (currentMessage==null) "." else currentMessage.toString
     if (s.length>50) s = s.substring(0, 50) + "..."
     currentMessageTF.text = s
     logMessage (">>", currentMessage)
@@ -647,8 +647,9 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   def script..
      live       = {*awaitMessageBeingHandled(true)*}
-                  if (shouldStep) ( @{gui(there)}: {!updateDisplay!} stepCommand 
-                                 || if(autoCheckBox.selected) {*waitForStepTimeout*} else (-) )
+                  ( if shouldStep then @{gui(there)}: {!updateDisplay!} stepCommand
+                                    || if autoCheckBox.selected then {*waitForStepTimeout*} else (-)
+                  )
                   {messageBeingHandled(false)}
                   ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
                || exitDebugger

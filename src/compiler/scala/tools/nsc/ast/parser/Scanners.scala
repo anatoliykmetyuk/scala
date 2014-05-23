@@ -219,14 +219,20 @@ trait Scanners extends ScannersCommon {
       token = idtoken
       if (idtoken == IDENTIFIER) {
         val idx = name.start - kwOffset
+        
         if (idx >= 0 && idx < kwArray.length) {
-          token = kwArray(idx)
-          if (token == IDENTIFIER 
-          && allowIdent   != name 
-          && nme.SCRIPTkw != name  // Note: only used in SubScript; do not warn
-          && nme.BREAKkw  != name  // Note: only used in SubScript; do not warn
-          && emitIdentifierDeprecationWarnings)
-            deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
+          token = kwArray(idx) 
+          if (token == IDENTIFIER) { 
+            if (allowIdent  != name 
+            && nme.SCRIPTkw != name  // Note: only used in SubScript; do not warn
+            && nme.BREAKkw  != name  // Note: only used in SubScript; do not warn
+            && emitIdentifierDeprecationWarnings)
+              deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
+          }
+        }
+        if (isInSubScript_script && name.toString=="then") {
+          //println(s"token was: $token idtoken=$idtoken cbuf.toString=${cbuf.toString}")
+          token = THEN
         }
       }
     }
@@ -433,6 +439,13 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
+       case '~' => if (isInSubScript_partialScript) {
+                      val lookahead = lookaheadReader; lookahead.nextChar()
+                      if (lookahead.ch == '~') {lookahead.nextChar()
+                       if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYARROW2; return} 
+                      }
+                   }
+                   getOperatorRest()
        case '=' => if (isInSubScript_partialScript) {
                       val lookahead = lookaheadReader; lookahead.nextChar()
                       if (lookahead.ch == '=') {lookahead.nextChar()
@@ -486,8 +499,9 @@ trait Scanners extends ScannersCommon {
             putChar(chOld)
             getOperatorRest()
           }
-        case '~' | '@' | '#' | '%' |
-             '+' | '-' | /* '>' | '<' |'=' |  */
+        case '@' | '#' | '%' |
+             '+' | '-' | 
+             // '~' |  '>' | '<' | '=' |  
              ':'| '&' |
              '|' | '\\' =>
           putChar(ch)
@@ -1249,33 +1263,35 @@ trait Scanners extends ScannersCommon {
     case XMLSTART      => "$XMLSTART$<"
       
     // SubScript tokens:  
-    case IF_QMARK                 => "if?"   
-    case LBRACE_DOT               => "{."   
-    case LBRACE_DOT3              => "{..."
-    case LBRACE_QMARK             => "{?"
-    case LBRACE_EMARK             => "{!"
-    case LBRACE_ASTERISK          => "{*"
-    case LBRACE_CARET             => "{^"
-    case RBRACE_DOT               => ".}"
-    case RBRACE_DOT3              => "...}"
-    case RBRACE_QMARK             => "?}"
-    case RBRACE_EMARK             => "!}"
-    case RBRACE_ASTERISK          => "*}"
-    case RBRACE_CARET             => "^}"
-    case DOT2                     => ".."
-    case DOT3                     => "..."
-    case LESS2                    => "<<"
-    case GREATER2                 => ">>"
-    case ARROW2                   => "==>"
-    case LPAREN_PLUS_RPAREN       => "(+)"
-    case LPAREN_MINUS_RPAREN      => "(-)"
-    case LPAREN_PLUS_MINUS_RPAREN => "(+-)"
-    case LPAREN_SEMI_RPAREN       => "(;)"
-    case LPAREN_ASTERISK          => "(*"
-    case LPAREN_ASTERISK2         => "(**"
-    case RPAREN_ASTERISK          => "*)"
-    case RPAREN_ASTERISK2         => "**)"
+    case IF_QMARK                 => "'if?'"   
+    case LBRACE_DOT               => "'{.'"   
+    case LBRACE_DOT3              => "'{...'"
+    case LBRACE_QMARK             => "'{?'"
+    case LBRACE_EMARK             => "'{!'"
+    case LBRACE_ASTERISK          => "'{*'"
+    case LBRACE_CARET             => "'{^'"
+    case RBRACE_DOT               => "'.}'"
+    case RBRACE_DOT3              => "'...}"
+    case RBRACE_QMARK             => "'?}'"
+    case RBRACE_EMARK             => "'!}'"
+    case RBRACE_ASTERISK          => "'*}'"
+    case RBRACE_CARET             => "'^}'"
+    case DOT2                     => "'..'"
+    case DOT3                     => "'...'"
+    case LESS2                    => "'<<'"
+    case GREATER2                 => "'>>'"
+    case ARROW2                   => "'==>'"
+    case LPAREN_PLUS_RPAREN       => "'(+)'"
+    case LPAREN_MINUS_RPAREN      => "'(-)'"
+    case LPAREN_PLUS_MINUS_RPAREN => "'(+-)'"
+    case LPAREN_SEMI_RPAREN       => "'(;)'"
+    case LPAREN_ASTERISK          => "'(*'"
+    case LPAREN_ASTERISK2         => "'(**'"
+    case RPAREN_ASTERISK          => "'*)'"
+    case RPAREN_ASTERISK2         => "'**)'"
     
+    case THEN                     => "'then'"
+      
     case _ =>
       (token2name get token) match {
         case Some(name) => "'" + name + "'"
