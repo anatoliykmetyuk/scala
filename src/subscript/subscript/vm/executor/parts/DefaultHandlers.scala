@@ -62,8 +62,8 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
       message.node match {
            //case n@N_root            (t: T_1_ary     ) => activateFrom(n, t.child0)
            case n@N_code_tiny                  (t)  => n.hasSuccess = true; executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
-           case n@N_localvar                   (t)  => if (t.isLoop) setIteration_n_ary_op_ancestor(n); 
-            val v = executeCode(n);n.n_ary_op_ancestor.initLocalVariable(t.localVariable.name, n.pass, v); doNeutral(n); insertDeactivation(n,null)
+           case n@N_localvar                   (t)  => if (t.isLoop) setIteration_n_ary_op_ancestor(n);
+            n.n_ary_op_ancestor.initLocalVariable(t.localVariable.name, n.pass, executeCode(n));doNeutral(n);insertDeactivation(n,null)
            case n@N_privatevar                 (t) => n.n_ary_op_ancestor.initLocalVariable(t.name, n.pass, n.getLocalVariableHolder(t.name).value)
            case n@N_code_normal                (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
            case n@N_code_unsure                (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))

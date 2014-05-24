@@ -331,7 +331,7 @@ mouseClicks(n:Int,comp: Component, ?p : java.awt.Point) = var mce: MouseClicked 
                                                                                                                                                    ^
 */
 
-     guard(comp: Component, test: () => Boolean)           = if (test()) .. else ... anyEvent(comp)
+     guard(comp: Component, test: () => Boolean)           = if test() then .. else ...; anyEvent(comp)
 
      key2(publisher: Publisher, ??keyCode : Char     )     = event(         KeyTypedReactor[N_code_eventhandling](publisher, _keyCode ))
     vkey2(publisher: Publisher, ??keyValue: Key.Value)     = event(        VKeyTypedReactor[N_code_eventhandling](publisher, _keyValue))

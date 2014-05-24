@@ -7,7 +7,7 @@ import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
 import akka.actor._
-import subscript.vm.model.callgraph.CallGraphNode
+import subscript.vm.model.callgraph._
 
 // was: import scala.actors.Logger
 object Debug extends Logger("") {}
@@ -55,7 +55,7 @@ trait SubScriptActor extends Actor {
       there.onDeactivate {synchronized {callHandlers -= handlerWithExecuteAA}}
     }: 
     {. Debug.info(s"$this.r$$") .}
-    if (s != null) s
+    if s != null then s
   
   
   // Callbacks
@@ -68,10 +68,10 @@ trait SubScriptActor extends Actor {
   } 
   
   override def aroundReceive(receive: Actor.Receive, msg: Any) {    
-    //synchronized {
-    //  sendSynchronizationMessage(this)
-    //  wait()
-    //}
+    synchronized {
+      sendSynchronizationMessage(this)
+      wait()
+    }
     
     runner.doScriptSteps
     var messageWasHandled = false
@@ -101,14 +101,14 @@ trait SubScriptActor extends Actor {
   final def receive: Actor.Receive = {case _ =>} 
   
     
-  //def sendSynchronizationMessage(lock: AnyRef) {
-  //  val vm = runner.executor
-  //  vm insert SynchronizationMessage(vm.rootNode, lock)    
-  //}
+  def sendSynchronizationMessage(lock: AnyRef) {
+    val vm = runner.executor
+    vm insert SynchronizationMessage(vm.rootNode, lock)    
+  }
 
 }
 
-//case class SynchronizationMessage(node: CallGraphNodeTrait, lock: AnyRef) extends CallGraphMessageN {
-//  type N = CallGraphNodeTrait
-//  override def priority = PRIORITY_InvokeFromET - 1  // After all actors are launched
-//}
+case class SynchronizationMessage(node: CallGraphNode, lock: AnyRef) extends CallGraphMessageN {
+  type N = CallGraphNode
+  override def priority = PRIORITY_InvokeFromET - 1  // After all actors are launched
+}
