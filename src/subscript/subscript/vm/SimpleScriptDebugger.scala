@@ -3,6 +3,7 @@ package subscript.vm
 import subscript.vm.executor._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
+import subscript.vm.model.callgraph.CallGraphNode
 
 /*
  * Simple text based script debugger
@@ -66,14 +67,14 @@ class SimpleScriptDebugger extends MsgListener {
   }
   def traceTree: Unit = {
     var j = 0;
-	  def traceTree[T <: TemplateNode](n: CallGraphNodeTrait, branches: List[Int], depth: Int): Unit = {
+	  def traceTree[T <: TemplateNode](n: CallGraphNode, branches: List[Int], depth: Int): Unit = {
 	    for (i<-1 to 30) {
 	      print(if(i==depth)"*"else if (branches.contains(i)) "|" else if(j%5==0)"-"else" ")
 	    }
 	    j+=1
 	    println(n.infoString)
 	    n match {
-	      case p:CallGraphParentNodeTrait => 
+	      case p:CallGraphNode => 
 	        val pcl=p.children.length
 	        p.children.foreach{ c =>
 	          var bs = if (c.template.indexAsChild<pcl-1) 

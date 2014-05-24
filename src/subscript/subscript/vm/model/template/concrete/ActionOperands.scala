@@ -3,7 +3,8 @@ package subscript.vm.model.template.concrete
 import subscript.vm.model.template._
 import subscript.vm._
 import subscript.DSL._
-
+import subscript.vm.model.callgraph._
+import subscript.vm.model.callgraph.generic._
 
 case class T_code_normal(
     override val code: N_code_normal => Unit

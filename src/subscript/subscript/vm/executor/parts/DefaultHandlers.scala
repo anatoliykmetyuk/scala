@@ -5,10 +5,9 @@ import subscript.vm.executor._
 import subscript.vm.executor.data._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
-
 import subscript.DSL._
-
 import scala.collection.mutable.Buffer
+import subscript.vm.model.callgraph._
 
 /** To DATA section; don't change */
 trait DefaultHandlers {this: ScriptExecutor with Tracer =>
@@ -62,9 +61,9 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
       executeCodeIfDefined(message.node, message.node.onActivateOrResume)
       message.node match {
            //case n@N_root            (t: T_1_ary     ) => activateFrom(n, t.child0)
-           case n@N_code_tiny                  (t)  => n.setSuccess(true); executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
-           case n@N_localvar                   (t)  => if (t.isLoop) setIteration_n_ary_op_ancestor(n); 
-            val v = executeCode(n);n.n_ary_op_ancestor.initLocalVariable(t.localVariable.name, n.pass, v); doNeutral(n); insertDeactivation(n,null)
+           case n@N_code_tiny                  (t)  => n.hasSuccess = true; executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
+           case n@N_localvar                   (t)  => if (t.isLoop) setIteration_n_ary_op_ancestor(n);
+            n.n_ary_op_ancestor.initLocalVariable(t.localVariable.name, n.pass, executeCode(n));doNeutral(n);insertDeactivation(n,null)
            case n@N_privatevar                 (t) => n.n_ary_op_ancestor.initLocalVariable(t.name, n.pass, n.getLocalVariableHolder(t.name).value)
            case n@N_code_normal                (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
            case n@N_code_unsure                (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
@@ -81,7 +80,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
            case n@N_epsilon                    (t) => insert(Success(n)); insertDeactivation(n,null)
            case n@N_nu                         (t) => doNeutral(n);       insertDeactivation(n,null)
            case n@N_while                      (t) => setIteration_n_ary_op_ancestor(n); 
-                                                      n.setSuccess(executeCode(n))
+                                                      n.hasSuccess = executeCode(n)
                                                       doNeutral(n)
                                                       if (!n.hasSuccess) {
                                                          insert(Break(n, null, ActivationMode.Inactive))
@@ -98,7 +97,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
            case n@N_then                       (t) => activateFrom(n, t.child0)
            case n@N_then_else                  (t) => activateFrom(n, t.child0)
            case n@N_n_ary_op                   (t, isLeftMerge) => val cn = activateFrom(n, t.children.head); if (!isLeftMerge) insertContinuation(message, cn)
-           case n@N_call                       (t) => executeCode(n)(n)
+           case n@N_call                       (t) => executeCode(n)
                                                       if (n.t_callee!=null) {activateFrom(n, n.t_callee)}
                                                       else {
                                                         insert(CAActivated   (n,null))
@@ -138,7 +137,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
                                                 n.transferParameters
                case _ =>
           }
-         message.node.setSuccess(true)
+         message.node.hasSuccess = true
          executeCodeIfDefined(message.node, message.node.onSuccess)
          message.node.forEachParent(p => insert(Success(p, message.node)))
   }
@@ -249,7 +248,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
            // set nc.partners vv and make it activate
            nc.communication = communication
            nc.parents ++: partners
-           for (p<-partners) {p.children+=nc}
+           for (p<-partners) {p addChild nc}
            //executeCode_call(nc);
            //activateFrom(nc, n.t_callee)}
            return true
@@ -293,7 +292,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * after an AA started in a communication reachable from multiple child nodes (*)
    */
   def handleAAHappened(message: AAHappened): Unit = {
-    message.node.setSuccess(false)
+    message.node.hasSuccess = false
     message.node.numberOfBusyActions += (message.mode match {
       case     AtomicCodeFragmentExecuted =>  0
       case DurationalCodeFragmentStarted  =>  1
@@ -304,13 +303,13 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
        case n@N_n_ary_op(t: T_n_ary, _) => insertContinuation (message) //don't return; just put the continuations in place, mainly used for left merge operators
                                                                      
           // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
-          var nodesToBeSuspended: Buffer[CallGraphNodeTrait] = null
-          var nodesToBeExcluded : Buffer[CallGraphNodeTrait] = null
+          var nodesToBeSuspended: Seq[n.Child] = null
+          var nodesToBeExcluded : Seq[n.Child] = null
       if (T_n_ary_op.isSuspending(n.template)) {
           val s = message.child
           if (s.aaHappenedCount==1) {
             t.kind match {
-              case "#" | "#%#"   => nodesToBeSuspended = n.children - s 
+              case "#" | "#%#"   => nodesToBeSuspended = n.children diff List(s)
               case "#%"          => nodesToBeExcluded  = n.children.filter(_.index < s.index) 
                                     nodesToBeSuspended = n.children.filter(_.index > s.index)
               case "#/" | "#/#/" => nodesToBeSuspended = n.children.filter(_.index < s.index) 
@@ -377,13 +376,9 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     val n = message.node
     n.isExcluded = true
     
-    message.node match {
-      case dch: DoCodeHolder[_] => 
-       if (dch.codeExecutor != null) {
-           dch.codeExecutor.interruptAA
-       }
-      case _ =>
-    }
+    if (message.node.template.isInstanceOf[TemplateCodeHolder[_, _]] && message.node.codeExecutor != null)
+      message.node.codeExecutor.interruptAA
+    
     n match {
       case cc: N_call => cc.stopPending
       case aa: N_atomic_action[_] =>
@@ -396,9 +391,8 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
         insert(Deactivation(aa, null, excluded=true))
       case _ =>
     }
-    n match {case p: CallGraphTreeParentNode => p.forEachChild(c => insert(Exclude(n,c)))
-             case _ =>
-    }
+    
+    n.children.foreach {c => insert(Exclude(n,c))}
   }
   
   /*
@@ -480,10 +474,10 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     var activateNext              = false
     var activationEnded           = false
     var activationEndedOptionally = false
-    var childNode: CallGraphNodeTrait = null // may indicate node from which the a message came
+    var childNode: CallGraphNode = null // may indicate node from which the a message came
 
     var shouldSucceed = false    
-
+    
     val isSequential = 
        n.template.kind match {
         case ";" | "|;"  | "||;" |  "|;|" => true
@@ -626,7 +620,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
 
     var nextActivationTemplateIndex = 0
   var nextActivationPass = 0
-  if (activateNextOrEnded) {
+  if (activateNextOrEnded) {    
     // old: childNode = if (T_n_ary.isLeftMerge(n.template.kind)) n.lastActivatedChild else message.childNode ; now done before
     nextActivationTemplateIndex = childNode.template.indexAsChild+1
     nextActivationPass = childNode.pass 
@@ -650,8 +644,8 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     }
     
     // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
-    var nodesToBeExcluded : Buffer[CallGraphNodeTrait] = null
-    var nodesToBeSuspended: Buffer[CallGraphNodeTrait] = null
+    var nodesToBeExcluded : Seq[CallGraphNode.Child] = null
+    var nodesToBeSuspended: Seq[CallGraphNode.Child] = null
     n.template.kind match {
 
       case "/" | "|/" 
@@ -668,9 +662,9 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
          | "&&:" | "||:" => val isLogicalOr = T_n_ary_op.getLogicalKind(n.template.kind)==LogicalKind.Or
                             // TBD: better descriptive name for consideredNodes
                             val consideredNodes = message.deactivations.map(_.child).filter(
-                               (c: CallGraphNodeTrait) => c.hasSuccess==isLogicalOr)
+                               (c: CallGraphNode) => c.hasSuccess==isLogicalOr)
                             if (!consideredNodes.isEmpty) {
-                              nodesToBeExcluded = n.children -- consideredNodes
+                              nodesToBeExcluded = n.children diff consideredNodes
                               activateNext = false
                             }
       case _ =>          
@@ -679,7 +673,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     if (!shouldSucceed && !n.hasSuccess) { // could already have been set for .. as child of ;
       
       // TBD: improve
-      //var nodesToBeResumed: Buffer[CallGraphNodeTrait] = null
+      //var nodesToBeResumed: Buffer[CallGraphNode] = null
       //if (message.success != null || message.aaHappeneds != Nil) {
       n.template.kind match {
             case ";" => shouldSucceed = activationEnded || activationEndedOptionally

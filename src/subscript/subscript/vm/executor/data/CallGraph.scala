@@ -4,6 +4,8 @@ import subscript.vm.executor._
 import subscript.vm._
 import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
+import subscript.vm.model.callgraph.CallGraphNode
+import subscript.vm.model.callgraph.CallGraphTreeNode
 
 class CallGraph(val executor: ScriptExecutor) {
   import CallGraph._
@@ -25,7 +27,7 @@ class CallGraph(val executor: ScriptExecutor) {
   def nextNodeIndex = {nNodes = nNodes+1; nNodes}
   
   // Graph
-  def activateFrom(parent: CallGraphParentNodeTrait, template: TemplateNode, pass: Option[Int] = None): CallGraphTreeNode = {
+  def activateFrom(parent: CallGraphNode.Parent, template: TemplateNode, pass: Option[Int] = None): CallGraphNode = {
     import CallGraph._
     val n = createNode(template, executor)
     n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)
@@ -38,28 +40,25 @@ class CallGraph(val executor: ScriptExecutor) {
 }
 
 object CallGraph {
-  def connect(parentNode: CallGraphParentNodeTrait, childNode: CallGraphTreeNode) {
-    childNode.parent = parentNode
+  def connect(parentNode: CallGraphNode.Parent, childNode: CallGraphNode.Child) {
+    childNode addParent parentNode
     childNode.scriptExecutor = parentNode.scriptExecutor
-    parentNode.appendChild(childNode)
     parentNode.nActivatedChildren += 1
   }  
   
-  def disconnect(childNode: CallGraphNodeTrait) {
+  def disconnect(childNode: CallGraphNode.Child) {
     childNode match {
-      case cn: CallGraphTreeNode => val parentNode = cn.parent
-                                    if (parentNode==null) return;
-                                    parentNode.children -= cn
-       case _ =>
+      case cn: CallGraphTreeNode => cn removeParent cn.parent
+      case _ =>
     }
   }
   
-  def setIteration_n_ary_op_ancestor(n: CallGraphNodeTrait) = {
+  def setIteration_n_ary_op_ancestor(n: CallGraphNode) = {
     val a = n.n_ary_op_ancestor
     if (a!=null) a.isIteration = true
   }
   
-  def createNode(template: TemplateNode, scriptExecutor: ScriptExecutor): CallGraphTreeNode = {
+  def createNode(template: TemplateNode, scriptExecutor: ScriptExecutor): CallGraphNode = {
    val result =
     template match {
       case t @ T_optional_break         (                          ) => N_optional_break(t)

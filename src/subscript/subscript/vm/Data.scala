@@ -27,6 +27,7 @@
 package subscript.vm
 
 import subscript.vm.executor._
+import subscript.vm.model.callgraph.CallGraphTreeNode
 /*
 Overview of formal and actual parameter use
 
