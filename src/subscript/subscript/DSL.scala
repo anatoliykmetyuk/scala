@@ -191,12 +191,14 @@ object DSL {
   def _optionalBreak                        = T_optional_break     ()
   def _optionalBreak_loop                   = T_optional_break_loop()
   def _loop                                 = T_loop               ()
-//def _if_inline                            = T_inline_if          () TBD
-//def _if_else_inline                       = T_inline_if_else     () TBD
   def _while0  (_cond:         =>Boolean)   = T_while((here: N_while ) => _cond)
   def _while   (_cond:N_while  =>Boolean)   = T_while(_cond)
   def _if0     (_cond:         =>Boolean)(c0: Child) = T_if((here: N_if) => _cond, c0)
   def _if      (_cond:N_if     =>Boolean)(c0: Child) = T_if(_cond, c0)
   def _if_else0(_cond:         =>Boolean)(c0: Child, c1: Child) = T_if_else((here: N_if_else) => _cond, c0, c1)
   def _if_else (_cond:N_if_else=>Boolean)(c0: Child, c1: Child) = T_if_else(_cond, c0, c1)
+  
+  def _do_then     (c0: Child, c1: Child           )  = T_do_then     (c0, c1) 
+  def _do_else     (c0: Child, c1: Child           )  = T_do_else     (c0, c1) 
+  def _do_then_else(c0: Child, c1: Child, c2: Child)  = T_do_then_else(c0, c1, c2) 
  }

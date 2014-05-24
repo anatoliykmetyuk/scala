@@ -38,16 +38,10 @@ case class T_if_else(
 ) extends T_2_ary with TemplateCodeHolder[N_if_else, Boolean]
 
 // Conditional script operators
-case class T_then     (
-    override val child0: Child,
-    override val child1: Child
-) extends T_2_ary
-
-case class T_then_else(
-    override val child0: Child,
-    override val child1: Child,
-    override val child2: Child
-) extends T_3_ary
+case class T_do_then     (override val child0: Child, override val child1: Child) extends T_2_ary
+case class T_do_else     (override val child0: Child, override val child1: Child) extends T_2_ary
+case class T_do_then_else(override val child0: Child, override val child1: Child, 
+                                                      override val child2: Child) extends T_3_ary
 
 /**
  * Operator of arbitrary arity.
@@ -67,19 +61,19 @@ object T_n_ary_op {
     kind match {
       case ";" | "|;" | "||;" | "|;|" 
          | "&&" | "&" | "&&:" | "&:"
-         | "=="  | "==>"  | "&==>"  | "&&==>"
-         | "==:" | "==>:" | "&==>:" | "&&==>:"
-         | "#" | "#/"          => LogicalKind.And
+         | "=="  | "&~~>"  | "&&~~>"
+         | "==:" | "&~~>:" | "&&~~>:"
+         | "%"   |  "%/"          => LogicalKind.And
                              
-      case "||"  | "|"    | "|==>"  | "||==>"
-         | "||:" | "|:"   | "|==>:" | "||==>:"
+      case "||"  | "|"    | "|~~>"  | "||~~>"
+         | "||:" | "|:"   | "|~~>:" | "||~~>:"
          | "|+"  | "|/" 
          | "||+" | "||/" 
          | "|+|" | "|/|" 
          | "+"   | "/" | "%" 
-         | "#%"  | "#%#"       => LogicalKind.Or                         
+         | "%;"  | "%&"       => LogicalKind.Or                         
       
-      case "#/#/"               => LogicalKind.None
+      case "%/%/"               => LogicalKind.None
       
       case _ => null
     }
@@ -98,10 +92,10 @@ object T_n_ary_op {
   def isMerge(kind: String): Boolean = {
     kind match {
       case "&&" | "&" | "&&:" | "&:"
-         | "=="  | "==>" | "&==>"  | "&&==>"  | "|==>"  | "||==>"
+         | "==" | "&~~>"  | "&&~~>"  | "|~~>"  | "||~~>"
 
          | "||"  | "|"  
-         | "||:" | "|:"   => true                         
+         | "||;" | "|;"   => true                         
       
       case _ => false
     }
@@ -110,7 +104,7 @@ object T_n_ary_op {
   def isLeftMerge(kind: String): Boolean = {
     kind match {
       case "&&:" | "&:"
-         | "==:"  | "==>:"  | "&==>:"  | "&&==>:"  | "|==>:"  | "||==>:"   
+         | "==:" | "&~~>:"  | "&&~~>:"  | "|~~>:"  | "||~~>:"   
          | "||:" | "|:" => true
       case _            => false
     }
@@ -118,9 +112,9 @@ object T_n_ary_op {
   def isSuspending(t: T_n_ary_op): Boolean = isSuspending(t.kind)
   def isSuspending(kind: String): Boolean = {
     kind match {
-      case "#" 
-         | "#%" | "#%#"
-         | "#/" | "#/#/" => true
+      case "%" 
+         | "%;" | "%&"
+         | "%/" | "%/%/" => true
       case _             => false
     }
   }

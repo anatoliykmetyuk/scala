@@ -84,8 +84,9 @@ object CallGraph {
       case t @ T_annotation             (              _, _        ) => N_annotation    (t)
       case t @ T_if                     (              _, _        ) => N_if            (t)
       case t @ T_if_else                (              _, _, _     ) => N_if_else       (t)
-      case t @ T_then                   (              _, _        ) => N_then          (t)
-      case t @ T_then_else              (              _, _, _     ) => N_then_else     (t)
+      case t @ T_do_then                (              _, _        ) => N_do_then       (t)
+      case t @ T_do_else                (              _, _        ) => N_do_else       (t)
+      case t @ T_do_then_else           (              _, _, _     ) => N_do_then_else  (t)
       case t @ T_n_ary_op               (kind: String, children@ _*) => N_n_ary_op (t, T_n_ary_op.isLeftMerge(kind))
       case t @ T_script(_, kind: String, name: Symbol, child0: TemplateNode) => N_script(t)
       case _ => null 

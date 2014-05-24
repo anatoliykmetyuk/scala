@@ -31,13 +31,17 @@ case class N_if_else(template: T_if_else)
 
 
 // Conditional script operators
-case class N_then(template: T_then) 
+case class N_do_then(template: T_do_then) 
   extends CallGraphTreeNode 
-  {type T = T_then}
+  {type T = T_do_then}
 
-case class N_then_else(template: T_then_else) 
+case class N_do_else(template: T_do_else) 
   extends CallGraphTreeNode 
-  {type T = T_then_else}
+  {type T = T_do_else}
+
+case class N_do_then_else(template: T_do_then_else) 
+  extends CallGraphTreeNode 
+  {type T = T_do_then_else}
 
 
 /** N-ary */

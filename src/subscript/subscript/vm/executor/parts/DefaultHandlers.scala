@@ -40,6 +40,8 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
                                                    insertContinuation(message); 
                                                    return}
            case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
+           case n@N_do_else     (t)  => if (message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return}
+           case n@N_do_then_else(t)  => if (message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return}
            case _ => 
       }
       message.node.forEachParent(p => insertDeactivation(p,message.node))
@@ -93,9 +95,10 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
            case n@N_annotation                 (t) => activateFrom(n, t.child0); executeCode(n)
            case n@N_if                         (t) => if (executeCode(n)) activateFrom(n, t.child0) else {doNeutral(n); insertDeactivation(n,null)}
            case n@N_if_else                    (t) => if (executeCode(n)) activateFrom(n, t.child0) 
-                                                               else  activateFrom(n, t.child1)
-           case n@N_then                       (t) => activateFrom(n, t.child0)
-           case n@N_then_else                  (t) => activateFrom(n, t.child0)
+                                                                    else  activateFrom(n, t.child1)
+           case n@N_do_then                    (t) => activateFrom(n, t.child0)
+           case n@N_do_else                    (t) => activateFrom(n, t.child0)
+           case n@N_do_then_else               (t) => activateFrom(n, t.child0)
            case n@N_n_ary_op                   (t, isLeftMerge) => val cn = activateFrom(n, t.children.head); if (!isLeftMerge) insertContinuation(message, cn)
            case n@N_call                       (t) => executeCode(n)
                                                       if (n.t_callee!=null) {activateFrom(n, n.t_callee)}
@@ -128,8 +131,8 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
          
          message.node match {
                case n@  N_annotation   (_  ) => {} // onSuccess?
-               case n@  N_then         (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
-               case n@  N_then_else    (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_do_then      (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_do_then_else (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
                case n@  N_1_ary_op     (t  ) => if (message.child         != null) {insertContinuation1(message); return}
                case n@  N_n_ary_op     (_,_) => if (message.child         != null) {insertContinuation (message); return}
                case n@  N_launch_anchor(_  ) => if(n.nActivatedChildrenWithoutSuccess > 0) {return}
@@ -309,10 +312,10 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
           val s = message.child
           if (s.aaHappenedCount==1) {
             t.kind match {
-              case "#" | "#%#"   => nodesToBeSuspended = n.children diff List(s)
-              case "#%"          => nodesToBeExcluded  = n.children.filter(_.index < s.index) 
+              case "%&" | "%;"   => nodesToBeSuspended = n.children diff List(s)
+              case "%"           => nodesToBeExcluded  = n.children.filter(_.index < s.index) 
                                     nodesToBeSuspended = n.children.filter(_.index > s.index)
-              case "#/" | "#/#/" => nodesToBeSuspended = n.children.filter(_.index < s.index) 
+              case "%/" | "%/%/" => nodesToBeSuspended = n.children.filter(_.index < s.index) 
             }
           }
       }

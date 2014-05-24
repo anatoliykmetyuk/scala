@@ -41,8 +41,9 @@ object TemplateNode {
       case T_if_else            (_,_,_) => "if-else"
       case T_launch                 (_) => "*"
       case T_launch_anchor          (_) => "**"
-      case T_then                 (_,_) => "then"
-      case T_then_else          (_,_,_) => "then-else"
+      case T_do_then              (_,_) => "do-then"
+      case T_do_else              (_,_) => "do-else"
+      case T_do_then_else       (_,_,_) => "do-then-else"
       case T_annotation           (_,_) => "@:"
       case T_call        (calleeName,_) => calleeName
       case T_script (_, kind: String, name: Symbol, _)          => name.toString
@@ -102,11 +103,12 @@ object TemplateNode {
       case T_1_ary_op(kind: String, _) =>   kind + hierarchyString(children.head, thisNode, false)
       case T_launch          (_) => "(*"  + hierarchyString(children.head, thisNode, false) +  "*)"
       case T_launch_anchor   (_) => "(**" + hierarchyString(children.head, thisNode, false) + "**)"
-      case T_if            (_,_) => "if()["      + hierarchyString(children.head, thisNode, false) + "]"
-      case T_if_else     (_,_,_) => "if()["      + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
-      case T_then          (_,_) =>     "["      + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + "]"
-      case T_then_else   (_,_,_) =>     "["      + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + 
-                                                                                                "]else[" + hierarchyString(children.tail.tail.head, thisNode, false) + "]"
+      case T_if            (_,_) => "if()then[" + hierarchyString(children.head, thisNode, false) + "]"
+      case T_if_else     (_,_,_) => "if()then[" + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
+      case T_do_then       (_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + "]"
+      case T_do_else       (_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
+      case T_do_then_else(_,_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + 
+                                                                                                    "]else[" + hierarchyString(children.tail.tail.head, thisNode, false) + "]"
       case T_annotation    (_,_) => thisNode.kind + hierarchyString(children.head, thisNode, false)
       case T_script (_, kind: String, name: Symbol, _) => name.toString + " = " + hierarchyString(children.head, thisNode, false)
     //case T_commscript(_, kind: String, _)                     => "cscript"
