@@ -74,23 +74,13 @@ trait SubScriptActor extends Actor {
     }
     
     runner.doScriptSteps
-    var messageWasHandled = false
-    callHandlers.synchronized {
-      for (h <- callHandlers if !messageWasHandled && (h isDefinedAt msg)) {
-        h(msg)  // TBD: check for success; requires access to the VM node
-        messageWasHandled = true
+    callHandlers.synchronized { // TBD: why is synchronized needed
+      callHandlers.collectFirst { case handler if handler isDefinedAt msg => handler(msg) } match {
+        case None    => super.aroundReceive( receive        , msg); Debug.info(s"$this aroundReceive did NOT handle msg   sender: $sender msg: $msg")
+        case Some(_) => super.aroundReceive({case _: Any =>}, msg); Debug.info(s"$this aroundReceive handled  sender: $sender msg: $msg")
+          			     runner.doScriptSteps
       }
     }
-    if (messageWasHandled) {
-         runner.doScriptSteps
-         Debug.info(s"$this aroundReceive handled  sender: $sender msg: $msg")}
-    else Debug.info(s"$this aroundReceive did NOT handle msg   sender: $sender msg: $msg")
-    
-    // If a message was handled, Akka will try to match it against a function that can handle any message
-    // otherwise it will try to match the message against function that can handle virtually nothing
-    // (except LocalObject, which is certainly local and can't be available from the outside)
-    case object LocalObject
-    super.aroundReceive(if (messageWasHandled) {case _: Any =>} else {case LocalObject =>}, msg)
   }
   
   override def aroundPostStop() {
