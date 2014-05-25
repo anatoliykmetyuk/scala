@@ -166,16 +166,18 @@ self =>
       new MarkupParser(this, preserveWS = true)
     }
 
-    def scriptLiteral(doInBrackets: Boolean) : Tree = {
+    def scriptLiteral(doInBrackets: Boolean, simpleTermOnly: Boolean) : Tree = {
       val wasInSubScript_script     = in.isInSubScript_script
       val wasInSubScript_nativeCode = in.isInSubScript_nativeCode
       in.isInSubScript_script = true
       in.isInSubScript_header = false
       in.isInSubScript_nativeCode = false
       var se: Tree = null
-      if (doInBrackets)
-            inBrackets{se = scriptExpr()}
-      else             se = scriptExpr()
+      
+      if (simpleTermOnly) if (doInBrackets) inBrackets{se = scriptExpr()}
+                          else              se = scriptExpr()
+      else simpleScriptTerm()
+      
       val result = makeScriptHeaderAndLocalsAndBody("<lambda>", se, Nil)
       in.isInSubScript_script     = wasInSubScript_script
       in.isInSubScript_nativeCode = wasInSubScript_nativeCode
@@ -1325,6 +1327,8 @@ self =>
     val NEWLINE_Name  = newTermName("NEWLINE")
     val   SPACE_Name  = newTermName(" ")
     val    SEMI_Name  = newTermName(";")
+    val       CURLYARROW2_Name = newTermName("~~>")
+    val CURLYBROKENARROW2_Name = newTermName("~/~>")
     
     val  script_Name  = newTermName("_script")
     val    here_Name  = newTermName("here")
@@ -1477,6 +1481,14 @@ self =>
     //  Function(vparams , block)
     //}
     
+    val DSLFunName_Dataflow_then      = newTermName("_dataflow_then")
+    val DSLFunName_Dataflow_else      = newTermName("_dataflow_else")
+    val DSLFunName_Dataflow_then_else = newTermName("_dataflow_then_else")
+    
+    def subScriptDSLFunForDataflow_then     : Tree = Select(sSubScriptDSL, DSLFunName_Dataflow_then)
+    def subScriptDSLFunForDataflow_else     : Tree = Select(sSubScriptDSL, DSLFunName_Dataflow_else)
+    def subScriptDSLFunForDataflow_then_else: Tree = Select(sSubScriptDSL, DSLFunName_Dataflow_then_else)
+
     def subScriptDSLFunForOperator(op: Tree, spaceOp: Name, newlineOp: Name): Tree = {
       val operatorName      : Name = op match {case Ident(name:Name) => if (name==SPACE_Name) spaceOp else if (name==NEWLINE_Name) newlineOp else name}
       val operatorDSLFunName: Name = mapOperatorNameToDSLFunName(operatorName) 
@@ -1928,18 +1940,17 @@ self =>
     }
     
     /*
-  scriptExpression        = operatorModifiers scriptExpression_10
+  scriptExpression        = operatorModifiers scriptExpression_9
  
   operatorModifiers       = . ("," + naryOperatorDesignator) . naryOperatorDesignator
  
-  scriptExpression_10     = scriptExpression_9 .. if newLineSignificant newLine else (-)
-  scriptExpression_9      = scriptExpression_8 .. (+ ";"  ";-;")
-  scriptExpression_8      = "if" valueExpression      "then" scriptExpression_8
+  scriptExpression_9      = scriptExpression_8 .. if newLineSignificant newLine else (-)
+  scriptExpression_8      = scriptExpression_7 .. (+ ";"  ";-;")
+  scriptExpression_7      = "if" valueExpression      "then" scriptExpression_8
                                                     . "else" scriptExpression_8
-                          + "do" scriptExpression_8 ( "then" scriptExpression_8
+                          + "do" scriptExpression_7 ( "then" scriptExpression_8
                                                    %; "else" scriptExpression_8 )
-                          + scriptExpression_7
-  scriptExpression_7      = scriptExpression_6 (.. "~~>" scriptLambda) 
+                          + scriptExpression_6
   scriptExpression_6      = scriptExpression_5 .. (+ "||"  "|"
                                                      orParArrow
                                                      "|+"  "|;"  "|/"
@@ -1949,8 +1960,9 @@ self =>
   scriptExpression_4      = scriptExpression_3 ..   "=="
   scriptExpression_3      = scriptExpression_2 ..    "+"
   scriptExpression_2      = scriptExpression_1 .. (+ "/"  "%"  "%/"  "%/%/"  "%&"  "%;")
-  scriptExpression_1      = scriptExpression_0 ..    "·"
-  scriptExpression_0      = scriptTerm         .. if commasOmittable (-) else (+)
+  scriptExpression_1      = scriptDataFlow     ..    "·"
+  scriptDataFlow          = scriptSpaceExpression (..; "~~>" scriptLambda %; "~/~>" scriptLambda) 
+  scriptSpaceExpression   =   scriptTerm         .. if commasOmittable (-) else (+)
       */
     
     def scriptExpr(semicolonAllowed: Boolean = true): Tree = scriptExpr(Local, semicolonAllowed)
@@ -1961,6 +1973,7 @@ self =>
     
     var areSpacesCommas              = false
     var areNewLinesSpecialSeparators = false
+    
     def scriptExpr(location: Int, semicolonAllowed: Boolean): Tree = {
  
       var scriptOperatorStack: List[ScriptOpInfo] = Nil
@@ -1975,8 +1988,8 @@ self =>
         case  NEWLINE | NEWLINES => 1
         case IDENTIFIER => operator.name.length
       }
-      var polishOp1: Name = null
-      var polishOp2: Name = null
+      var polishOp1: Name = null  //  first operator in prefix position, e.g. in (+ a b c) instead of (a+b+c)
+      var polishOp2: Name = null  // second operator in prefix position, e.g. in (;+ a b c <NEWLINE> d e) instead of   a b c + d e
 
       def reduceScriptOperatorStack(prec: Int): Unit = {
         while (scriptOperatorStack != base && prec <= subScriptInfixOpPrecedence(scriptOperatorStack.head.operatorName)) {
@@ -2011,7 +2024,7 @@ self =>
       
       var moreTerms = true
       do {
-        top = scriptSpaceExpression()
+        top = scriptDataFlow()
         //if (!areNewLinesSpecialSeparators) eatNewlines()
         if (isSubScriptInfixOp(in, semicolonAllowed=semicolonAllowed, areNewLinesSpecialSeparators)) {
            reduceScriptOperatorStack(subScriptInfixOpPrecedence(operatorName(in)))
@@ -2048,7 +2061,37 @@ self =>
       
     }
     
+    def scriptLambdaTerm(): Tree = {
+      var result = scriptTerm() // TBD: allow that this returns a single-parameter list, e.g. (i:Int)
+      val parameterList = result match {
+            case ident @ Ident(_) if in.token==ARROW2 => List(ValDef(null, null, null, null)) // TBD...
+            case Parens(xs) if xs.forall(isTypedParam) => convertToParams(result) 
+            case _ => null
+      }
+      if (parameterList!=null) {
+        val pos = accept(ARROW2)
+        val lambda = scriptLiteral(doInBrackets=false, simpleTermOnly=true)
+        result = atPos(pos) {Function(parameterList, lambda)}
+      }
+      result
+    }
     
+    def scriptDataFlow(): Tree = {
+      var result = scriptSpaceExpression()
+      while (in.token==CURLYARROW2 
+          || in.token==CURLYBROKENARROW2) {
+        val pos = in.offset
+        if (in.token==      CURLYARROW2) {  in.nextToken(); val thenPart=scriptLambdaTerm() 
+          if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
+                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(thenPart, elsePart))}}
+          else                              result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then     , List(thenPart))}
+        }
+        else if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
+                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_else, List(elsePart))}
+        }
+      }
+      result
+    }
     def scriptSpaceExpression(): Tree = {
       val ts  = new ListBuffer[Tree]
       var moreTerms = true
@@ -2511,7 +2554,7 @@ self =>
     def scriptCaseScript(): Tree = if (in.token==ARROW2) {
                                       in.start_SubScript_partialScript_caseScript; 
                                       atPos(accept(ARROW2)){
-                                        val sl = scriptLiteral(doInBrackets=false)
+                                        val sl = scriptLiteral(doInBrackets=false, simpleTermOnly=false)
                                         in.  end_SubScript_partialScript_caseScript
                                         sl
                                       }
@@ -2813,7 +2856,7 @@ self =>
       else simpleExpr()
     }
     def xmlLiteral(): Tree
-    def scriptLiteral(doInBrackets: Boolean): Tree
+    def scriptLiteral(doInBrackets: Boolean, simpleTermOnly: Boolean): Tree
 
     /** {{{
      *  SimpleExpr    ::= new (ClassTemplate | TemplateBody)
@@ -2833,7 +2876,7 @@ self =>
       val t =
         if (isLiteral) literal()
         else in.token match {
-          case LBRACKET => canApply = false; scriptLiteral(doInBrackets=true)
+          case LBRACKET => canApply = false; scriptLiteral(doInBrackets=true, simpleTermOnly=false)
           case XMLSTART => xmlLiteral()
           case IDENTIFIER | BACKQUOTED_IDENT | THIS | SUPER
                       => path(thisOK = true, typeOK = false)

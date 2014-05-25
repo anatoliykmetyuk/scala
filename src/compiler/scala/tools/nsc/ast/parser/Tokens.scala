@@ -134,6 +134,7 @@ object Tokens extends Tokens {
   final val GREATER2                 = 135
   final val ARROW2                   = 136
   final val CURLYARROW2              = 137
+  final val CURLYBROKENARROW2        = 138
   
   final val LBRACE_DOT               = 140
   final val LBRACE_DOT3              = 141

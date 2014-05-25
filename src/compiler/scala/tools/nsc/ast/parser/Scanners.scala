@@ -444,6 +444,12 @@ trait Scanners extends ScannersCommon {
                       if (lookahead.ch == '~') {lookahead.nextChar()
                        if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYARROW2; return} 
                       }
+                      else 
+                       if (lookahead.ch == '/') {lookahead.nextChar()
+                        if (lookahead.ch == '~') {lookahead.nextChar()
+                         if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYBROKENARROW2; return} 
+                        }
+                      }
                    }
                    getOperatorRest()
        case '=' => if (isInSubScript_partialScript) {
@@ -1263,7 +1269,9 @@ trait Scanners extends ScannersCommon {
     case XMLSTART      => "$XMLSTART$<"
       
     // SubScript tokens:  
-    case IF_QMARK                 => "'if?'"   
+    case CURLYARROW2              => "'~~>'"   
+    case CURLYBROKENARROW2        => "'~/~>'"   
+    case IF_QMARK                 => "'?if'"   
     case LBRACE_DOT               => "'{.'"   
     case LBRACE_DOT3              => "'{...'"
     case LBRACE_QMARK             => "'{?'"
