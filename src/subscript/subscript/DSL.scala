@@ -201,4 +201,21 @@ object DSL {
   def _do_then     (c0: Child, c1: Child           )  = T_do_then     (c0, c1) 
   def _do_else     (c0: Child, c1: Child           )  = T_do_else     (c0, c1) 
   def _do_then_else(c0: Child, c1: Child, c2: Child)  = T_do_then_else(c0, c1, c2) 
+  
+  //def _test[     T<:String,U](s: Script[T], t: Script[U]): Script[U] = [ do s then t ]
+  def _dataflow_then1[    U](s: Script[String], t: String=>Script[U]): Script[U] = [ do s then t(null) ]
+  def _dataflow_else[     U](s: Script[String], t: String=>Script[U]): Script[U] = [ do s else t(null) ]
+  def _dataflow_then_else[U](s: Script[String], t: String=>Script[U]
+                                           , f: Exception=>Script[U]): Script[U] = [ do s then t(null) else f(null) ]
+  
+  // FTTB type parameter Script assumed. Reason:
+  // The following lines do not compile; msg is
+  // error: not found: value _t
+  //   def _dataflow_then[T<:String,U](s: Script[T], t: T=>Script[U]): Script[U] = [ do s then t(null) ]
+  //                                                                                           ^
+  
+  //def _dataflow_then[T<:String,U](s: Script[T], t: T=>Script[U]): Script[U] = [ do s then t(null) ]
+  //def _dataflow_else[     T,U](s: Script[T], t: T=>Script[U]): Script[U] = [ do s else t(null) ]
+  //def _dataflow_then_else[T,U](s: Script[T], t: T=>Script[U]
+  //                                 , f: Exception=>Script[U]): Script[U] = [ do s then t(null) else f(null) ]
  }
