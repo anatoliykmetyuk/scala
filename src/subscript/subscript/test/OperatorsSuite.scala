@@ -277,6 +277,7 @@ class OperatorsSuite {
     b = atom('b')
     c = atom('c')
     d = atom('d')
+    e = atom('e')
 
   val scriptBehaviourList_for_debug = List(
      [a..; b]       -> "->a  a->ab aa->ab ab aab"
@@ -435,6 +436,49 @@ class OperatorsSuite {
    , [ a b && . && (-) ]       -> "->a a->0"
    , [ (a b+(+))  & .  & (-) ] -> "->1a     FAIL:a->b FAIL:ab->0"
    , [ (a b+(+)) && . && (-) ] -> "->1a FAIL:a->0"
+
+  
+   // if
+   , [ if  true then a ]            -> "->a a"
+   , [ if  true then a b ]          -> "->a a->b ab"
+   , [ if false then a ]            -> "->1"
+   , [ if false then a b ]          -> "->1"
+   , [ if  true then a   else c   ] -> "->a a"
+   , [ if  true then a b else c d ] -> "->a a->b ab"
+   , [ if false then a   else c   ] -> "->c c"
+   , [ if false then a b else c d ] -> "->c c->d cd"
+
+   // do
+   , [ do a     then b ]              -> "->a a->b ab"
+   , [ do a     then b c ]            -> "->a a->b ab->c abc"
+   , [ do a              else d   ]   -> "->a a"
+   , [ do a              else d e ]   -> "->a a"
+   , [ do a     then b   else d   ]   -> "->a a->b ab"
+   , [ do a     then b c else d e ]   -> "->a a->b ab->c abc"
+   
+   , [ do   (+) then b ]              -> "->b b"
+   , [ do   (+) then b c ]            -> "->b b->c bc"
+   , [ do   (+)          else d   ]   -> "->1"
+   , [ do   (+)          else d e ]   -> "->1"
+   , [ do   (+) then b   else d   ]   -> "->b b"
+   , [ do   (+) then b c else d e ]   -> "->b b->c bc"
+   
+   , [ do   (-) then b ]              -> "->1"
+   , [ do   (-) then b c ]            -> "->1"
+   , [ do   (-)          else d   ]   -> "->d d"
+   , [ do   (-)          else d e ]   -> "->d d->e de"
+   , [ do   (-) then b   else d   ]   -> "->d d"
+   , [ do   (-) then b c else d e ]   -> "->d d->e de"
+   
+   , [ do a (-) then b ]              -> "->a a"
+   , [ do a (-) then b c ]            -> "->a a"
+   , [ do a (-)          else d   ]   -> "->a a->d ad"
+   , [ do a (-)          else d e ]   -> "->a a->d ad->e ade"
+   , [ do a (-) then b   else d   ]   -> "->a a->d ad"
+   , [ do a (-) then b c else d e ]   -> "->a a->d ad->e ade"
+   
+   , [ do a then b ]                -> "->a FAIL:ab"
+   
    
    // Threaded code fragments. TBD: check whether the test mechanism can handle this; maybe not
    , [ a {**} .. ; b ]         -> "->a a->ab aa->ab ab aab"
@@ -445,7 +489,7 @@ class OperatorsSuite {
    , [ (** a **) b  ]          -> "ab"
    
    , [ (*  a  *)]              -> "a"
-   , [ (* a b *)]              -> "ab"
+   , [ (* a b *)]              -> "a->b ab"
    , [ (* a *) b  ]            -> "->ab a->b b->a ab ba"
    , [ (* a b *) c d ]         -> "->ac a->bc  c->ad  ab->c  ac->bd  ca->bd  cd->a  abc->d  acb->d acd->b cab->d cad->b cda->b abcd  acbd acdb cabd cadb cdab"
    
@@ -470,7 +514,6 @@ class OperatorsSuite {
    
    // Various
    , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
-
   )
 
   val scriptBehaviourMap = scriptBehaviourList.toMap
