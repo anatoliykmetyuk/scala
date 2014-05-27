@@ -53,15 +53,19 @@ class SimpleScriptDebugger extends MsgListener {
   // some tracing stuff
   var nSteps = 0
   var maxSteps = 0 // 0 means unlimited
-  val highTraceLevel = 3
-  var traceLevel = 2 // 0-no tracing; 1-message handling; 2-message insertion+handling; highTraceLevel-every step a tree 
+  
+  val treeTraceLevel = 3
+  val highTraceLevel = 4
+  
+  var traceLevel = 2 // 0-no tracing; 1-message handling; 2-message insertion+handling; 3 - every step a tree; highTraceLevel - every step expected messages
   def trace(level:Int,as: Any*) = {
     if (traceLevel>=level) {
       as.foreach {a=>print(a.toString)}; 
       println
       //traceMessages
     }
-    if (traceLevel >= highTraceLevel) traceTree
+    if (traceLevel >= treeTraceLevel) traceTree
+    if (traceLevel >= highTraceLevel) traceMessages
     if (maxSteps>0 && nSteps > maxSteps) {println("Exiting after "+nSteps+"steps"); System.exit(0)}
     nSteps += 1
   }
@@ -99,8 +103,8 @@ class SimpleScriptDebugger extends MsgListener {
         trace(1,">> ",m)
         m match {
           case AAToBeExecuted(_) =>
-            traceTree
-            traceMessages
+            if (traceLevel < treeTraceLevel) traceTree     // else already done in trace(1,...). messy but it works
+            if (traceLevel < highTraceLevel) traceMessages
           case _ =>  
         }
   }

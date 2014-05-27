@@ -19,38 +19,6 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
   import graph.activateFrom
   
   /*
-   * Handle a deactivation message. 
-   * If the receiving node is a n_ary operator and there is a sending child node,
-   * then postpone further processing by inserting a continuation message.
-   * TBD: add a case for a 1_ary operator
-   * 
-   * Insert deactivation messages for all parent nodes
-   * Execute code for deactivation, if defined
-   * Unlink the node from the call graph
-   */
-  def handleDeactivation(message: Deactivation): Unit = {
-       message.node match {
-           case n@N_n_ary_op (_: T_n_ary, _)  => if(message.child!=null) {
-                                                   if (message.child.hasSuccess) {
-                                                      n.childThatEndedInSuccess_index(message.child.index)
-                                                   }
-                                                   else {
-                                                      n.aChildEndedInFailure = true
-                                                   }
-                                                   insertContinuation(message); 
-                                                   return}
-           case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
-           case n@N_do_else     (t)  => if (message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return}
-           case n@N_do_then_else(t)  => if (message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return}
-           case _ => 
-      }
-      message.node.forEachParent(p => insertDeactivation(p,message.node))
-      executeCodeIfDefined(message.node, message.node.onDeactivate)
-      executeCodeIfDefined(message.node, message.node.onDeactivateOrSuspend)
-      disconnect(childNode = message.node)
-  }
-
-  /*
    * Handle an activation message.
    * This involves:
    * 
@@ -111,6 +79,42 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
   }
   
   /*
+   * Handle a deactivation message. 
+   * If the receiving node is a n_ary operator and there is a sending child node,
+   * then postpone further processing by inserting a continuation message.
+   * TBD: add a case for a 1_ary operator
+   * 
+   * Insert deactivation messages for all parent nodes
+   * Execute code for deactivation, if defined
+   * Unlink the node from the call graph
+   */
+  def handleDeactivation(message: Deactivation): Unit = {
+       message.node match {
+           case n@N_n_ary_op (_: T_n_ary, _)  => if(!message.excluded
+                                                 &&  message.child!=null) {
+                                                   if (message.child.hasSuccess) {
+                                                      n.childThatEndedInSuccess_index(message.child.index)
+                                                   }
+                                                   else {
+                                                      n.aChildEndedInFailure = true
+                                                   }
+                                                   insertContinuation(message); 
+                                                   return}
+           case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
+           case n@N_do_then     (t)  => if (!message.excluded && message.child!=null
+                                                              && message.child.template==t.child0 && !message.child.hasSuccess) {doNeutral(n); 
+                                                                                                                                insertDeactivation(n,null); return} else if(!n.children.isEmpty) return
+           case n@N_do_else     (t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return} else if(!n.children.isEmpty) return
+           case n@N_do_then_else(t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return} else if(!n.children.isEmpty) return
+           case _ => 
+      }
+      message.node.forEachParent(p => insertDeactivation(p,message.node))
+      executeCodeIfDefined(message.node, message.node.onDeactivate)
+      executeCodeIfDefined(message.node, message.node.onDeactivateOrSuspend)
+      disconnect(childNode = message.node)
+  }
+
+  /*
    * Handle a success message
    * 
    * for n_ary and 1_ary nodes if the message comes from a child node:
@@ -131,8 +135,10 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
          
          message.node match {
                case n@  N_annotation   (_  ) => {} // onSuccess?
-               case n@  N_do_then      (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
-               case n@  N_do_then_else (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
+                                           // Note: message.child!=null is needed because of doNeutral(n) in handleDeactivation()
+               case n@  N_do_then      (t  ) => if (message.child!=null && message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_do_then_else (t  ) => if (                       message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_do_else      (t  ) => if (                       message.child.template==t.child0) {if (n.getLogicalKind_n_ary_op_ancestor==LogicalKind.Or) return}
                case n@  N_1_ary_op     (t  ) => if (message.child         != null) {insertContinuation1(message); return}
                case n@  N_n_ary_op     (_,_) => if (message.child         != null) {insertContinuation (message); return}
                case n@  N_launch_anchor(_  ) => if(n.nActivatedChildrenWithoutSuccess > 0) {return}
