@@ -439,7 +439,7 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-       case '~' => if (isInSubScript_partialScript) {
+       case '~' => if (isInSubScript_expression) {
                       val lookahead = lookaheadReader; lookahead.nextChar()
                       if (lookahead.ch == '~') {lookahead.nextChar()
                        if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYARROW2; return} 
@@ -447,12 +447,12 @@ trait Scanners extends ScannersCommon {
                       else 
                        if (lookahead.ch == '/') {lookahead.nextChar()
                         if (lookahead.ch == '~') {lookahead.nextChar()
-                         if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYBROKENARROW2; return} 
+                         if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); nextChar(); token = CURLYBROKENARROW2; return} 
                         }
                       }
                    }
                    getOperatorRest()
-       case '=' => if (isInSubScript_partialScript) {
+       case '=' => if (isInSubScript_partialScript || isInSubScript_expression) {
                       val lookahead = lookaheadReader; lookahead.nextChar()
                       if (lookahead.ch == '=') {lookahead.nextChar()
                        if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = ARROW2; return} 

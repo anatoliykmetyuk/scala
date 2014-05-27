@@ -2073,8 +2073,8 @@ self =>
       // TBD: support USCORE?
       var result = simpleScriptTerm(allowParameterList=true) // TBD: allow that this returns a single-parameter list, e.g. (i:Int)
       val parameterList = result match {
-            case ident @ Ident(_) if in.token==ARROW2 => accept(ARROW2); List(convertToParam(ident))
-            case typed @ Typed(p,aType)               => accept(ARROW2); List(convertToParam(typed))
+            case ident @ Ident(_) if in.token==ARROW2 => List(convertToParam(ident))
+            case typed @ Typed(p,aType)               => List(convertToParam(typed))
             case _ => null
       }
       if (parameterList!=null) {
@@ -2095,13 +2095,14 @@ self =>
 	      while (in.token==CURLYARROW2 
 	          || in.token==CURLYBROKENARROW2) {
 	        val pos = in.offset
+	        val sourcePart = makeScriptHeaderAndLocalsAndBody("~~>", result, Nil)
 	        if (in.token==      CURLYARROW2) {  in.nextToken(); val thenPart=scriptLambdaTerm() 
 	          if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
-	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(thenPart, elsePart))}}
-	          else                              result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then     , List(thenPart))}
+	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(sourcePart, thenPart, elsePart))}}
+	          else                              result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then     , List(sourcePart, thenPart))}
 	        }
 	        else if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
-	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_else, List(elsePart))}
+	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_else, List(sourcePart, elsePart))}
 	        }
 	      }
       }
