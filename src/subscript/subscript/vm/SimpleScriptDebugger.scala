@@ -40,15 +40,15 @@ object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
 
 class SimpleScriptDebugger extends MsgListener {
 
-  private var _scriptExecutor: ScriptExecutor = null
+  private var _scriptExecutor: ScriptExecutor[_] = null
   def scriptExecutor = _scriptExecutor
   override def attach(p: MsgPublisher) {
     super.attach(p)
-    _scriptExecutor = p.asInstanceOf[ScriptExecutor]
+    _scriptExecutor = p.asInstanceOf[ScriptExecutor[_]]
   }
   
   def callGraphMessages = scriptExecutor.msgQueue.collection
-  def rootNode            = scriptExecutor.rootNode
+  def rootNode          = scriptExecutor.rootNode
   
   // some tracing stuff
   var nSteps = 0
@@ -109,7 +109,7 @@ class SimpleScriptDebugger extends MsgListener {
         }
   }
   override def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m)
-  override def messageDequeued    (m: CallGraphMessage                ) = trace(2, "-- ", m)
+  override def messageDequeued    (m: CallGraphMessage                 ) = trace(2, "-- ", m)
   override def messageContinuation(m: CallGraphMessage, c: Continuation) = trace(2, "** ", c)
   override def messageAwaiting: Unit = {traceTree; traceMessages}
 }

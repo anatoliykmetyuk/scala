@@ -4620,6 +4620,15 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
               val tree2        = Apply(tree1, List(here_Ident)) // (_a(here.toString))(here)
              
               // blockToFunction adds "here" to the context
+              // TBD: use something like: 
+              //   val parameterizedType = AppliedTypeTree(nodeType, List(funpt))
+              //   val function_here_to_code = blockToFunction(tree2, nodeType, tree.pos) // here=>(_a(here.toString))(here)
+              //
+              // but note that funpt is already a type. Moreover, to determine funpt we already should have created a
+              // function_here_to_code in the previous op.typed call.
+              // The problem is that we would already have needed the funpt for that 
+              // Maybe the usual typer of the scala compiler can deal with such mutual dependencies.
+              
               val function_here_to_code = blockToFunction(tree2, nodeType, tree.pos) // here=>(_a(here.toString))(here)
               val apply_template        = Apply(fun_template, List(funName, function_here_to_code)) // _call  {here=>(_a(here.toString))(here)}
 

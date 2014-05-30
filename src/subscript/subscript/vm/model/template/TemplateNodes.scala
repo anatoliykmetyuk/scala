@@ -10,46 +10,49 @@ import subscript.vm.model.template.concrete._
 object TemplateNode {
   // Defined statically in the object. Now we can
   // use these types everywhere.
-  type Root   = RootNode with TemplateNode
+  type Root   =     RootNode with TemplateNode
   type Parent = TemplateNode
-  type Child  = ChildNode with TemplateNode
+  type Child  =    ChildNode with TemplateNode
   
   def kindAsString(t: TemplateNode): String = 
     t match {
       // matching on T_n_ary_op (and T_1_ary_op) does not work;
       // therefore FTTB those classes have their own implementation of kindAsString
-      case T_1_ary_op(kind: String, _) => kind
-      case T_n_ary_op(kind: String, _) => kind
+      case T_1_ary_op               (kind: String, _) => kind
+      case T_n_ary_op               (kind: String, _) => kind
       
-      case T_code_normal            (_) => "{}"
-      case T_code_tiny              (_) => "{!!}"
-      case T_code_threaded          (_) => "{**}"
-      case T_code_unsure            (_) => "{??}"
-      case T_code_eventhandling     (_) => "{.}"
-      case T_code_eventhandling_loop(_) => "{...}"
-      case T_localvar(isVal: Boolean, isLoop: Boolean, localVariable, _) => "var"
-      case T_privatevar  (name: Symbol) => "private "+name
-      case T_while                  (_) => "while"
-      case T_break                   () => "break"
-      case T_optional_break          () => "."
-      case T_optional_break_loop     () => ".."
-      case T_delta                   () => "(-)"
-      case T_epsilon                 () => "(+)"
-      case T_nu                      () => "(+-)"
-      case T_loop                    () => "..."
-      case T_if                   (_,_) => "if"
-      case T_if_else            (_,_,_) => "if-else"
-      case T_launch                 (_) => "*"
-      case T_launch_anchor          (_) => "**"
-      case T_do_then              (_,_) => "do-then"
-      case T_do_else              (_,_) => "do-else"
-      case T_do_then_else       (_,_,_) => "do-then-else"
-      case T_annotation           (_,_) => "@:"
-      case T_call        (calleeName,_) => calleeName
-      case T_script (_, kind: String, name: Symbol, _)          => name.toString
-      case T_commscript(_, kind: String, _)                     => "cscript"
-      case T_communication(_, kind: String, names: Seq[Symbol]) => "comm"
-      case T_local_valueCode  (_, _, _)                         => "T_local_valueCode???"
+      case T_code_normal            (_)               => "{}"
+      case T_code_tiny              (_)               => "{!!}"
+      case T_code_threaded          (_)               => "{**}"
+      case T_code_unsure            (_)               => "{??}"
+      case T_code_eventhandling     (_)               => "{.}"
+      case T_code_eventhandling_loop(_)               => "{...}"
+      case T_localvar               (isVal: Boolean, 
+                                    isLoop: Boolean, 
+                                      localVariable,
+                                                   _) => "var"
+      case T_privatevar             (name: Symbol)    => "private "+name
+      case T_while                  (_)               => "while"
+      case T_break                  ()                => "break"
+      case T_optional_break         ()                => "."
+      case T_optional_break_loop    ()                => ".."
+      case T_delta                  ()                => "(-)"
+      case T_epsilon                ()                => "(+)"
+      case T_nu                     ()                => "(+-)"
+      case T_loop                   ()                => "..."
+      case T_if                     (_,_)             => "if"
+      case T_if_else                (_,_,_)           => "if-else"
+      case T_launch                 (_)               => "*"
+      case T_launch_anchor          (_)               => "**"
+      case T_do_then                (_,_)             => "do-then"
+      case T_do_else                (_,_)             => "do-else"
+      case T_do_then_else           (_,_,_)           => "do-then-else"
+      case T_annotation             (_,_)             => "@:"
+      case T_local_valueCode        (_, _, _)         => "T_local_valueCode???"
+      case T_call                   (calleeName,_)    => calleeName
+      case T_script                 (_, kind: String, name: Symbol, _) => name.toString
+    //case T_commscript             [S](_, kind: String, _)                     => "cscript"
+    //case T_communication          [S](_, kind: String, names: Seq[Symbol]) => "comm"
       case _ => getClass.getName
     }
   
@@ -87,30 +90,30 @@ object TemplateNode {
         if (doParenthesize) "(" + s + ")" else s
     }
     else thisNode match {
-      case T_n_ary_op(kind: String, _) =>
+      case t@T_n_ary_op(kind: String, _) =>
         var isSpaceSeq = false
         val doParenthesize = if (parent==null) false else parent match {
-          case T_annotation        (_,_) => true
-          case T_launch              (_) => true
-          case T_launch_anchor       (_) => true
-          case T_1_ary_op(pk: String, _) => true
-          case T_n_ary_op(pk: String, _) => if (kind==";" && !parentIsSpaceSeq) {isSpaceSeq = true; false}
-                                            else subScriptInfixOpPrecedence(kind) <= subScriptInfixOpPrecedence(pk)
-          case _                         => false
+          case t@T_annotation          (_,_)           => true
+          case t@T_launch              (_)             => true
+          case t@T_launch_anchor       (_)             => true
+          case t@T_1_ary_op            (pk: String, _) => true
+          case t@T_n_ary_op            (pk: String, _) => if (kind==";" && !parentIsSpaceSeq) {isSpaceSeq = true; false}
+                                                          else subScriptInfixOpPrecedence(kind) <= subScriptInfixOpPrecedence(pk)
+          case _                                       => false
         }
         val s = children.map(hierarchyString(_, thisNode, isSpaceSeq)).mkString(if (isSpaceSeq) " " else thisNode.kind)
         if (doParenthesize) "(" + s + ")" else s
-      case T_1_ary_op(kind: String, _) =>   kind + hierarchyString(children.head, thisNode, false)
-      case T_launch          (_) => "(*"  + hierarchyString(children.head, thisNode, false) +  "*)"
-      case T_launch_anchor   (_) => "(**" + hierarchyString(children.head, thisNode, false) + "**)"
-      case T_if            (_,_) => "if()then[" + hierarchyString(children.head, thisNode, false) + "]"
-      case T_if_else     (_,_,_) => "if()then[" + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
-      case T_do_then       (_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + "]"
-      case T_do_else       (_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
-      case T_do_then_else(_,_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + 
-                                                                                                    "]else[" + hierarchyString(children.tail.tail.head, thisNode, false) + "]"
-      case T_annotation    (_,_) => thisNode.kind + hierarchyString(children.head, thisNode, false)
-      case T_script (_, kind: String, name: Symbol, _) => name.toString + " = " + hierarchyString(children.head, thisNode, false)
+      case t@T_1_ary_op        (kind: String, _) =>   kind + hierarchyString(children.head, thisNode, false)
+      case t@T_launch          (_)     =>       "(*"  + hierarchyString(children.head, thisNode, false) +  "*)"
+      case t@T_launch_anchor   (_)     =>       "(**" + hierarchyString(children.head, thisNode, false) + "**)"
+      case t@T_if              (_,_)   => "if()then[" + hierarchyString(children.head, thisNode, false) + "]"
+      case t@T_if_else         (_,_,_) => "if()then[" + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
+      case t@T_do_then         (_,_)   =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + "]"
+      case t@T_do_else         (_,_)   =>       "do[" + hierarchyString(children.head, thisNode, false) + "]else[" + hierarchyString(children.tail.head, thisNode, false) + "]"
+      case t@T_do_then_else    (_,_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + 
+                                                                                                          "]else[" + hierarchyString(children.tail.tail.head, thisNode, false) + "]"
+      case t@T_annotation      (_,_)   => thisNode.kind + hierarchyString(children.head, thisNode, false)
+      case t@T_script          (_, kind: String, name: Symbol, _) => name.toString + " = " + hierarchyString(children.head, thisNode, false)
     //case T_commscript(_, kind: String, _)                     => "cscript"
     //case T_communication(_, kind: String, names: Seq[Symbol]) => "comm"
       case _ => thisNode.kind
@@ -122,9 +125,9 @@ object TemplateNode {
  * Base class for all template nodes. 
  */
 trait TemplateNode extends TreeNode with TemplateNodeHelpers {
-  override type Root   = TemplateNode.Root
+  override type Root   = TemplateNode.Root  
   override type Parent = TemplateNode.Parent
-  override type Child  = TemplateNode.Child
+  override type Child  = TemplateNode.Child 
   
   def owner: AnyRef = null
   def kind: String = TemplateNode.kindAsString(this)
@@ -134,7 +137,7 @@ trait TemplateNode extends TreeNode with TemplateNodeHelpers {
 /**
  * Node that can hold code.
  */
-trait TemplateCodeHolder[N, R] extends TemplateNode {val code: N => R}
+trait TemplateCodeHolder[R,N] extends TemplateNode {val code: N => R}
 
 
 // Differentiation by arity.
@@ -142,9 +145,9 @@ trait T_0_ary extends TemplateNode with TreeNode_0 with ChildNode
 trait T_1_ary extends TemplateNode with TreeNode_1 with ChildNode
 trait T_2_ary extends TemplateNode with TreeNode_2 with ChildNode
 trait T_3_ary extends TemplateNode with TreeNode_3 with ChildNode
-trait T_n_ary extends TemplateNode with ChildNode
+trait T_n_ary extends TemplateNode                 with ChildNode
 
 /**
- * Atomic action template.
+ * Code fragments.
  */
-trait T_atomic_action[N] extends T_0_ary with TemplateCodeHolder[N, Unit]
+trait T_code_fragment[R,N<:subscript.vm.model.callgraph.N_code_fragment[R]] extends T_0_ary with TemplateCodeHolder[R,N]

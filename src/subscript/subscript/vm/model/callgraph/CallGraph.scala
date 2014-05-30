@@ -1,5 +1,6 @@
 package subscript.vm.model.callgraph
 
+import scala.util.{Try,Success,Failure}
 import subscript.vm._
 import subscript.vm.model.template._
 import subscript.vm.model.callgraph.generic._
@@ -17,6 +18,7 @@ trait CallGraphNode extends GraphNode
     with OldCallGraphNodeApi
 {
   type T <: TemplateNode
+  type S
   override type Child  = CallGraphNode.Child
   override type Parent = CallGraphNode.Parent
   
@@ -25,12 +27,12 @@ trait CallGraphNode extends GraphNode
   
   override def toString = f"$index%2d $template"
 }
-
+trait ScriptResultHolder[R] {var $:Try[R] = null}
 trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode
 trait CallGraphLeafNode extends CallGraphTreeNode with GraphLeafNode
 
-trait N_atomic_action[Node] extends CallGraphLeafNode {
-  type T <: T_atomic_action[Node]
+trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] {
+  type T <: T_code_fragment[R,_]
   override def asynchronousAllowed: Boolean = true
   var msgAAToBeExecuted: CallGraphMessage = null
   var priority = 0 // < 0 is low, > 0 is high
@@ -41,8 +43,6 @@ trait N_atomic_action[Node] extends CallGraphLeafNode {
 }
 
 object CallGraphNode {
-  type _scriptType[T] = N_call=>Unit
-  
   type Child  = CallGraphNode
   type Parent = CallGraphNode
   

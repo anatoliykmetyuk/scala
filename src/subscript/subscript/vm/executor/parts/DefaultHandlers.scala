@@ -10,7 +10,7 @@ import scala.collection.mutable.Buffer
 import subscript.vm.model.callgraph._
 
 /** To DATA section; don't change */
-trait DefaultHandlers {this: ScriptExecutor with Tracer =>
+trait DefaultHandlers {this: ScriptExecutor[_] with Tracer =>
   import CodeExecutor._
   import CallGraph._
   import MessageHandlers._
@@ -74,7 +74,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
                                                         insert(CAActivated   (n,null))
                                                         insert(CAActivatedTBD(n))
                                                       }
-           case n@N_script                     (t) => activateFrom(n, t.child0)
+           case n@Script                       (t) => activateFrom(n, t.child0)   // ???????????
       }      
   }
   
@@ -175,6 +175,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
           }
           message.node.forEachParent(p => insert(AAActivated(p, message.node)))
   }
+/*
   /*
    * Handle an CAActivated message: activated communications 
    * This may be of interest for a "+" operator higher up in the graph: 
@@ -282,7 +283,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     // TBD: first try comms that may still grow (having multipicities other than One)
     return tryCommunicationWithPartners(Nil)
   }
-            
+*/          
 
   /*
    * Handle an AAHappened message
@@ -385,12 +386,12 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     val n = message.node
     n.isExcluded = true
     
-    if (message.node.template.isInstanceOf[TemplateCodeHolder[_, _]] && message.node.codeExecutor != null)
+    if (message.node.template.isInstanceOf[TemplateCodeHolder[_,_]] && message.node.codeExecutor != null)
       message.node.codeExecutor.interruptAA
     
     n match {
-      case cc: N_call => cc.stopPending
-      case aa: N_atomic_action[_] =>
+      case cc: N_call[_] => cc.stopPending
+      case aa: N_code_fragment[_] =>
         aa.codeExecutor.cancelAA
         if (aa.msgAAToBeExecuted != null) {
           remove(message) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
@@ -421,7 +422,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * Note: the message may have been canceled instead of removed from the queue (was easier to implement),
    * so for the time being check the canceled flag
    */
-  def handleAAToBeExecuted[T<:TemplateCodeHolder[_,R],R](message: AAToBeExecuted) {
+  def handleAAToBeExecuted[T<:TemplateCodeHolder[R,_],R](message: AAToBeExecuted[R]) {
     val e = message.node.codeExecutor
     if (!e.canceled)  // temporary fix, since the message queue does not yet allow for removals
          e.executeAA
@@ -434,7 +435,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * Note: the message may have been canceled instead of removed from the queue (was easier to implement),
    * so for the time being check the canceled flag
    */
-  def handleAAToBeReexecuted[T<:TemplateCodeHolder[_,R],R](message: AAToBeReexecuted) {
+  def handleAAToBeReexecuted[T<:TemplateCodeHolder[R,_],R](message: AAToBeReexecuted[R]) {
     val e = message.node.codeExecutor
     if (!e.canceled) // temporary fix, since the message queue does not yet allow for removals
        insert(AAToBeExecuted(message.node)) // this way, failed {??} code ends up at the back of the queue
@@ -450,7 +451,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * It has inserted an AAExecutionFinished, so that this will be handled synchronously in the main script executor loop.
    *
    */
-  def handleAAExecutionFinished[T<:TemplateCodeHolder[_,R],R](message: AAExecutionFinished) {
+  def handleAAExecutionFinished[T<:TemplateCodeHolder[R,_],R](message: AAExecutionFinished) {
      message.node.codeExecutor.afterExecuteAA
   }
   
@@ -743,13 +744,13 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
       case a@Success          (_,_) => handleSuccess    (a)
       case a@Break        (_, _, _) => handleBreak      (a)
       case a@AAActivated      (_,_) => handleAAActivated(a)
-      case a@CAActivated      (_,_) => handleCAActivated(a)
-      case a@CAActivatedTBD     (_) => handleCAActivatedTBD(a)
+   // case a@CAActivated      (_,_) => handleCAActivated(a)
+   // case a@CAActivatedTBD     (_) => handleCAActivatedTBD(a)
       case a@AAHappened     (_,_,_) => handleAAHappened (a)
       case a@AAExecutionFinished(_) => handleAAExecutionFinished(a)
       case a@AAToBeReexecuted   (_) => handleAAToBeReexecuted   (a)
       case a@AAToBeExecuted     (_) => handleAAToBeExecuted     (a)
-      case CommunicationMatchingMessage => handleCommunicationMatchingMessage
+   // case CommunicationMatchingMessage => handleCommunicationMatchingMessage
     }
   val communicationHandler: MessageHandler = {
     case InvokeFromET(_, payload) => payload()

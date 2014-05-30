@@ -26,6 +26,7 @@
 
 package subscript
 
+import scala.util.{Try,Success,Failure}
 import subscript.vm._
 import subscript.DSL._
 import subscript.vm.executor._
@@ -37,6 +38,14 @@ import subscript.vm.model.callgraph.generic._
 // Predefined stuff - pass and some scripts: times, delta, epsilon, nu
 //
 object Predef {
+  
+  def $         [R]               (implicit s: Script[R]): Try[R]    = s.$
+  def $result   [R]               (implicit s: Script[R]): R         = s.$.asInstanceOf[Success[R]].value
+  def $failure  [R]               (implicit s: Script[R]): Throwable = {val f=s.$.asInstanceOf[Failure[R]]; if(f==null)null else f.exception}
+  def $_=       [R] (v: Try[R]   )(implicit s: Script[R])            = s.$=v
+  def $result_= [R] (v: R        )(implicit s: Script[R])            = s.$=Success(v)
+  def $failure_=[R] (v: Throwable)(implicit s: Script[R])            = s.$=Failure(v)  
+  
   def pass    (implicit node: CallGraphTreeNode): Int = node.pass
   def pass_up1(implicit node: CallGraphTreeNode): Int = node.n_ary_op_ancestor.pass
   def pass_up2(implicit node: CallGraphTreeNode): Int = node.n_ary_op_ancestor.n_ary_op_ancestor.pass
@@ -54,5 +63,5 @@ object Predef {
     test = times1(100)
   
   // the folloging would be almost equivalent to the times script:
-  def _times1(n:Int) = {_script(this, 'times1) {_while{implicit here=>pass<n}}}
+  def _times1(n:Int) = {_script(this, 'times1) {(script:Script[Unit]) => _while{implicit here=>pass<n}}}
 }

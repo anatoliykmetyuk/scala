@@ -178,7 +178,7 @@ self =>
       else if (doInBrackets) inBrackets{se = scriptExpr()}
            else                         se = scriptExpr() 
       
-      val result = makeScriptHeaderAndLocalsAndBody("<lambda>", se, Nil)
+      val result = makeScriptHeaderAndLocalsAndBody("<lambda>", se, Nil, TypeTree())
       in.isInSubScript_script     = wasInSubScript_script
       in.isInSubScript_nativeCode = wasInSubScript_nativeCode
       result
@@ -1330,10 +1330,11 @@ self =>
     val       CURLYARROW2_Name = newTermName("~~>")
     val CURLYBROKENARROW2_Name = newTermName("~/~>")
     
-    val  script_Name  = newTermName("_script")
-    val    here_Name  = newTermName("here")
+    val _script_Name  = newTermName("_script")
+    val  script_Name  = newTermName("script")
     val      at_Name  = newTermName("at")
     val   value_Name  = newTermName("value")
+    val    here_Name  = newTermName("here")
     val   there_Name  = newTermName("there")
     val     tmp_Name  = newTermName("$tmp")
     val    tmp1_Name  = newTermName("$tmp1")
@@ -1372,9 +1373,9 @@ self =>
     def sActualAdaptingParameter   : Tree = Select(sSubScriptVM,    actualAdaptingParameter_Name)
 
     def s_Unit       : Tree = Select(Ident(nameScala), name_unitType)
-    def s_script     : Tree = Select(sSubScriptDSL, script_Name)
-    def s_scriptType0: Tree = Select(sSubScriptDSL, name_scriptType)
-    def s_scriptType : Tree = AppliedTypeTree(s_scriptType0, List(s_Unit))
+    def s__script    : Tree = Select(sSubScriptDSL, _script_Name)
+    def s_scriptType : Tree = Select(sSubScriptVM, name_scriptType)
+  //def s_scriptType : Tree = AppliedTypeTree(s_scriptType0, List(s_Unit))
     
     final val raw_space = " "
     final val raw_semi  = ";"
@@ -1470,13 +1471,24 @@ self =>
       //val block = body match {case Block(_,_) => body case _ => Block(body)}
       Function(vparams , body)
     }
+    
+    // answer Script[scriptResultType]
+	def scriptType_resultType(scriptResultType: Tree) = {AppliedTypeTree(s_scriptType, List(scriptResultType))}
   
     /*
-     * Enclose the given block with a function with parameter "here" of the given node type 
+     * Enclose the given block with a function with parameter "here" or "there" of the given node type 
      * i.e.: here: NodeType => block
+     * 
+     * FTTB at the call sides of these 2 blockToFunction methods, many of these NodeType's are parameterized with [Any].
+     * Ideally the type parameter should be the return type of the given block
+     * Probably this can be done, but in the Typer phase. 
+     * That would be done when this Parser is cleaned up again, or replaced by SugarScala.
      */
-    def blockToFunction_here (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos,  here_Name)
-    def blockToFunction_there(block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos, there_Name) //  TBD Clean up
+    def blockToFunction_here  (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos,  here_Name)
+    def blockToFunction_there (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos, there_Name) //  TBD Clean up
+    def blockToFunction_script(block: Tree, scriptResultType: Tree, pos: Position): Function = {
+        blockToFunction       (block, scriptType_resultType(scriptResultType), pos, script_Name) //  TBD Clean up
+    }
     //{ val vparams = List(makeParam(there_Name, TypeTree()))
     //  Function(vparams , block)
     //}
@@ -1585,7 +1597,7 @@ self =>
       false
     }
     
-    def isScriptIdent = in.token == IDENTIFIER && in.name == nme.SCRIPTkw
+    def isScriptIdent = in.token == IDENTIFIER && in.name == nme.SCRIPTkw // TBD: use script_Name instead?
     def isBreakIdent  = in.token == IDENTIFIER && in.name == nme.BREAKkw
     
     // TBD cleanup
@@ -1750,7 +1762,7 @@ self =>
     var scriptLocalVariables              = new scala.collection.mutable.HashMap[Name,(Tree, Boolean)] // should be in a context stack; now the scope becomes too big 
     var scriptLocalValues                 = new scala.collection.mutable.HashMap[Name,(Tree, Boolean)]
     
-    def makeScriptHeaderAndLocalsAndBody(name: String, scriptBody: Tree, paramBindings: List[Tree]): Tree = {
+    def makeScriptHeaderAndLocalsAndBody(name: String, scriptBody: Tree, paramBindings: List[Tree], resultType: Tree): Tree = {
     		        
 		        // now all parameters and local values should be available in the list buffers.
 		        // transform the tree so that the identifiers are replaced appropriately
@@ -1772,8 +1784,13 @@ self =>
 		        }
 		        val rhs_withAdjustedScriptLocalDataTransformed = scriptLocalDataTransformer.transform(scriptBody)
 		        
-		        // add for each variable and value: val _c = subscript.DSL._declare[Char]('c)
+		        // Make rhsMethod: (script: Script[resultType]) => rhs_withAdjustedScriptLocalDataTransformed
+		        val rhsMethod   = blockToFunction_script(rhs_withAdjustedScriptLocalDataTransformed, resultType, scriptBody.pos)
+		        
+		        // structure for local variables, the script header and its body
 		        val resultElems = new ListBuffer[Tree]
+		        
+		        // add for each variable and value: val _c = subscript.DSL._declare[Char]('c)
 		        
 		        // This pattern captures the algorithm of the local variable's body generation
 		        // First argument is the name of the variable, second - its type, that makes sense
@@ -1803,8 +1820,8 @@ self =>
 		        }
 		        
 		        val scriptNameAsSym         = Apply(scalaDot(nme.Symbol), List(Literal(Constant(name.toString))))
-	            val scriptHeader            = Apply(s_script, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings) 
-	            val scriptHeaderAndBody     = Apply(scriptHeader, List(rhs_withAdjustedScriptLocalDataTransformed))
+	            val scriptHeader            = Apply(s__script, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
+	            val scriptHeaderAndBody     = Apply(scriptHeader, List(rhsMethod))
 	            
 	            resultElems += scriptHeaderAndBody
 	            makeBlock(resultElems.toList)
@@ -1853,6 +1870,8 @@ self =>
 		        val contextBoundBuf = new ListBuffer[Tree]
 		        val tparams         = typeParamClauseOpt(name, contextBoundBuf)
 		        val vparamss        =     paramClauses  (name, contextBoundBuf.toList, ofCaseClass = false)
+                val resultType      = typedOpt()
+		        
 		        newLineOptWhenFollowedBy(EQUALS)
 		        //var restype = fromWithinReturnType(typedOpt()) // TBD: support Script return values
 		        
@@ -1917,11 +1936,11 @@ self =>
 		              }
 		            }
     
-	            val scriptHeaderAndLocalsAndBody = makeScriptHeaderAndLocalsAndBody(name.toString, rhs, paramBindings)
+	            val scriptHeaderAndLocalsAndBody = makeScriptHeaderAndLocalsAndBody(name.toString, rhs, paramBindings, resultType)
 		        val underscored_script_name      = newTermName(underscore_prefix(   name.toString))
 
 	            // to enable moving this all to a later phase, we should create a ScriptDef rather than a DefDef
-	            DefDef(newmods, underscored_script_name, tparams, List(underscored_param_defs), s_scriptType, scriptHeaderAndLocalsAndBody)
+	            DefDef(newmods, underscored_script_name, tparams, List(underscored_param_defs), scriptType_resultType(resultType), scriptHeaderAndLocalsAndBody)
 		      }
 	          signalParseProgress(scriptDef.pos)
 
@@ -2095,7 +2114,7 @@ self =>
 	      while (in.token==CURLYARROW2 
 	          || in.token==CURLYBROKENARROW2) {
 	        val pos = in.offset
-	        val sourcePart = makeScriptHeaderAndLocalsAndBody("~~>", result, Nil)
+	        val sourcePart = makeScriptHeaderAndLocalsAndBody("~~>", result, Nil, TypeTree())
 	        if (in.token==      CURLYARROW2) {  in.nextToken(); val thenPart=scriptLambdaTerm() 
 	          if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
 	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(sourcePart, thenPart, elsePart))}}
@@ -2334,7 +2353,9 @@ self =>
             val annotationCode = simpleNativeValueExpr(allowBraces = true); accept(COLON)
             val body           = stripParens(unaryPrefixScriptTerm(allowParameterList = false))
             
-            val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, vmNodeOf(body), startPos)))
+            val parameterizedType = AppliedTypeTree(vmNodeOf(body), List(Ident(any_TypeName)))
+
+            val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, parameterizedType, startPos)))
             Apply(applyAnnotationCode, List(body))
           }
         }
@@ -2607,7 +2628,8 @@ self =>
       val startPos   = r2p(in.offset, in.offset, in.lastOffset max in.offset)
       accept(startBrace)
       val b = block()
-      val ret = Apply(dslFunFor(startBrace), List(blockToFunction_here(b, vmNodeFor(startBrace), startPos))) // TBD: transform here?
+      val parameterizedType = AppliedTypeTree(vmNodeFor(startBrace), List(Ident(any_TypeName)))
+      val ret = Apply(dslFunFor(startBrace), List(blockToFunction_here(b, parameterizedType, startPos))) // TBD: transform here?
       in.isInSubScript_nativeCode = false
       accept(endBrace)
       ret
@@ -3742,7 +3764,7 @@ self =>
         case VAL    =>       patDefOrDcl (pos,  mods                  withPosition(VAL , tokenRange(in)))
         case VAR    =>       patDefOrDcl (pos, (mods | Flags.MUTABLE) withPosition(VAR , tokenRange(in)))
         case DEF    => 
-                  in.nextTokenAllow(nme.SCRIPTkw)
+                  in.nextTokenAllow(nme.SCRIPTkw) // TBD: use script_Name instead?
                   if (isScriptIdent) {
                          linePosOfScriptsSection = pos - in.lineStartOffset
                          scriptDefsOrDcls(pos,  mods                  withPosition(DEF , tokenRange(in)))

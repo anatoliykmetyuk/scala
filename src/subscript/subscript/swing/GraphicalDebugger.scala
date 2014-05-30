@@ -39,11 +39,11 @@ object GraphicalDebugger2 extends GraphicalDebuggerApp {
 
 class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
-  private var _scriptExecutor: ScriptExecutor = null
+  private var _scriptExecutor: ScriptExecutor[_] = null
   def scriptExecutor = _scriptExecutor
   override def attach(p: MsgPublisher) {
     super.attach(p)
-    _scriptExecutor = p.asInstanceOf[ScriptExecutor]
+    _scriptExecutor = p.asInstanceOf[ScriptExecutor[_]]
   }
   
   override def main(args: Array[String]): Unit = {
@@ -223,9 +223,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     def getScriptTemplates: List[T_script] = {
       val lb = new ListBuffer[T_script]
       def getScriptTemplates(n: CallGraphNode): Unit = {
-        n match {case ns: N_script                    => if (!lb.exists(_.name.name==ns.template.name.name)) lb += ns.template case _ =>}
-        n match {case pn: CallGraphNode 
-                                                      =>pn.forEachChild{getScriptTemplates(_)} case _ =>}
+        n match {case ns: Script[_]     => if (!lb.exists(_.name.name==ns.template.name.name)) lb += ns.template case _ =>}
+        n match {case pn: CallGraphNode => pn.forEachChild{getScriptTemplates(_)} case _ =>}
       } 
       getScriptTemplates(rootNode)
       lb.toList
@@ -431,13 +430,13 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         val vCenter   = boxTop  + BOX_H/2
         
         val s: String = n match {
-          case ns: N_script   => ns.template.name.name
+          case ns: Script[_]  => ns.template.name.name
           case no: N_n_ary_op => no.template.kind + (if (no.isIteration) " ..." else "")
           case _              => n .template.kind
         }
         val nameFont = n match {
-          case _: N_script | _: N_call => smallFont
-          case _                       => normalFont
+          case _: Script[_] | _: N_call[_] => smallFont
+          case _                           => normalFont
         }
         
         val r = new Rectangle(boxLeft, boxTop, BOX_W, BOX_H)

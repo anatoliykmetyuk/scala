@@ -1,4 +1,4 @@
-/*
+/*,C],R]
     This file is part of Subscript - an extension of the Scala language 
                                      with constructs from Process Algebra.
 
@@ -52,9 +52,14 @@ import subscript.vm.model.callgraph.generic._
  * Usage: see example programs
  */
 object DSL {
-  type Script[T] = CallGraphNode._scriptType[T]
-  def _script   (owner : AnyRef, name        : Symbol      , p: FormalParameter[_]*)(_t: Child): Script[Unit] = {(_c: N_call) => _c.calls(T_script    (owner, "script"       , name,     _t), p:_*)}
-  def _comscript(owner : AnyRef, communicator: Communicator, p: FormalParameter[_]*)                       : Script[Unit] = {(_c: N_call) => _c.calls(T_commscript(owner, "communicator" , communicator), p:_*)}
+  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: Script[S]=>TemplateNode.Child): Script[S] = {
+    val template = T_script(owner, "script", name, child0=null)
+    val result = new Script[S](template, p:_*)
+    val childTemplate = childTemplateAt(result)
+    template.setChild(childTemplate)
+    result
+  }
+  //def _comscript(owner : AnyRef, communicator: Communicator, p: FormalParameter[_]*)                       : Script[Unit] = {(_c: N_call) => _c.calls(T_commscript(owner, "communicator" , communicator), p:_*)}
   
 // TBD: communication scripts
 //  def _communication(owner: Any, names: Symbol*): N_communication => TemplateNode = {
@@ -64,46 +69,47 @@ object DSL {
 //    (_c: N_communication) => _c.inits(T_communication("communication", names.toList.map(_.asInstanceOf[Symbol])), owner)
 //  }
 
-  def getScriptTemplate    (s: Script[Unit]): T_script     = {val nc = N_call(T_call("", null)); s(nc); nc.t_callee}
-  def getScriptBodyTemplate(s: Script[Unit]): TemplateNode = getScriptTemplate(s).child0
-  def toScriptString    (s: Script[Unit]): String =          getScriptTemplate    (s).hierarchyString
-  def toScriptBodyString(s: Script[Unit]): String = {val c = getScriptBodyTemplate(s); if(c==null) "" else c.hierarchyString}
-  def _communication(body: N_communication => TemplateNode) = Communication(body)
-  def _communicator(name: Symbol) = Communicator(name)
-  def _relate(communication: Communication, crs: CommunicatorRole*): Unit = communication.setCommunicatorRoles(crs.toList)
+  def getScriptTemplate    [S](s: Script[S]): T_script     = s.template // TBD: check; was: {val nc = N_call(T_call("", null)); s(nc); nc.t_callee}
+  def getScriptBodyTemplate[S](s: Script[S]): TemplateNode = getScriptTemplate(s).child0
+  def toScriptString       [S](s: Script[S]): String       = getScriptTemplate(s).hierarchyString
+  def toScriptBodyString   [S](s: Script[S]): String       = {val c = getScriptBodyTemplate(s); if(c==null) "" else c.hierarchyString}
+//def _communication(body: N_communication => TemplateNode) = Communication(body)
+//def _communicator(name: Symbol) = Communicator(name)
+//def _relate(communication: Communication, crs: CommunicatorRole*): Unit = communication.setCommunicatorRoles(crs.toList)
 
-  implicit def communicatorToCommunicatorRole(c: Communicator) = new CommunicatorRole(c)
+//implicit def communicatorToCommunicatorRole(c: Communicator) = new CommunicatorRole(c)
   
-  def _execute(_script: Script[Unit]): ScriptExecutor = _execute(_script, null, true)
-  def _execute(_script: Script[Unit], executor: ScriptExecutor): ScriptExecutor = _execute(_script, null, executor)
-  def _execute(_script: Script[Unit], debugger: MsgListener): ScriptExecutor = _execute(_script, debugger, false)
-  def _execute(_script: Script[Unit],                           allowDebugger: Boolean): ScriptExecutor = _execute(_script, null, allowDebugger)
-  def _execute(_script: Script[Unit], debugger: MsgListener, allowDebugger: Boolean): ScriptExecutor = {
-    val executor = ScriptExecutorFactory.createScriptExecutor(allowDebugger && debugger == null)
+  def _execute[S     ](_script: Script[S]                             ): ScriptExecutor[S] = _execute(_script, null, true)
+  def _execute[S<:X,X](_script: Script[S], executor: ScriptExecutor[X]): ScriptExecutor[X] = _execute(_script, null, executor)
+  def _execute[S     ](_script: Script[S], debugger: MsgListener      ): ScriptExecutor[S] = _execute(_script, debugger, false)
+  def _execute[S     ](_script: Script[S], allowDebugger: Boolean     ): ScriptExecutor[S] = _execute(_script, null, allowDebugger)
+  def _execute[S     ](_script: Script[S], debugger: MsgListener
+                                         , allowDebugger: Boolean     ): ScriptExecutor[S] = {
+    val executor = ScriptExecutorFactory.createScriptExecutor[S](allowDebugger && debugger == null)
     _execute(_script, debugger, executor)
   }
-  def _execute(_script: Script[Unit], debugger: MsgListener, executor: ScriptExecutor): ScriptExecutor = {
+  def _execute[S<:X,X](_script: Script[S], debugger: MsgListener, executor: ScriptExecutor[X]): ScriptExecutor[X] = {
     if (debugger!=null) debugger.attach(executor)
     executor.run(_script)
   }
 
   implicit // these code fragment variations require the "here" parameter explicitly
-  def _normal             (cf: N_code_normal             =>Unit) = T_code_normal            (cf)
-  def _threaded           (cf: N_code_threaded           =>Unit) = T_code_threaded          (cf)
-  def _unsure             (cf: N_code_unsure             =>Unit) = T_code_unsure            (cf)
-  def _tiny               (cf: N_code_tiny               =>Unit) = T_code_tiny              (cf)
-  def _eventhandling      (cf: N_code_eventhandling      =>Unit) = T_code_eventhandling     (cf)
-  def _eventhandling_loop (cf: N_code_eventhandling_loop =>Unit) = T_code_eventhandling_loop(cf)
+  def _normal             [R](cf: N_code_normal            [R] =>R) = T_code_normal            (cf)
+  def _threaded           [R](cf: N_code_threaded          [R] =>R) = T_code_threaded          (cf)
+  def _unsure             [R](cf: N_code_unsure            [R] =>R) = T_code_unsure            (cf)
+  def _tiny               [R](cf: N_code_tiny              [R] =>R) = T_code_tiny              (cf)
+  def _eventhandling      [R](cf: N_code_eventhandling     [R] =>R) = T_code_eventhandling     (cf)
+  def _eventhandling_loop [R](cf: N_code_eventhandling_loop[R] =>R) = T_code_eventhandling_loop(cf)
 
   implicit // alternative code fragment variations that have no "here" parameter
-  def _normal0            (cf: => Unit) = T_code_normal            ((_here:N_code_normal            ) => cf)
-  def _threaded0          (cf: => Unit) = T_code_threaded          ((_here:N_code_threaded          ) => cf)
-  def _unsure0            (cf: => Unit) = T_code_unsure            ((_here:N_code_unsure            ) => cf)
-  def _tiny0              (cf: => Unit) = T_code_tiny              ((_here:N_code_tiny              ) => cf)
-  def _eventhandling0     (cf: => Unit) = T_code_eventhandling     ((_here:N_code_eventhandling     ) => cf)
-  def _eventhandling_loop0(cf: => Unit) = T_code_eventhandling_loop((_here:N_code_eventhandling_loop) => cf)
+  def _normal0            [R](cf: => R ) = T_code_normal            ((_here:N_code_normal            [R]) => cf)
+  def _threaded0          [R](cf: => R ) = T_code_threaded          ((_here:N_code_threaded          [R]) => cf)
+  def _unsure0            [R](cf: => R ) = T_code_unsure            ((_here:N_code_unsure            [R]) => cf)
+  def _tiny0              [R](cf: => R ) = T_code_tiny              ((_here:N_code_tiny              [R]) => cf)
+  def _eventhandling0     [R](cf: => R ) = T_code_eventhandling     ((_here:N_code_eventhandling     [R]) => cf)
+  def _eventhandling_loop0[R](cf: => R ) = T_code_eventhandling_loop((_here:N_code_eventhandling_loop[R]) => cf)
 
-  implicit def _call      (calleeName: String, cf: => Script[Unit]) = T_call(calleeName, n=>{cf(n); cf})
+  implicit def _call      [R](calleeName: String, code: N_call[R] => Script[R]) = T_call[R](calleeName, code)
   
   implicit def valueToActualValueParameter[T<:Any](value: T) = new ActualValueParameter(value)
 
@@ -125,12 +131,12 @@ object DSL {
   //    }
   //  }
   
-  def _var     [V<:Any](v: LocalVariable[V]                                ) = T_localvar(false, false, v, null)
-  def _var_loop[V<:Any](v: LocalVariable[V]                                ) = T_localvar(false,  true, v, null)
-  def _var     [V<:Any](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar(false, false, v, valueCode)
-  def _val     [V<:Any](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar( true, false, v, valueCode)
-  def _var_loop[V<:Any](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar(false,  true, v, valueCode)
-  def _val_loop[V<:Any](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar( true,  true, v, valueCode)
+  def _var     [V](v: LocalVariable[V]                             ) = T_localvar(false, false, v, null)
+  def _var_loop[V](v: LocalVariable[V]                             ) = T_localvar(false,  true, v, null)
+  def _var     [V](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar(false, false, v, valueCode)
+  def _val     [V](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar( true, false, v, valueCode)
+  def _var_loop[V](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar(false,  true, v, valueCode)
+  def _val_loop[V](v: LocalVariable[V], valueCode: N_localvar[V]=>V) = T_localvar( true,  true, v, valueCode)
 
   def _privatevar[T<:Any](vsym: Symbol) = T_privatevar(vsym)
 
@@ -181,8 +187,8 @@ object DSL {
   def _not           = _op1("!")_
   def _not_react     = _op1("-")_
   def _react         = _op1("~")_
-  def _launch        = (child0  : Child ) => T_launch(child0)
-  def _launch_anchor = (child0  : Child ) => T_launch_anchor(child0)
+  def _launch        = (child0: Child) => T_launch       (child0)
+  def _launch_anchor = (child0: Child) => T_launch_anchor(child0)
 
   def _empty                                = T_epsilon            ()
   def _deadlock                             = T_delta              ()
@@ -202,10 +208,10 @@ object DSL {
   def _do_else     (c0: Child, c1: Child           )  = T_do_else     (c0, c1) 
   def _do_then_else(c0: Child, c1: Child, c2: Child)  = T_do_then_else(c0, c1, c2) 
   
-  def _dataflow_then[     U](s: Script[U], t: String=>Script[U]) = _call("dataflow_then", [do s then t(null)])
-  def _dataflow_else[     U](s: Script[U], t: String=>Script[U]) = _call("dataflow_else", [ do s else t(null) ])
-  def _dataflow_then_else[U](s: Script[U], t: String=>Script[U]
-                                      , f: Throwable=>Script[U]) = _call("dataflow_then_else", [ do s then t(null) else f(null) ])
+//def _dataflow_then     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_then", [ do s then t(null.asInstanceOf[R])])
+//def _dataflow_else     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_else", [ do s else t(null.asInstanceOf[R]) ])
+//def _dataflow_then_else[R,U](s: Script[R], t: R=>Script[U]
+//                                 , f: Throwable=>Script[U]) = _call[R]("dataflow_then_else", [ do s then t(null.asInstanceOf[R]) else f(null) ])
   
   // FTTB type parameter String assumed. Reason:
   // The following lines do not compile; msg is

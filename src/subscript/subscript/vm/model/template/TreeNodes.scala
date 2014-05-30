@@ -62,7 +62,7 @@ trait TreeNode_0 extends TreeNode   {
 }
 
 trait TreeNode_1 extends TreeNode_0 {
-  def child0: Child
+  var child0: Child
   override val children: Seq[Child] = child0::Nil
 }
 

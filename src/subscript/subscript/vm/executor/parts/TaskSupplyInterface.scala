@@ -8,17 +8,16 @@ import subscript.vm.model.template.concrete._
 import subscript.DSL._
 import subscript.vm.model.callgraph.CallGraphNode
 
-trait TaskSupplyInterface {this: ScriptExecutor =>
+trait TaskSupplyInterface {this: ScriptExecutor[_] =>
   def invokeFromET(f: => Unit) = msgQueue sInsert InvokeFromET(graph.rootNode, () => f)
   
-  def launch(n: CallGraphNode, aScript: Script[_])  {
+  def launch[R](n: CallGraphNode, aScript: Script[R])  {
     val launchAnchor       = CallGraphNode.getLowestLaunchAnchorAncestor(n) // could be rootNode
-    val callAnchorTemplate =     T_call("<launched>", null)
+    val callAnchorTemplate =     T_call[R]("<launched>", null)
     val callAnchorNode     =     N_call(callAnchorTemplate)
     CallGraph.connect(parentNode = launchAnchor, childNode = callAnchorNode)
-    // callAnchorTemplate.parent = launchAnchor.template // would not be mutual...
-    aScript(callAnchorNode)
-    graph.activateFrom(callAnchorNode, callAnchorNode.t_callee, Some(0))
+    CallGraph.connect(parentNode = callAnchorNode, childNode = aScript) // code duplicated from Callgraph.activateFrom
+    msgQueue insert Activation(aScript)                                 // idem
   }
   
 }

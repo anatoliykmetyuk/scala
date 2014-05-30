@@ -105,6 +105,20 @@ import subscript.vm.model.callgraph._
 	    result
 	  }
 	}
+
+/*
+ /src/subscript/subscript/vm/CallGraphMessage.scala:123: warning: 
+ inferred existential type Option[subscript.vm.N_call[_$1]] forSome { type _$1 }, which cannot be expressed by wildcards,  should be enabled
+by making the implicit value scala.language.existentials visible.
+This can be achieved by adding the import clause 'import scala.language.existentials'
+or by setting the compiler option -language:existentials.
+See the Scala docs for value scala.language.existentials for a discussion
+why the feature should be explicitly enabled.
+ 	case class CAActivatedTBD     (node: N_call[_]    ) extends CallGraphMessageN {type N = N_call[_]; def priority = PRIORITY_CAActivatedTBD} // for late handling
+                    ^
+import scala.language.existentials
+*/
+
 	case class Continuation1      (node: N_1_ary_op) extends CallGraphMessageN {type N = N_1_ary_op; def priority = PRIORITY_Continuation}
 	case class Deactivation       (node: CallGraphNode, 
 	                              child: CallGraphNode, excluded: Boolean) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Deactivation}
@@ -120,22 +134,22 @@ import subscript.vm.model.callgraph._
 	                              child: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_AAActivated}
 	case class CAActivated        (node: CallGraphNode, 
 	                              child: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_CAActivated} // for immediate handling
-	case class CAActivatedTBD     (node: N_call            ) extends CallGraphMessageN {type N = N_call; def priority = PRIORITY_CAActivatedTBD} // for late handling
+	case class CAActivatedTBD[R]  (node: N_call[R]    ) extends CallGraphMessageN {type N = N_call[R]; def priority = PRIORITY_CAActivatedTBD} // for late handling
 	case class AAHappened         (node: CallGraphNode, 
 	                              child: CallGraphNode, mode: AAHappenedMode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_AAHappened}
 	case class AAExecutionFinished(node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_AAExecutionFinished}
-	case class AAToBeExecuted     (node: N_atomic_action[_]   ) extends CallGraphMessageN {type N = N_atomic_action[_]; def priority = PRIORITY_AAToBeExecuted
+	case class AAToBeExecuted[R]  (node: N_code_fragment[R]   ) extends CallGraphMessageN {type N = N_code_fragment[R]; def priority = PRIORITY_AAToBeExecuted
 	  override def secondaryPriority =  node.priority 
 	  override def tertiaryPriority  = -node.index // oldest nodes first 
     }
-	case class AAToBeReexecuted   (node: N_atomic_action[_]) extends CallGraphMessageN {type N = N_atomic_action[_]; def priority = PRIORITY_AAToBeReexecuted
+	case class AAToBeReexecuted[R](node: N_code_fragment[R]) extends CallGraphMessageN {type N = N_code_fragment[R]; def priority = PRIORITY_AAToBeReexecuted
 	  override def secondaryPriority = -index // oldest messages first, so that retries are FIFO  
 	}
 	case object CommunicationMatchingMessage extends CallGraphMessageN {
 	  type N = CallGraphNode
 	  def priority = PRIORITY_CommunicationMatchingMessage 
 	  def node:CallGraphNode = null
-	  def activatedCommunicatorCalls = scala.collection.mutable.ArrayBuffer.empty[N_call]
+	  def activatedCommunicatorCalls = scala.collection.mutable.ArrayBuffer.empty[N_call[_]]
 	}
 	// TBD: AAActivated etc to inherit from 1 trait; params: 1 node, many children
 	// adjust insert method
