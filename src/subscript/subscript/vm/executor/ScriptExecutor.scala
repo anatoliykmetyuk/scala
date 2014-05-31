@@ -1,11 +1,13 @@
 package subscript.vm.executor
 
+import scala.util.{Try}
 import subscript.vm._
 import subscript.vm.executor.data._
 import subscript.vm.executor.parts._
 import subscript.DSL._
 import scala.collection.mutable.Buffer
 import subscript.vm.executor.data.MessageHandlers.MessageHandler
+import subscript.vm.model.callgraph.ScriptResultHolder
 
 object ScriptExecutorFactory {
   var scriptDebuggerQueue = new scala.collection.mutable.Queue[MsgListener]
@@ -13,8 +15,8 @@ object ScriptExecutorFactory {
     //println("addScriptDebugger: "+sd.getClass.getCanonicalName)
     scriptDebuggerQueue += sd
   }
-  def createScriptExecutor(allowDebugger: Boolean) = {
-    val se = new CommonScriptExecutor
+  def createScriptExecutor[S](allowDebugger: Boolean) = {
+    val se = new CommonScriptExecutor[S]
     if (allowDebugger && !scriptDebuggerQueue.isEmpty) {
       val h = scriptDebuggerQueue.head
       //println("createScriptExecutor: "+se+ " Debugger: "+h.getClass.getCanonicalName)
@@ -26,7 +28,7 @@ object ScriptExecutorFactory {
   }
 }
 
-trait ScriptExecutor extends MsgPublisher with TaskSupplyInterface with Tracer with OldApi {
+trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Tracer with OldApi with ScriptResultHolder[S] {
   // Internal state
   // TBD: change restriction from `subscript` to `vm`
   val stateAccessLock = new Object
@@ -44,14 +46,14 @@ trait ScriptExecutor extends MsgPublisher with TaskSupplyInterface with Tracer w
   /**
    * Launches this VM to execute given script.
    */
-  def run(s: Script[_]): ScriptExecutor
+  def run[R<:S](s: Script[R]): ScriptExecutor[S]
   
   /**
    * Performs initialization before this VM starts working.
    * Must be called before VM starts operating.
    * Must be called exactly once.
    */
-  def initializeExecution(s: Script[_]): Unit
+  def initializeExecution[R<:S](s: Script[R]): Unit
   
   /**
    * Tries to dequeue and handle message from the messages queue.
@@ -79,7 +81,7 @@ trait ScriptExecutor extends MsgPublisher with TaskSupplyInterface with Tracer w
   }
 }
 
-abstract class AbstractScriptExecutor extends ScriptExecutor {
+abstract class AbstractScriptExecutor[S] extends ScriptExecutor[S] {
   // Initialization
   msgQueue addListener this
   
@@ -89,10 +91,10 @@ abstract class AbstractScriptExecutor extends ScriptExecutor {
    * Must be called before VM starts operating.
    * Must be called exactly once.
    */
-  def initializeExecution(s: Script[_]) {
+  def initializeExecution[R<:S](s: Script[R]) {
     val anchorNode = graph.anchorNode
-    s(anchorNode)
-    graph.activateFrom(anchorNode, anchorNode.t_callee)
+    CallGraph.connect(parentNode = anchorNode, childNode = s) // code duplicated from Callgraph.activateFrom
+    msgQueue insert Activation(s)                             // idem
   }
   
   /**
@@ -114,18 +116,19 @@ abstract class AbstractScriptExecutor extends ScriptExecutor {
     for (h <- msgHandlers.collection if h isDefinedAt message) h(message)
 }
 
-class CommonScriptExecutor extends AbstractScriptExecutor with Tracer with
+class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
     DefaultHandlers {
   msgQueue addListener new MessageQueuedNotifier(this)
   msgHandlers sInsert defaultHandler
   msgHandlers sInsert communicationHandler
   
-  def run(s: Script[_]) = {
+  def run[R<:S](s: Script[R]) = {
     initializeExecution(s)
     while (hasActiveProcesses) {
       updateCollections()
       if (tryHandleMessage(Int.MinValue)==null) awaitMessages
     }
+    $ = s.$
     this
   }
   
@@ -143,7 +146,7 @@ class CommonScriptExecutor extends AbstractScriptExecutor with Tracer with
 /**
  * This is for compatibility with not yet refactored part of the VM.
  */
-trait OldApi {this: ScriptExecutor =>
+trait OldApi {this: ScriptExecutor[_] =>
   def insert(m: CallGraphMessage) = msgQueue sInsert m  
   def rootNode = graph.rootNode
   def addHandler(h: MessageHandler) = msgHandlers sInsert h

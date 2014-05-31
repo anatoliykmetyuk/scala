@@ -26,7 +26,7 @@ import subscript.vm.model.callgraph._
  *    This is in particular useful after a failing test has occurred.
  *    One may call this "progression testing", as opposite of "regression testing"
  *  
- * Command line option -v is for verbose output.
+ * Command line option -v is for verbose output; use -V for even more verbose output
  * 
  * *************************** 
  * High level methods
@@ -143,7 +143,8 @@ import subscript.vm.model.callgraph._
 @Test
 class OperatorsSuite {
 
-  var doVerbose = false
+  var doVerboseLevel = 0
+  def doVerbose = doVerboseLevel>0
   
   /*
    * Behaviour operators characterized by their logic property
@@ -194,7 +195,7 @@ class OperatorsSuite {
     
     lazy val afterInput    = if(input=="") "" else s"after input: $input"
     lazy val failureString = if(expectTestFailure) "Fails as marked" else "Fails"
-    lazy val testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult%4s"
+    var testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult%4s"
 
     if (testIndexForDebugging > 0 && 
         testIndexForDebugging != currentTestIndex) return
@@ -205,9 +206,10 @@ class OperatorsSuite {
 	                            .sortWith(_<_).mkString
 
 	if (expectedResultFailure && !expectedResultAtoms.isEmpty)                              
-       println(s"$testInfo -  Error in test specification: no atoms should be expected in combination with 0") // very unlikely to occur
+       println(s"$testInfo - Error in test specification: no atoms should be expected in combination with 0") // very unlikely to occur
     else {
-      if (debug) println(testInfo)
+      if (debug) println (testInfo)
+      else if (doVerbose) {print(testInfo); testInfo = ""}
         
       acceptedAtoms         = ""
       inputStream           = scala.io.Source.fromString(input).toStream
@@ -217,9 +219,12 @@ class OperatorsSuite {
       
       executor     = new CommonScriptExecutor
       val debugger = if (debug) new SimpleScriptDebugger else null
-      if (doVerbose && debug) {executor.doTrace = true; debugger.traceLevel = 3}
+      if (doVerbose && debug) {executor.doTrace = true; debugger.traceLevel = if (doVerboseLevel==1) 3 else 4}
       
-      _execute(scriptDef, debugger, executor)
+      try {
+        _execute(scriptDef, debugger, executor)
+      }
+      catch {case e: Throwable => println(s"$testInfo - an exception occurred"); throw e}
       
       val executionSuccess = scriptSuccessAtEndOfInput.getOrElse(executor.hasSuccess)
       val expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
@@ -247,8 +252,7 @@ class OperatorsSuite {
   def remove1Element[T](list: List[T], elt: T): List[T] = list diff List(elt)
   
   // add expectation of the given atom; also prepares for the symmetric to unexpect during the inevitable deactivation
-  def expect   (where: N_code_unsure, atom: Char) {where.onDeactivate(unexpect(where, atom)); expectedAtoms ::= atom
-                                                                                              expectedAtomsAtEndOfInput=None}
+  def expect   (where: N_code_unsure, atom: Char) {where.onDeactivate(unexpect(where, atom)); expectedAtoms ::= atom}
   // remove expectation of the given atom
   def unexpect (where: N_code_unsure, atom: Char) {expectedAtoms = remove1Element(expectedAtoms, atom)}
   
@@ -259,9 +263,9 @@ class OperatorsSuite {
        if (expectedAtomsAtEndOfInput== None) {
            expectedAtomsAtEndOfInput = Some(expectedAtoms)
            scriptSuccessAtEndOfInput = Some(executor.hasSuccess)
-           if (false) println("inputStream.isEmpty=${inputStream.isEmpty} expectedAtoms=${expectedAtoms.mkString}"
-                             +     (if (inputStream.isEmpty) "" else " inputStream.head=${inputStream.head}") 
-                             +                                          " scriptSuccess=$scriptSuccessAtEndOfInput")
+           if (debug) println(s"inputStream.isEmpty=${inputStream.isEmpty} expectedAtoms=${expectedAtoms.mkString}"
+                             +     (if (inputStream.isEmpty) "" else s" inputStream.head=${inputStream.head}") 
+                             +                                          s" scriptSuccess=$scriptSuccessAtEndOfInput")
        }
     }
     else if (inputStream.head==atom) {inputStream = inputStream.drop(1); acceptedAtoms += atom}
@@ -477,9 +481,6 @@ class OperatorsSuite {
    , [ do a (-) then b   else d   ]   -> "->a a->d ad"
    , [ do a (-) then b c else d e ]   -> "->a a->d ad->e ade"
    
-   , [ do a then b ]                -> "->a FAIL:ab"
-   
-   
    // Threaded code fragments. TBD: check whether the test mechanism can handle this; maybe not
    , [ a {**} .. ; b ]         -> "->a a->ab aa->ab ab aab"
 
@@ -544,7 +545,8 @@ class OperatorsSuite {
 object OperatorsSuiteApp extends OperatorsSuite {
   def main(args: Array[String]): Unit = {
     for (i <- 0 to args.length-1) {
-      if (args(i)=="-v") doVerbose = true
+      if      (args(i)=="-v") doVerboseLevel = 1
+      else if (args(i)=="-V") doVerboseLevel = 2
       else testIndexForDebugging = args(i).toInt
     }
     testBehaviours

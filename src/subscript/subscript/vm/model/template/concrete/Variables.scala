@@ -12,12 +12,12 @@ case class T_localvar[V](
                  isLoop       : Boolean,
                  localVariable: LocalVariable[V],
     override val code         : N_localvar[V] => V
-) extends T_0_ary with TemplateCodeHolder[N_localvar[V],V]
+) extends T_0_ary with TemplateCodeHolder[V,N_localvar[V]] {type N = N_localvar[V]}
 
 case class T_privatevar(name: Symbol) extends T_0_ary
 
-case class T_local_valueCode[V<:Any] (
+case class T_local_valueCode[V] (
     override val kind         : String,
                  localVariable: LocalVariable[V],
     override val code         : N_localvar[V]=>V
-) extends T_0_ary with TemplateCodeHolder[N_localvar[V], V]
+) extends T_0_ary with TemplateCodeHolder[V,N_localvar[V]] {type N = N_localvar[V]}

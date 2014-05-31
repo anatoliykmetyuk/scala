@@ -15,6 +15,6 @@ trait OldCallGraphNodeApi {this: CallGraphNode =>
     if (parents.size < 2) parents.headOption.getOrElse(null)
     else null
     
-  def adaptExecutor(ca: CodeExecutorAdapter[CodeExecutorTrait]): Unit =
+  def adaptExecutor(ca: CodeExecutorAdapter[_,CodeExecutorTrait]): Unit =
     {ca.adapt(codeExecutor); codeExecutor=ca}
 }

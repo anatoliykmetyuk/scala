@@ -10,7 +10,7 @@ import scala.collection.mutable.Buffer
 import subscript.vm.model.callgraph._
 
 /** To DATA section; don't change */
-trait DefaultHandlers {this: ScriptExecutor with Tracer =>
+trait DefaultHandlers {this: ScriptExecutor[_] with Tracer =>
   import CodeExecutor._
   import CallGraph._
   import MessageHandlers._
@@ -18,38 +18,6 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
   import msgQueue._
   import graph.activateFrom
   
-  /*
-   * Handle a deactivation message. 
-   * If the receiving node is a n_ary operator and there is a sending child node,
-   * then postpone further processing by inserting a continuation message.
-   * TBD: add a case for a 1_ary operator
-   * 
-   * Insert deactivation messages for all parent nodes
-   * Execute code for deactivation, if defined
-   * Unlink the node from the call graph
-   */
-  def handleDeactivation(message: Deactivation): Unit = {
-       message.node match {
-           case n@N_n_ary_op (_: T_n_ary, _)  => if(message.child!=null) {
-                                                   if (message.child.hasSuccess) {
-                                                      n.childThatEndedInSuccess_index(message.child.index)
-                                                   }
-                                                   else {
-                                                      n.aChildEndedInFailure = true
-                                                   }
-                                                   insertContinuation(message); 
-                                                   return}
-           case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
-           case n@N_do_else     (t)  => if (message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return}
-           case n@N_do_then_else(t)  => if (message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return}
-           case _ => 
-      }
-      message.node.forEachParent(p => insertDeactivation(p,message.node))
-      executeCodeIfDefined(message.node, message.node.onDeactivate)
-      executeCodeIfDefined(message.node, message.node.onDeactivateOrSuspend)
-      disconnect(childNode = message.node)
-  }
-
   /*
    * Handle an activation message.
    * This involves:
@@ -106,10 +74,46 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
                                                         insert(CAActivated   (n,null))
                                                         insert(CAActivatedTBD(n))
                                                       }
-           case n@N_script                     (t) => activateFrom(n, t.child0)
+           case n@Script                       (t) => activateFrom(n, t.child0)   // ???????????
       }      
   }
   
+  /*
+   * Handle a deactivation message. 
+   * If the receiving node is a n_ary operator and there is a sending child node,
+   * then postpone further processing by inserting a continuation message.
+   * TBD: add a case for a 1_ary operator
+   * 
+   * Insert deactivation messages for all parent nodes
+   * Execute code for deactivation, if defined
+   * Unlink the node from the call graph
+   */
+  def handleDeactivation(message: Deactivation): Unit = {
+       message.node match {
+           case n@N_n_ary_op (_: T_n_ary, _)  => if(!message.excluded
+                                                 &&  message.child!=null) {
+                                                   if (message.child.hasSuccess) {
+                                                      n.childThatEndedInSuccess_index(message.child.index)
+                                                   }
+                                                   else {
+                                                      n.aChildEndedInFailure = true
+                                                   }
+                                                   insertContinuation(message); 
+                                                   return}
+           case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
+           case n@N_do_then     (t)  => if (!message.excluded && message.child!=null
+                                                              && message.child.template==t.child0 && !message.child.hasSuccess) {doNeutral(n); 
+                                                                                                                                insertDeactivation(n,null); return} else if(!n.children.isEmpty) return
+           case n@N_do_else     (t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return} else if(!n.children.isEmpty) return
+           case n@N_do_then_else(t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return} else if(!n.children.isEmpty) return
+           case _ => 
+      }
+      message.node.forEachParent(p => insertDeactivation(p,message.node))
+      executeCodeIfDefined(message.node, message.node.onDeactivate)
+      executeCodeIfDefined(message.node, message.node.onDeactivateOrSuspend)
+      disconnect(childNode = message.node)
+  }
+
   /*
    * Handle a success message
    * 
@@ -131,8 +135,10 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
          
          message.node match {
                case n@  N_annotation   (_  ) => {} // onSuccess?
-               case n@  N_do_then      (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
-               case n@  N_do_then_else (t  ) => if (message.child.template==t.child0) {activateFrom(n, t.child1); return}
+                                           // Note: message.child!=null is needed because of doNeutral(n) in handleDeactivation()
+               case n@  N_do_then      (t  ) => if (message.child!=null && message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_do_then_else (t  ) => if (                       message.child.template==t.child0) {activateFrom(n, t.child1); return}
+               case n@  N_do_else      (t  ) => if (                       message.child.template==t.child0) {if (n.getLogicalKind_n_ary_op_ancestor==LogicalKind.Or) return}
                case n@  N_1_ary_op     (t  ) => if (message.child         != null) {insertContinuation1(message); return}
                case n@  N_n_ary_op     (_,_) => if (message.child         != null) {insertContinuation (message); return}
                case n@  N_launch_anchor(_  ) => if(n.nActivatedChildrenWithoutSuccess > 0) {return}
@@ -169,6 +175,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
           }
           message.node.forEachParent(p => insert(AAActivated(p, message.node)))
   }
+/*
   /*
    * Handle an CAActivated message: activated communications 
    * This may be of interest for a "+" operator higher up in the graph: 
@@ -276,7 +283,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     // TBD: first try comms that may still grow (having multipicities other than One)
     return tryCommunicationWithPartners(Nil)
   }
-            
+*/          
 
   /*
    * Handle an AAHappened message
@@ -379,12 +386,12 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
     val n = message.node
     n.isExcluded = true
     
-    if (message.node.template.isInstanceOf[TemplateCodeHolder[_, _]] && message.node.codeExecutor != null)
+    if (message.node.template.isInstanceOf[TemplateCodeHolder[_,_]] && message.node.codeExecutor != null)
       message.node.codeExecutor.interruptAA
     
     n match {
-      case cc: N_call => cc.stopPending
-      case aa: N_atomic_action[_] =>
+      case cc: N_call[_] => cc.stopPending
+      case aa: N_code_fragment[_] =>
         aa.codeExecutor.cancelAA
         if (aa.msgAAToBeExecuted != null) {
           remove(message) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
@@ -415,7 +422,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * Note: the message may have been canceled instead of removed from the queue (was easier to implement),
    * so for the time being check the canceled flag
    */
-  def handleAAToBeExecuted[T<:TemplateCodeHolder[_,R],R](message: AAToBeExecuted) {
+  def handleAAToBeExecuted[T<:TemplateCodeHolder[R,_],R](message: AAToBeExecuted[R]) {
     val e = message.node.codeExecutor
     if (!e.canceled)  // temporary fix, since the message queue does not yet allow for removals
          e.executeAA
@@ -428,7 +435,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * Note: the message may have been canceled instead of removed from the queue (was easier to implement),
    * so for the time being check the canceled flag
    */
-  def handleAAToBeReexecuted[T<:TemplateCodeHolder[_,R],R](message: AAToBeReexecuted) {
+  def handleAAToBeReexecuted[T<:TemplateCodeHolder[R,_],R](message: AAToBeReexecuted[R]) {
     val e = message.node.codeExecutor
     if (!e.canceled) // temporary fix, since the message queue does not yet allow for removals
        insert(AAToBeExecuted(message.node)) // this way, failed {??} code ends up at the back of the queue
@@ -444,7 +451,7 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
    * It has inserted an AAExecutionFinished, so that this will be handled synchronously in the main script executor loop.
    *
    */
-  def handleAAExecutionFinished[T<:TemplateCodeHolder[_,R],R](message: AAExecutionFinished) {
+  def handleAAExecutionFinished[T<:TemplateCodeHolder[R,_],R](message: AAExecutionFinished) {
      message.node.codeExecutor.afterExecuteAA
   }
   
@@ -737,13 +744,13 @@ trait DefaultHandlers {this: ScriptExecutor with Tracer =>
       case a@Success          (_,_) => handleSuccess    (a)
       case a@Break        (_, _, _) => handleBreak      (a)
       case a@AAActivated      (_,_) => handleAAActivated(a)
-      case a@CAActivated      (_,_) => handleCAActivated(a)
-      case a@CAActivatedTBD     (_) => handleCAActivatedTBD(a)
+   // case a@CAActivated      (_,_) => handleCAActivated(a)
+   // case a@CAActivatedTBD     (_) => handleCAActivatedTBD(a)
       case a@AAHappened     (_,_,_) => handleAAHappened (a)
       case a@AAExecutionFinished(_) => handleAAExecutionFinished(a)
       case a@AAToBeReexecuted   (_) => handleAAToBeReexecuted   (a)
       case a@AAToBeExecuted     (_) => handleAAToBeExecuted     (a)
-      case CommunicationMatchingMessage => handleCommunicationMatchingMessage
+   // case CommunicationMatchingMessage => handleCommunicationMatchingMessage
     }
   val communicationHandler: MessageHandler = {
     case InvokeFromET(_, payload) => payload()

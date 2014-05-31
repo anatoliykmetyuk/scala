@@ -13,7 +13,7 @@ object Multiplicity extends Enumeration {
   type MultiplicityType = Value
   val Zero_or_One, Zero_or_More, One, One_or_More = Value
 }
-
+/*
 case class Communication(_body: N_communication => TemplateNode) {
   var communicatorRoles: List[CommunicatorRole] = null
   var template: T_communication = null
@@ -40,3 +40,4 @@ case class CommunicatorRole(communicator: Communicator) {
   def ~(s: Symbol): CommunicatorRole = {parameterNames += s; this}
   def ~(m: Multiplicity.MultiplicityType): CommunicatorRole = {multiplicity = m; this}
 }
+*/

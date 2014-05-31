@@ -7,13 +7,13 @@ import subscript.vm.model.template.concrete._
 import subscript.vm.model.callgraph.CallGraphNode
 import subscript.vm.model.callgraph.CallGraphTreeNode
 
-class CallGraph(val executor: ScriptExecutor) {
+class CallGraph[S](val executor: ScriptExecutor[S]) {
   import CallGraph._
-  private   val anchorTemplate =     T_call("<root>", null)
+  private   val anchorTemplate =     T_call[S]("<root>", null)
   private   val rootTemplate   = new T_launch_anchor(anchorTemplate) {override def owner = executor}
   
   val rootNode       =     N_launch_anchor(rootTemplate)
-  val anchorNode     =     N_call(anchorTemplate)
+  val anchorNode     =     N_call[S](anchorTemplate)
  
   /**
    * Must be called before this graph is used.
@@ -58,7 +58,7 @@ object CallGraph {
     if (a!=null) a.isIteration = true
   }
   
-  def createNode(template: TemplateNode, scriptExecutor: ScriptExecutor): CallGraphNode = {
+  def createNode(template: TemplateNode, scriptExecutor: ScriptExecutor[_]): CallGraphNode = {
    val result =
     template match {
       case t @ T_optional_break         (                          ) => N_optional_break(t)
@@ -88,7 +88,7 @@ object CallGraph {
       case t @ T_do_else                (              _, _        ) => N_do_else       (t)
       case t @ T_do_then_else           (              _, _, _     ) => N_do_then_else  (t)
       case t @ T_n_ary_op               (kind: String, children@ _*) => N_n_ary_op (t, T_n_ary_op.isLeftMerge(kind))
-      case t @ T_script(_, kind: String, name: Symbol, child0: TemplateNode) => N_script(t)
+    //case t @ T_script(_, kind: String, name: Symbol, child0: TemplateNode) => N_script(t) node should be created by the script-method call
       case _ => null 
     }
     result.codeExecutor = CodeExecutor.defaultCodeFragmentExecutorFor(result, scriptExecutor)

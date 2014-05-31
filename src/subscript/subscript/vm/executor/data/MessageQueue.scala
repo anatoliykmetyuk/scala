@@ -45,7 +45,7 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
       val h = collection.head
       if (h.priority <= PRIORITY_AAToBeExecuted) {
         h match {
-          case aatbe@AAToBeExecuted(n: N_atomic_action[_]) if (n.priority >= minimalPriorityForAA) =>
+          case aatbe@AAToBeExecuted(n: N_code_fragment[_]) if (n.priority >= minimalPriorityForAA) =>
           case _ => return null
         }
       }
@@ -151,8 +151,8 @@ trait TrackToBeExecuted extends MessageQueue {
     // then that message may be garbage collected and the link to the node will be gone, so that the node may also 
     // be garbage collected
     m match {
-      case maa@AAToBeExecuted  (n: N_atomic_action[_]) => n.msgAAToBeExecuted = if (track) maa else null
-      case maa@AAToBeReexecuted(n: N_atomic_action[_]) => n.msgAAToBeExecuted = if (track) maa else null
+      case maa@AAToBeExecuted  (n: N_code_fragment[_]) => n.msgAAToBeExecuted = if (track) maa else null
+      case maa@AAToBeReexecuted(n: N_code_fragment[_]) => n.msgAAToBeExecuted = if (track) maa else null
       case _ =>
     }
   }

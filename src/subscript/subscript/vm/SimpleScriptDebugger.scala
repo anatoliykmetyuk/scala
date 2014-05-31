@@ -40,28 +40,32 @@ object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
 
 class SimpleScriptDebugger extends MsgListener {
 
-  private var _scriptExecutor: ScriptExecutor = null
+  private var _scriptExecutor: ScriptExecutor[_] = null
   def scriptExecutor = _scriptExecutor
   override def attach(p: MsgPublisher) {
     super.attach(p)
-    _scriptExecutor = p.asInstanceOf[ScriptExecutor]
+    _scriptExecutor = p.asInstanceOf[ScriptExecutor[_]]
   }
   
   def callGraphMessages = scriptExecutor.msgQueue.collection
-  def rootNode            = scriptExecutor.rootNode
+  def rootNode          = scriptExecutor.rootNode
   
   // some tracing stuff
   var nSteps = 0
   var maxSteps = 0 // 0 means unlimited
-  val highTraceLevel = 3
-  var traceLevel = 2 // 0-no tracing; 1-message handling; 2-message insertion+handling; highTraceLevel-every step a tree 
+  
+  val treeTraceLevel = 3
+  val highTraceLevel = 4
+  
+  var traceLevel = 2 // 0-no tracing; 1-message handling; 2-message insertion+handling; 3 - every step a tree; highTraceLevel - every step expected messages
   def trace(level:Int,as: Any*) = {
     if (traceLevel>=level) {
       as.foreach {a=>print(a.toString)}; 
       println
       //traceMessages
     }
-    if (traceLevel >= highTraceLevel) traceTree
+    if (traceLevel >= treeTraceLevel) traceTree
+    if (traceLevel >= highTraceLevel) traceMessages
     if (maxSteps>0 && nSteps > maxSteps) {println("Exiting after "+nSteps+"steps"); System.exit(0)}
     nSteps += 1
   }
@@ -99,13 +103,13 @@ class SimpleScriptDebugger extends MsgListener {
         trace(1,">> ",m)
         m match {
           case AAToBeExecuted(_) =>
-            traceTree
-            traceMessages
+            if (traceLevel < treeTraceLevel) traceTree     // else already done in trace(1,...). messy but it works
+            if (traceLevel < highTraceLevel) traceMessages
           case _ =>  
         }
   }
   override def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m)
-  override def messageDequeued    (m: CallGraphMessage                ) = trace(2, "-- ", m)
+  override def messageDequeued    (m: CallGraphMessage                 ) = trace(2, "-- ", m)
   override def messageContinuation(m: CallGraphMessage, c: Continuation) = trace(2, "** ", c)
   override def messageAwaiting: Unit = {traceTree; traceMessages}
 }
