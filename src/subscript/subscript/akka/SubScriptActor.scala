@@ -31,7 +31,7 @@ trait SubScriptActor extends Actor {
   val runner: SubScriptActorRunner = SSARunnerV1Scheduler
   
   private object Terminator { // TBD: find better name; something with Blocker
-    var executor: EventHandlingCodeFragmentExecutor[N_code_eventhandling] = null
+    var executor: EventHandlingCodeFragmentExecutor[N_code_eventhandling[_]] = null
     
     def script block = @{executor = new EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)}: {. .}
     def release = executor.executeMatching(isMatching=true)

@@ -20,7 +20,7 @@ trait SubScriptActorRunner {
   
   def system: ActorSystem
  
-  def executor: CommonScriptExecutor
+  def executor: CommonScriptExecutor[_]
   
   def doScriptSteps
   
