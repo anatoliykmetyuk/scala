@@ -4022,6 +4022,11 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       def sSubScriptDSL_N_code_normal: Tree = Select(sSubScriptDSL, name_fun_code_normal)
       def sSubScriptDSL_call         : Tree = Select(sSubScriptDSL, name_fun_call)
       
+      def sSubScriptVM_N_call_typed(t: Tree) = AppliedTypeTree(sSubScriptVM_N_call, List(t))
+      def sSubScriptDSL_call_typed (t: Tree) = TypeApply(sSubScriptDSL_call , List(t))
+      
+      def sSubScriptVM_N_call_default = sSubScriptVM_N_call_typed(Ident(newTypeName("Any")))
+      def sSubScriptDSL_call_default  = sSubScriptDSL_call_typed (Ident(newTypeName("Any")))
       def here_Ident                 : Tree = Ident(here_Name)
       def sSubScriptVM_ActualValueParameter: Tree = Select(sSubScriptVM, actualValueParameter_Name)
       
@@ -4591,8 +4596,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
             case SilentTypeError  (err)  => err_scriptResolution = err
             case SilentResultValue(fun1) =>
               
-              val nodeType     = sSubScriptVM_N_call
-              val fun_template = sSubScriptDSL_call
+              val nodeType     = sSubScriptVM_N_call_default
+              val fun_template = sSubScriptDSL_call_default
               
               /* the following code would wrap not-yet-wrapped arguments in an ActualValueParameter
                *  However, this does not work out well since the type parameter of ActualValueParameter
@@ -4643,8 +4648,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           if (args.isEmpty) {
               silent(op => {
                   // Case 1: try just: a
-                  val nodeType     = op.sSubScriptVM_N_call
-                  val fun_template = op.sSubScriptDSL_call
+                  val nodeType     = op.sSubScriptVM_N_call_default
+                  val fun_template = op.sSubScriptDSL_call_default
                   val tree2        = Apply(copied_fun1, List(here_Ident)) // a(here)
              
                   // blockToFunction adds "here" to the context
@@ -4665,8 +4670,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 case _ =>
 		               silent(op => {
 		                  val tree1        = op.typed(Apply(sSubScriptVM_ActualValueParameter, List(copied_fun2))) // _b(ActualValueParameter(a))
-		                  val nodeType     = op.sSubScriptVM_N_call
-		                  val fun_template = op.sSubScriptDSL_call
+		                  val nodeType     = op.sSubScriptVM_N_call_default
+		                  val fun_template = op.sSubScriptDSL_call_default
 		                  val tree2        = Apply(tree1, List(here_Ident)) // (_b(ActualValueParameter(a)))(here)
 		             
 		                  // blockToFunction adds "here" to the context
