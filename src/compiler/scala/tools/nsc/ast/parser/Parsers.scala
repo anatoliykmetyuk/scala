@@ -1875,19 +1875,16 @@ self =>
 		        newLineOptWhenFollowedBy(EQUALS)
 		        //var restype = fromWithinReturnType(typedOpt()) // TBD: support Script return values
 		        
-		        val rhs =
-		          if (isStatSep || in.token == RBRACE) {
+		        
+		        val rhs: Option[Tree] =
+		          if (isStatSep || in.token == RBRACE || in.token != EQUALS) {
 		            //if (restype.isEmpty) restype = scalaUnitConstr
 		            newmods |= Flags.DEFERRED
-		            EmptyTree
-		          } else {
-		            if (in.token == EQUALS) {
-		              in.isInSubScript_header = false
-		              linePosOfScriptEqualsSym = in.offset - in.lineStartOffset
-		              in.nextToken()
-		            } 
-		            else {accept(EQUALS)}
+		            None
+		          } else Some {
 		            in.isInSubScript_header = false
+		            linePosOfScriptEqualsSym = in.offset - in.lineStartOffset
+		            in.nextToken()
 		            scriptExpr()
 		          }
 		        
@@ -1935,8 +1932,15 @@ self =>
 		                Apply(select, List(pSym))
 		              }
 		            }
-    
-	            val scriptHeaderAndLocalsAndBody = makeScriptHeaderAndLocalsAndBody(name.toString, rhs, paramBindings, resultType)
+		        
+		        // If the script definition is not abstract, wrap the
+		        // right hand side into the script header
+		        // otherwise use EmptyTree
+	          val scriptHeaderAndLocalsAndBody =
+	            rhs map {
+	              makeScriptHeaderAndLocalsAndBody(name.toString, _, paramBindings, resultType)
+	            } getOrElse EmptyTree
+	            
 		        val underscored_script_name      = newTermName(underscore_prefix(   name.toString))
 
 	            // to enable moving this all to a later phase, we should create a ScriptDef rather than a DefDef
@@ -2353,7 +2357,7 @@ self =>
             val annotationCode = simpleNativeValueExpr(allowBraces = true); accept(COLON)
             val body           = stripParens(unaryPrefixScriptTerm(allowParameterList = false))
             
-            val parameterizedType = AppliedTypeTree(vmNodeOf(body), List(Ident(any_TypeName)))
+            val parameterizedType = vmNodeOf(body)
 
             val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, parameterizedType, startPos)))
             Apply(applyAnnotationCode, List(body))
