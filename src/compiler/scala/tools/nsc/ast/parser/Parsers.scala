@@ -1775,9 +1775,11 @@ self =>
 		                    || isFormalConstrainedParameter(name)) atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), value_Name)} // _p.value
 		              else if (scriptLocalVariables             .contains(name) 
 		                   ||  scriptLocalValues                .contains(name)) {  // _c.at(here).value
-		                      val select_at     = atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), at_Name)}
+		                      /*val select_at     = atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), at_Name)}
 		                      val apply_at_here = atPos(ident.pos) {Apply(select_at, List(here_Ident))}
 		                      atPos(ident.pos) {Select(apply_at_here, value_Name)}
+		                      */
+		                      atPos(ident.pos)(ScriptVal(name))
 		              } else ident
 		            case _ => super.transform(tree)
 		          }
