@@ -32,13 +32,13 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
       case n @ N_call(t) => CodeExecutor.executeCode(n)
       case _             => createNode(template, executor)
     }
-    activateFrom(parent, n, pass)
+    linkNode(parent, n, pass)
   }
   
   /**
    * Links and activates a node that already exists.
    */
-  def activateFrom(parent: CallGraphNode.Parent, n: CallGraphNode.Child, pass: Option[Int]): CallGraphNode = {
+  def linkNode(parent: CallGraphNode.Parent, n: CallGraphNode.Child, pass: Option[Int]): CallGraphNode = {
     import CallGraph._
     n.codeExecutor = CodeExecutor.defaultCodeFragmentExecutorFor(n, executor)
     n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)

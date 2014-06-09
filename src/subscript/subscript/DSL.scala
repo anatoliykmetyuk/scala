@@ -53,10 +53,12 @@ import subscript.vm.model.callgraph.generic._
  */
 object DSL {
   def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: (=>Script[S])=>TemplateNode.Child): Script[S] = {
+    // In order to create the Script, we need to know T_script, the tempalte
+    // To create the template, we need to know its children
+    // To create the children, we need to know Script
+    // Hence, we create the children with a by-name Script and proceed in a usual manner
     var template: T_script = null
-    lazy val result: Script[S] =
-      if (template eq null) throw new IllegalStateException("This script can't be constructed before its children are constructed")
-      else new Script(template, p:_*)
+    lazy val result: Script[S] = new Script(template, p:_*)
     val child = childTemplateAt(result)
     template = T_script(owner, "script", name, child)
     result
