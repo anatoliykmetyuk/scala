@@ -1473,7 +1473,7 @@ self =>
     }
     
     // answer Script[scriptResultType]
-	def scriptType_resultType(scriptResultType: Tree) = {AppliedTypeTree(s_scriptType, List(scriptResultType))}
+	  def scriptType_resultType(scriptResultType: Tree) = AppliedTypeTree(s_scriptType, List(scriptResultType))
   
     /*
      * Enclose the given block with a function with parameter "here" or "there" of the given node type 
@@ -1487,7 +1487,7 @@ self =>
     def blockToFunction_here  (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos,  here_Name)
     def blockToFunction_there (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos, there_Name) //  TBD Clean up
     def blockToFunction_script(block: Tree, scriptResultType: Tree, pos: Position): Function = {
-        blockToFunction       (block, scriptType_resultType(scriptResultType), pos, script_Name) //  TBD Clean up
+        blockToFunction       (block, TypeTree(), pos, script_Name) //  TBD Clean up
     }
     //{ val vparams = List(makeParam(there_Name, TypeTree()))
     //  Function(vparams , block)
@@ -1821,8 +1821,9 @@ self =>
 		          resultElems += valDef
 		        }
 		        
-		        val scriptNameAsSym         = Apply(scalaDot(nme.Symbol), List(Literal(Constant(name.toString))))
-	            val scriptHeader            = Apply(s__script, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
+		        val scriptNameAsSym           = Apply(scalaDot(nme.Symbol), List(Literal(Constant(name.toString))))
+		          val dslScriptTyped          = TypeApply(s__script, List(resultType))
+	            val scriptHeader            = Apply(dslScriptTyped, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
 	            val scriptHeaderAndBody     = Apply(scriptHeader, List(rhsMethod))
 	            
 	            resultElems += scriptHeaderAndBody

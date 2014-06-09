@@ -28,8 +28,19 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
   
   // Graph
   def activateFrom(parent: CallGraphNode.Parent, template: TemplateNode, pass: Option[Int] = None): CallGraphNode = {
+    val n = parent match {
+      case n @ N_call(t) => CodeExecutor.executeCode(n)
+      case _             => createNode(template, executor)
+    }
+    activateFrom(parent, n, pass)
+  }
+  
+  /**
+   * Links and activates a node that already exists.
+   */
+  def activateFrom(parent: CallGraphNode.Parent, n: CallGraphNode.Child, pass: Option[Int]): CallGraphNode = {
     import CallGraph._
-    val n = createNode(template, executor)
+    n.codeExecutor = CodeExecutor.defaultCodeFragmentExecutorFor(n, executor)
     n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)
     connect(parentNode = parent, childNode = n)
     // ?? probably delete the following line
@@ -38,7 +49,6 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
     n
   }
 }
-
 object CallGraph {
   def connect(parentNode: CallGraphNode.Parent, childNode: CallGraphNode.Child) {
     childNode addParent parentNode
@@ -91,7 +101,6 @@ object CallGraph {
     //case t @ T_script(_, kind: String, name: Symbol, child0: TemplateNode) => N_script(t) node should be created by the script-method call
       case _ => null 
     }
-    result.codeExecutor = CodeExecutor.defaultCodeFragmentExecutorFor(result, scriptExecutor)
     result
   }
 }

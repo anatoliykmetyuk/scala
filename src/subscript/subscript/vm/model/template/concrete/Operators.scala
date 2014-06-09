@@ -12,7 +12,7 @@ import subscript.vm.model.callgraph.generic._
  */
 case class T_annotation[CN<:CallGraphNode,CT<:Child](
     override val code: N_annotation[CN,CT] => Unit,
-    override var child0: Child
+    override val child0: Child
 ) extends T_1_ary with TemplateCodeHolder[Unit,N_annotation[CN,CT]] {type N = N_annotation[CN,CT]}
 
 // Inconsistency: why T_annotation doesn't extend T_1_ary_op?
@@ -21,26 +21,26 @@ case class T_annotation[CN<:CallGraphNode,CT<:Child](
  */
 case class T_1_ary_op(
     override val kind: String,
-    override var child0: Child
+    override val child0: Child
 ) extends T_1_ary
 
 
 // Conditional boolean operators
 case class T_if(
     override val code: N_if => Boolean,
-    override var child0: Child
+    override val child0: Child
 ) extends T_1_ary with TemplateCodeHolder[Boolean,N_if] {type N = N_if}
 
 case class T_if_else(
     override val code: N_if_else => Boolean,
-    override var child0: Child,
+    override val child0: Child,
     override val child1: Child
 ) extends T_2_ary with TemplateCodeHolder[Boolean,N_if_else] {type N = N_if_else}
 
 // Conditional script operators
-case class T_do_then     (override var child0: Child, override val child1: Child) extends T_2_ary {type N = N_do_then}
-case class T_do_else     (override var child0: Child, override val child1: Child) extends T_2_ary {type N = N_do_else}
-case class T_do_then_else(override var child0: Child, override val child1: Child, 
+case class T_do_then     (override val child0: Child, override val child1: Child) extends T_2_ary {type N = N_do_then}
+case class T_do_else     (override val child0: Child, override val child1: Child) extends T_2_ary {type N = N_do_else}
+case class T_do_then_else(override val child0: Child, override val child1: Child, 
                                                       override val child2: Child) extends T_3_ary {type N = N_do_then_else}
 
 /**

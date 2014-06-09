@@ -52,11 +52,13 @@ import subscript.vm.model.callgraph.generic._
  * Usage: see example programs
  */
 object DSL {
-  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: Script[S]=>TemplateNode.Child): Script[S] = {
-    val template = T_script(owner, "script", name, child0=null)
-    val result = new Script[S](template, p:_*)
-    val childTemplate = childTemplateAt(result)
-    template.setChild(childTemplate)
+  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: (=>Script[S])=>TemplateNode.Child): Script[S] = {
+    var template: T_script = null
+    lazy val result: Script[S] =
+      if (template eq null) throw new IllegalStateException("This script can't be constructed before its children are constructed")
+      else new Script(template, p:_*)
+    val child = childTemplateAt(result)
+    template = T_script(owner, "script", name, child)
     result
   }
   //def _comscript(owner : AnyRef, communicator: Communicator, p: FormalParameter[_]*)                       : Script[Unit] = {(_c: N_call) => _c.calls(T_commscript(owner, "communicator" , communicator), p:_*)}

@@ -51,6 +51,7 @@ trait ChildNode extends TreeNode {
 trait RootNode extends TreeNode {
   def parent = null.asInstanceOf[Parent]
   def root   = this.asInstanceOf[Root]
+  
   TreeNode.setIndexes(this, 0, 0)
 }
 
@@ -62,16 +63,16 @@ trait TreeNode_0 extends TreeNode   {
 }
 
 trait TreeNode_1 extends TreeNode_0 {
-  var child0: Child
+  val child0: Child
   override val children: Seq[Child] = child0::Nil
 }
 
 trait TreeNode_2 extends TreeNode_1 {
-  def child1: Child
+  val child1: Child
   override val children: Seq[Child] = child0::child1::Nil
 }
 
 trait TreeNode_3 extends TreeNode_2 {
-  def child2: Child
+  val child2: Child
   override val children: Seq[Child] = child0::child1::child2::Nil
 }
