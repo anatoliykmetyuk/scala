@@ -10,11 +10,11 @@ import subscript.vm.model.callgraph.generic._
 
 // Local launches and calls
 case class T_launch(
-    override var child0: Child
+    override val child0: Child
 ) extends T_1_ary
 
 case class T_launch_anchor(
-    override var child0: Child
+    override val child0: Child
 ) extends T_1_ary
 
 case class T_call[R](
@@ -27,10 +27,9 @@ case class T_script (
     override val owner : AnyRef,
     override val kind  : String,
                  name  : Symbol,
-    override var child0: Child
+    override val child0: Child
 ) extends TemplateNode with TreeNode_1 with RootNode {
   override def toString = name.name
-  def setChild(c: Child) = child0 = c
 }
 
 //case class T_commscript(

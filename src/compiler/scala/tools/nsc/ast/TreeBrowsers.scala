@@ -452,6 +452,9 @@ abstract class TreeBrowsers {
 
       case Ident(name) =>
         Nil
+        
+      case ScriptVal(name) =>
+        Nil
 
       case Literal(value) =>
         Nil

@@ -602,7 +602,7 @@ TODO:
     <property name="partest-javaagent.description" value="Scala Compiler Testing Tool (compiler-specific java agent)"/>
 
     <!-- projects without project-specific options: asm, forkjoin, manual, bin, repl -->
-    <for list="actors,subscript,compiler,interactive,scaladoc,library,parser-combinators,partest,partest-extras,partest-javaagent,reflect,scalap,swing,xml,continuations-plugin,continuations-library" param="project">
+    <for list="actors,subscript,subscript-extras,compiler,interactive,scaladoc,library,parser-combinators,partest,partest-extras,partest-javaagent,reflect,scalap,swing,xml,continuations-plugin,continuations-library" param="project">
       <sequential>
         <!-- description is mandatory -->
         <init-project-prop project="@{project}" name="package"     default=""/> <!-- used by mvn-package, copy-bundle, make-bundle -->
@@ -692,6 +692,10 @@ TODO:
     <path id="quick.subscript.build.path">
       <path refid="quick.library.build.path"/>
       <pathelement location="${build-quick.dir}/classes/subscript"/>
+    </path>
+
+    <path id="quick.subscript-extras.build.path">
+      <path refid="quick.subscript.build.path"/>
       <pathelement location="${swing.jar}"/>
       <path refid="test.junit.compiler.build.path"/>
     </path>
@@ -1074,6 +1078,9 @@ TODO:
 
   <target name="quick.subscript"  depends="quick.comp">
     <staged-build with="quick"   stage="quick" project="subscript"/> </target>
+
+  <target name="quick.subscript-extras" depends="quick.subscript">
+    <staged-build with="quick"   stage="quick" project="subscript-extras"/> </target>
 
 
 

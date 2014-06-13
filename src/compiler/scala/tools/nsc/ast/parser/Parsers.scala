@@ -1473,7 +1473,7 @@ self =>
     }
     
     // answer Script[scriptResultType]
-	def scriptType_resultType(scriptResultType: Tree) = {AppliedTypeTree(s_scriptType, List(scriptResultType))}
+	  def scriptType_resultType(scriptResultType: Tree) = AppliedTypeTree(s_scriptType, List(scriptResultType))
   
     /*
      * Enclose the given block with a function with parameter "here" or "there" of the given node type 
@@ -1487,7 +1487,7 @@ self =>
     def blockToFunction_here  (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos,  here_Name)
     def blockToFunction_there (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos, there_Name) //  TBD Clean up
     def blockToFunction_script(block: Tree, scriptResultType: Tree, pos: Position): Function = {
-        blockToFunction       (block, scriptType_resultType(scriptResultType), pos, script_Name) //  TBD Clean up
+        blockToFunction       (block, TypeTree(), pos, script_Name) //  TBD Clean up
     }
     //{ val vparams = List(makeParam(there_Name, TypeTree()))
     //  Function(vparams , block)
@@ -1775,9 +1775,11 @@ self =>
 		                    || isFormalConstrainedParameter(name)) atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), value_Name)} // _p.value
 		              else if (scriptLocalVariables             .contains(name) 
 		                   ||  scriptLocalValues                .contains(name)) {  // _c.at(here).value
-		                      val select_at     = atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), at_Name)}
+		                      /*val select_at     = atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), at_Name)}
 		                      val apply_at_here = atPos(ident.pos) {Apply(select_at, List(here_Ident))}
 		                      atPos(ident.pos) {Select(apply_at_here, value_Name)}
+		                      */
+		                      atPos(ident.pos)(ScriptVal(name))
 		              } else ident
 		            case _ => super.transform(tree)
 		          }
@@ -1819,8 +1821,9 @@ self =>
 		          resultElems += valDef
 		        }
 		        
-		        val scriptNameAsSym         = Apply(scalaDot(nme.Symbol), List(Literal(Constant(name.toString))))
-	            val scriptHeader            = Apply(s__script, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
+		        val scriptNameAsSym           = Apply(scalaDot(nme.Symbol), List(Literal(Constant(name.toString))))
+		          val dslScriptTyped          = TypeApply(s__script, List(resultType))
+	            val scriptHeader            = Apply(dslScriptTyped, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
 	            val scriptHeaderAndBody     = Apply(scriptHeader, List(rhsMethod))
 	            
 	            resultElems += scriptHeaderAndBody
@@ -1875,19 +1878,16 @@ self =>
 		        newLineOptWhenFollowedBy(EQUALS)
 		        //var restype = fromWithinReturnType(typedOpt()) // TBD: support Script return values
 		        
-		        val rhs =
-		          if (isStatSep || in.token == RBRACE) {
+		        
+		        val rhs: Option[Tree] =
+		          if (isStatSep || in.token == RBRACE || in.token != EQUALS) {
 		            //if (restype.isEmpty) restype = scalaUnitConstr
 		            newmods |= Flags.DEFERRED
-		            EmptyTree
-		          } else {
-		            if (in.token == EQUALS) {
-		              in.isInSubScript_header = false
-		              linePosOfScriptEqualsSym = in.offset - in.lineStartOffset
-		              in.nextToken()
-		            } 
-		            else {accept(EQUALS)}
+		            None
+		          } else Some {
 		            in.isInSubScript_header = false
+		            linePosOfScriptEqualsSym = in.offset - in.lineStartOffset
+		            in.nextToken()
 		            scriptExpr()
 		          }
 		        
@@ -1935,8 +1935,15 @@ self =>
 		                Apply(select, List(pSym))
 		              }
 		            }
-    
-	            val scriptHeaderAndLocalsAndBody = makeScriptHeaderAndLocalsAndBody(name.toString, rhs, paramBindings, resultType)
+		        
+		        // If the script definition is not abstract, wrap the
+		        // right hand side into the script header
+		        // otherwise use EmptyTree
+	          val scriptHeaderAndLocalsAndBody =
+	            rhs map {
+	              makeScriptHeaderAndLocalsAndBody(name.toString, _, paramBindings, resultType)
+	            } getOrElse EmptyTree
+	            
 		        val underscored_script_name      = newTermName(underscore_prefix(   name.toString))
 
 	            // to enable moving this all to a later phase, we should create a ScriptDef rather than a DefDef
@@ -2353,7 +2360,7 @@ self =>
             val annotationCode = simpleNativeValueExpr(allowBraces = true); accept(COLON)
             val body           = stripParens(unaryPrefixScriptTerm(allowParameterList = false))
             
-            val parameterizedType = AppliedTypeTree(vmNodeOf(body), List(Ident(any_TypeName)))
+            val parameterizedType = vmNodeOf(body)
 
             val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, parameterizedType, startPos)))
             Apply(applyAnnotationCode, List(body))

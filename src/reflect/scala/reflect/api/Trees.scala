@@ -1757,6 +1757,12 @@ trait Trees { self: Universe =>
    *  @template
    */
   type Ident >: Null <: RefTree with IdentApi
+  
+  /** A name of a local script variable/value application `name`.
+   *  @group Trees
+   *  @template
+   */
+  type ScriptVal >: Null <: RefTree with RefTreeApi
 
   /** The constructor/extractor for `Ident` instances.
    *  @group Extractors
@@ -2531,6 +2537,11 @@ trait Trees { self: Universe =>
      *  Having a tree as a prototype means that the tree's attachments, type and symbol will be copied into the result.
      */
     def Ident(tree: Tree, name: Name): Ident
+    
+    /** Creates a `Ident` node from the given components, having a given `tree` as a prototype.
+     *  Having a tree as a prototype means that the tree's attachments, type and symbol will be copied into the result.
+     */
+    def ScriptVal(tree: Tree, name: Name): ScriptVal
 
     /** Creates a `ReferenceToBoxed` node from the given components, having a given `tree` as a prototype.
      *  Having a tree as a prototype means that the tree's attachments, type and symbol will be copied into the result.

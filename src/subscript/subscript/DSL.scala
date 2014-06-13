@@ -52,11 +52,15 @@ import subscript.vm.model.callgraph.generic._
  * Usage: see example programs
  */
 object DSL {
-  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: Script[S]=>TemplateNode.Child): Script[S] = {
-    val template = T_script(owner, "script", name, child0=null)
-    val result = new Script[S](template, p:_*)
-    val childTemplate = childTemplateAt(result)
-    template.setChild(childTemplate)
+  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: (=>Script[S])=>TemplateNode.Child): Script[S] = {
+    // In order to create the Script, we need to know T_script, the tempalte
+    // To create the template, we need to know its children
+    // To create the children, we need to know Script
+    // Hence, we create the children with a by-name Script and proceed in a usual manner
+    var template: T_script = null
+    lazy val result: Script[S] = new Script(template, p:_*)
+    val child = childTemplateAt(result)
+    template = T_script(owner, "script", name, child)
     result
   }
   //def _comscript(owner : AnyRef, communicator: Communicator, p: FormalParameter[_]*)                       : Script[Unit] = {(_c: N_call) => _c.calls(T_commscript(owner, "communicator" , communicator), p:_*)}

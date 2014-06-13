@@ -383,6 +383,12 @@ trait Trees extends api.Trees {
     def qualifier: Tree = EmptyTree
     def isBackquoted = this.hasAttachment[BackquotedIdentifierAttachment.type]
   }
+
+  case class ScriptVal(name: Name) extends RefTree with RefTreeApi {
+    def qualifier   : Tree    = EmptyTree
+    def isBackquoted: Boolean = this.hasAttachment[BackquotedIdentifierAttachment.type]
+  }
+
   case class ReferenceToBoxed(ident: Ident) extends TermTree with ReferenceToBoxedApi {
     override def symbol: Symbol = ident.symbol
     override def symbol_=(sym: Symbol) { ident.symbol = sym }
@@ -404,7 +410,7 @@ trait Trees extends api.Trees {
   }
   case class      TypeBoundsTree( lo: Tree, hi: Tree                ) extends TypTree with TypeBoundsTreeApi
   case class ExistentialTypeTree(tpt: Tree, whereClauses: List[Tree]) extends TypTree with ExistentialTypeTreeApi
-  
+
   object PackageDef          extends          PackageDefExtractor
   object ClassDef            extends            ClassDefExtractor
   object ModuleDef           extends           ModuleDefExtractor
@@ -506,12 +512,12 @@ trait Trees extends api.Trees {
   }
 
   class StrictTreeCopier extends InternalTreeCopierOps {
-    def         ClassDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef], 
+    def         ClassDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef],
                                                                                      impl: Template) = new   ClassDef      (mods, name.toTypeName, tparams, impl              ).copyAttrs(tree)
     def       PackageDef(tree: Tree,                   pid: RefTree, stats: List[Tree]             ) = new PackageDef      (pid, stats                                        ).copyAttrs(tree)
     def        ModuleDef(tree: Tree, mods: Modifiers, name: Name, impl: Template                   ) = new  ModuleDef      (mods, name.toTermName, impl                       ).copyAttrs(tree)
     def           ValDef(tree: Tree, mods: Modifiers, name: Name,  tpt: Tree, rhs: Tree            ) = new     ValDef      (mods, name.toTermName, tpt,                    rhs).copyAttrs(tree)
-    def           DefDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef],                                  
+    def           DefDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef],
                                                  vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree) = new     DefDef      (mods, name.toTermName, tparams, vparamss, tpt, rhs).copyAttrs(tree)
     def          TypeDef(tree: Tree, mods: Modifiers, name: Name, tparams: List[TypeDef], rhs: Tree) = new    TypeDef      (mods, name.toTypeName, tparams,                rhs).copyAttrs(tree)
     def         LabelDef(tree: Tree, name: Name,                   params: List[Ident  ], rhs: Tree) = new   LabelDef      (      name.toTermName,  params,                rhs).copyAttrs(tree)
@@ -555,6 +561,7 @@ trait Trees extends api.Trees {
     def This               (tree: Tree, qual     : Name                                            ) = new This               (qual.toTypeName                                ).copyAttrs(tree)
     def Select             (tree: Tree, qualifier: Tree, selector: Name                            ) = new Select             (qualifier, selector                            ).copyAttrs(tree)
     def Ident              (tree: Tree,      name: Name                                            ) = new Ident              (name                                           ) copyAttrs tree
+    def ScriptVal          (tree: Tree,      name: Name                                            ) = new ScriptVal          (name                                           ) copyAttrs tree
     def ReferenceToBoxed   (tree: Tree,       idt: Ident                                           ) = new ReferenceToBoxed   (idt                                            ).copyAttrs(tree)
     def Literal            (tree: Tree,     value: Constant                                        ) = new Literal            (value                                          ).copyAttrs(tree)
     def Annotated          (tree: Tree,     annot: Tree, arg: Tree                                 ) = new Annotated          (annot, arg                                     ).copyAttrs(tree)
@@ -739,6 +746,11 @@ trait Trees extends api.Trees {
       if name0 == name => t
       case _ => treeCopy.Ident(tree, name)
     }
+    def ScriptVal(tree: Tree, name: Name) = tree match {
+      case t @ ScriptVal(name0)
+      if name0 == name => t
+      case _ => treeCopy.ScriptVal(tree, name)
+    }
     def ReferenceToBoxed(tree: Tree, idt: Ident) = tree match {
       case t @ ReferenceToBoxed(idt0)
       if (idt0 == idt) => t
@@ -836,7 +848,7 @@ trait Trees extends api.Trees {
     def & (flag: Long): Modifiers = {val flags1 = flags &   flag ; if (flags1 == flags) this else Modifiers(flags1, privateWithin, annotations) setPositions positions}
     def &~(flag: Long): Modifiers = {val flags1 = flags & (~flag); if (flags1 == flags) this else Modifiers(flags1, privateWithin, annotations) setPositions positions}
     def | (flag: Long): Modifiers = {val flags1 = flags |   flag ; if (flags1 == flags) this else Modifiers(flags1, privateWithin, annotations) setPositions positions}
-    
+
     def withAnnotations(annots: List[Tree])     = if (annots.isEmpty) this
                                                   else copy(annotations = annotations ::: annots) setPositions positions
     def withPosition(flag: Long, position: Position) = copy() setPositions positions + (flag -> position)
@@ -1058,9 +1070,10 @@ trait Trees extends api.Trees {
       case This               (qual                     ) =>                      traverseName(qual)
       case Select             (qualifier, selector      ) => traverse(qualifier); traverseName(selector)
       case Ident              (name                     ) =>                      traverseName(name)
+      case ScriptVal          (name                     ) =>                      traverseName(name)
       case ReferenceToBoxed   (idt                      ) => traverse(idt      )
       case Literal            (const                    ) =>                      traverseConstant(const)
-      case TypeTree           (                         ) => 
+      case TypeTree           (                         ) =>
       case SingletonTypeTree  (ref                      ) => traverse(ref      )
       case SelectFromTypeTree (qualifier, selector      ) => traverse(qualifier); traverseName(selector)
       case CompoundTypeTree   (templ                    ) => traverse(templ    )
@@ -1089,6 +1102,7 @@ trait Trees extends api.Trees {
     // begin itransform
     tree match {
       case Ident   (name)                                  =>                       treeCopy.Ident              (tree, name)
+      case ScriptVal(name)                                 =>                       treeCopy.ScriptVal          (tree, name)
       case Select  (qualifier, selector)                   =>                       treeCopy.Select             (tree, transform(qualifier), selector)
       case Apply   (fun, args)                             =>                       treeCopy.Apply              (tree, transform(fun), transformTrees(args))
       case ScriptApply(fun, args)                          =>                       treeCopy.ScriptApply        (tree, transform(fun), transformTrees(args))
@@ -1548,7 +1562,7 @@ trait Trees extends api.Trees {
   implicit val             UnApplyTag = ClassTag[UnApply            ](classOf[UnApply            ])
   implicit val              ValDefTag = ClassTag[ValDef             ](classOf[ValDef             ])
   implicit val         ValOrDefDefTag = ClassTag[ValOrDefDef        ](classOf[ValOrDefDef        ])
-                                                                                                 
+
   implicit val         ScriptApplyTag = ClassTag[ScriptApply        ](classOf[ScriptApply        ])
 
   val treeNodeCount = Statistics.newView("#created tree nodes")(nodeCount)

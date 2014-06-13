@@ -58,10 +58,11 @@ object Predef {
     break_up(n:Int) = {!here.break_up(n)!}
     break_up1 = break_up,1
     break_up2 = break_up,2
+  
 
-    
-    test = times1(100)
+// TBD: Tests don't work so far. Maybe we need to use Script[Any] instead of Script[Unit] in the _times1
+//    test = times1(100)
   
   // the folloging would be almost equivalent to the times script:
-  def _times1(n:Int) = {_script(this, 'times1) {(script:Script[Unit]) => _while{implicit here=>pass<n}}}
+//  def _times1(n:Int) = {_script(this, 'times1) {(script:Script[Unit]) => _while{implicit here=>pass<n}}}
 }

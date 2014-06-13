@@ -4000,36 +4000,37 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       }
       def wrapErrors(tree: Tree, typeTree: Typer => Tree): Tree = silent(typeTree) orElse (err => DynamicRewriteError(tree, err.head))
     }
-    
+
       val here_Name = newTermName("here")
       val actualValueParameter_Name = newTermName("ActualValueParameter")
       val normalCode_NodeString = "N_code_normal"
       val scriptCall_NodeString = "N_call"
       val normalCode_NodeName   = newTypeName(normalCode_NodeString)
       val scriptCall_NodeName   = newTypeName(scriptCall_NodeString)
-      
+
       val nameSubScript        = newTermName("subscript")
       val nameDSL              = newTermName("DSL")
       val nameVM               = newTermName("vm")
-      val name_scriptType      = newTypeName("_scriptType")
+      val name_scriptType      = newTypeName("Script")
       val name_fun_code_normal = newTermName("_normal")
       val name_fun_call        = newTermName("_call")
- 
+
       def sSubScriptDSL: Tree = Select(Ident(nameSubScript), nameDSL)
       def sSubScriptVM : Tree = Select(Ident(nameSubScript), nameVM )
       def sSubScriptVM_N_code_normal : Tree = Select(sSubScriptVM, normalCode_NodeName)
       def sSubScriptVM_N_call        : Tree = Select(sSubScriptVM, scriptCall_NodeName)
       def sSubScriptDSL_N_code_normal: Tree = Select(sSubScriptDSL, name_fun_code_normal)
       def sSubScriptDSL_call         : Tree = Select(sSubScriptDSL, name_fun_call)
-      
+      def sSubScriptVM_scriptType    : Tree = Select(sSubScriptVM, name_scriptType)
+
       def sSubScriptVM_N_call_typed(t: Tree) = AppliedTypeTree(sSubScriptVM_N_call, List(t))
       def sSubScriptDSL_call_typed (t: Tree) = TypeApply(sSubScriptDSL_call , List(t))
-      
+
       def sSubScriptVM_N_call_default = sSubScriptVM_N_call_typed(Ident(newTypeName("Any")))
       def sSubScriptDSL_call_default  = sSubScriptDSL_call_typed (Ident(newTypeName("Any")))
       def here_Ident                 : Tree = Ident(here_Name)
       def sSubScriptVM_ActualValueParameter: Tree = Select(sSubScriptVM, actualValueParameter_Name)
-      
+
       def underscore_name(name: Name) = newTermName("_"+name)
       // copied from Parsers.scala:
       def makeParam (pname: TermName, tpe: Tree) =  ValDef(Modifiers(PARAM), pname, tpe, EmptyTree)
@@ -4535,7 +4536,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
             })
         }
       }
-      
+
       def normalTypedScriptApply(tree: Tree, fun: Tree, args: List[Tree]) = {
           val funpt     = if (mode.inPatternMode) pt else WildcardType
           val appStart  = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
@@ -4554,7 +4555,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           var tree_conversion_scriptResolution1: Tree = null
           var tree_conversion_scriptResolution2: Tree = null
           var            tree_methodResolution : Tree = null
-          
+
           // resolve script and method calls
           // Note: : a script named "a" becomes method "_a"
           //
@@ -4562,7 +4563,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           // - method call: a(here.toString) ===> _normal{here=>  a(here.toString)}
           //
           // If these don't work, try implicit conversions to a script.
-          // Note that Scalac can do at most 1 implict conversion, and an actual value parameter that should match an 
+          // Note that Scalac can do at most 1 implict conversion, and an actual value parameter that should match an
           // actual constrained parameter, for which a conversion to ActualValueParameter(a) would match.
           // So we need to try that one as well.
           // - implicit 1a:   a   ===>                            ===> _call{here=>(_b(                        a ))(here)}
@@ -4571,34 +4572,49 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           // - implicit 3 :   a?? ===> ActualAdaptingParameter(a) ===> _call{here=>(_b(ActualAdaptingParameter(a)))(here)}
           //
           // Note: the question marks have been transformed already in the Parser phase to ActualOutputParameter and ActualAdaptingParameter (TBD?)
-          // 
-          
+          //
+
           val copied_fun1 = fun.duplicate // make sure typing in 2nd and 3rd tries do not conflict
-          val copied_fun2 = fun.duplicate 
-          val copied_fun3 = fun.duplicate 
+          val copied_fun2 = fun.duplicate
+          val copied_fun3 = fun.duplicate
           
-          // 1st try: an explicit script call
           
+          // Gathering some information about the passed tree
+          var isLocalValScript = false
           val underscored_fun = fun match {
-            case Ident(name) => {Ident(underscore_name(name))}
-            case Select(qual, selector) =>  Select(qual, underscore_name(selector))
-            case _ => null
+            case Ident(name)            => Ident (      underscore_name(name    ))
+            case Select(qual, selector) => Select(qual, underscore_name(selector))
+            case ScriptVal(_)           => isLocalValScript = true; null
+            case _                      =>                          null
           }
           val funName: Literal = Literal(Constant(fun match {
             case Ident(name) => name.toString
+            case ScriptVal(name) => name.toString
             case Select(qual, selector) => selector.toString
             case Literal(constant) => constant.escapedStringValue
             case _ => fun.toString // "<call>"
           }))
-          if (underscored_fun != null) silent(op => op.typed(atPos(fun.pos) {underscored_fun}, mode.forFunMode, funpt),
-                 if (mode.inExprMode) false else context.ambiguousErrors,
-                 if (mode.inExprMode) tree  else context.tree) match {
-            case SilentTypeError  (err)  => err_scriptResolution = err
-            case SilentResultValue(fun1) =>
-              
+          
+          // Below is a function to quickly build _call(here => ...) from bare script trees.
+          /* Given a script tree `script`, it will build the following:
+           *            
+           * here: N_call[Any] => {
+               val s: subscript.vm.Script[Any] = script
+               here.calls(s.template, (s.p: _*));
+               s
+             }
+           * The most essential operation that "links" the static
+           * script into the dynamic graph is N_call.calls(template, parameters*).
+           * So first we assign the script tree to `s`,
+           * then we do here.calls with the template of this script and
+           * its parameters.
+           * And we return the script.
+           */
+          def scriptApplicationTree(script: Tree): Tree = {
+                          
               val nodeType     = sSubScriptVM_N_call_default
               val fun_template = sSubScriptDSL_call_default
-              
+
               /* the following code would wrap not-yet-wrapped arguments in an ActualValueParameter
                *  However, this does not work out well since the type parameter of ActualValueParameter
                *  cannot be made covariant.
@@ -4606,7 +4622,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                *
               def actualParameterPacked(v: List[_]) = !v.isEmpty && (v.head match {
                 case Select(subscriptVm, wrapperClass) => wrapperClass.toString match {
-                    case "ActualValueParameter" | "ActualOutputParameter" | 
+                    case "ActualValueParameter" | "ActualOutputParameter" |
                    "ActualConstrainedParameter" | "ActualAdaptingParameter" => true
                     case _ => false
                   }
@@ -4618,40 +4634,87 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 case _ => Apply(Select(sSubScriptVM, actualValueParameter_Name), List(arg))
               }}
               val tree1        = Apply( fun1, wrappedArgs)             // _a(here.toString)
-              * 
+              *
               */
-              
-              val tree1        = Apply( fun1, args)             // _a(here.toString)
-              val tree2        = Apply(tree1, List(here_Ident)) // (_a(here.toString))(here)
-             
+              import scala.reflect.internal.ModifierFlags._
+
+              val scriptTermName = newTermName("s")
+              val scriptValDef = ValDef(                    // val s: Script[Any] = script
+                Modifiers(PARAM),
+                scriptTermName,                             // s
+                AppliedTypeTree(                            // subscript.vm.Script[Any]
+                    sSubScriptVM_scriptType,
+                    List(
+                      Ident(newTypeName("Any"))
+                    )
+                ),
+                script
+              )
+
+              // here.calls
+              val callsMethod    = Select(here_Ident, "calls")
+
+              // s.template   // s is the val where the script is stored inside the block
+              val calleeTemplate = Select(Ident(scriptTermName), "template")
+
+              // s.p:_*       // the parameters of the script, adapted to be passed as varargs
+              val parameters     = Typed(Select(Ident(scriptTermName), "p"), Ident(newTypeName("_*")))
+
+              // here.calls(s.template, s.p:_*)
+              val hereCallsScript = Apply(callsMethod, List(calleeTemplate, parameters))
+
+              // Build everything together into a block; see the big comment above.
+              val scriptIntegrationBlock = Block(scriptValDef, hereCallsScript, Ident(scriptTermName))
+
               // blockToFunction adds "here" to the context
-              // TBD: use something like: 
+              // TBD: use something like:
               //   val parameterizedType = AppliedTypeTree(nodeType, List(funpt))
               //   val function_here_to_code = blockToFunction(tree2, nodeType, tree.pos) // here=>(_a(here.toString))(here)
               //
               // but note that funpt is already a type. Moreover, to determine funpt we already should have created a
               // function_here_to_code in the previous op.typed call.
-              // The problem is that we would already have needed the funpt for that 
+              // The problem is that we would already have needed the funpt for that
               // Maybe the usual typer of the scala compiler can deal with such mutual dependencies.
-              
-              val function_here_to_code = blockToFunction(tree2, nodeType, tree.pos) // here=>(_a(here.toString))(here)
-              val apply_template        = Apply(fun_template, List(funName, function_here_to_code)) // _call  {here=>(_a(here.toString))(here)}
 
-              // by now the ScriptApply has been rewritten into 3 nested normal Apply's, so this can be typed:
-              tree_scriptResolution = typed(apply_template)
+              // here=>{scriptIntegrationBlock}
+              val function_here_to_code = blockToFunction(scriptIntegrationBlock, nodeType, tree.pos)
+              
+              // _call(here => {scriptIntegrationBlock})
+              Apply(fun_template, List(funName, function_here_to_code))
           }
+          
+          
+          // 1st try: an explicit script call
+          
+          if (underscored_fun != null) silent(op => op.typed(atPos(fun.pos) {underscored_fun}, mode.forFunMode, funpt),
+                 if (mode.inExprMode) false else context.ambiguousErrors,
+                 if (mode.inExprMode) tree  else context.tree) match {
+            case SilentTypeError  (err)  => err_scriptResolution = err
+            case SilentResultValue(fun1) =>
+              val script            = Apply(fun1, args)             // _f(3)
+              val wrappedScript     = scriptApplicationTree(script)  // _call(here => ......) (see typedScriptApplicationTree)
+              tree_scriptResolution = typed(wrappedScript)
+          }
+          
+          // 1.5 try: a call to a script that is in a local variable
+          
+          if (isLocalValScript) {
+              val wrappedScript     = scriptApplicationTree(fun)    // _call(here => ... ScriptVal(x) ...)
+              tree_scriptResolution = typed(wrappedScript)          // here ScriptVal will be desugared to _x.at(here).value - with "here" in scope
+          }
+          
           
           // 2nd try: an implicit call a or b.a with a some data for which an implicit script exists.
           // FTTB We only do a single item "a", so no other implicit parameters (args.isEmpty)
           // (multiple parameters would need to be wrapped in a tuple first)
           //
-          if (args.isEmpty) {
+          if (args.isEmpty && !isLocalValScript) {
               silent(op => {
                   // Case 1: try just: a
                   val nodeType     = op.sSubScriptVM_N_call_default
                   val fun_template = op.sSubScriptDSL_call_default
                   val tree2        = Apply(copied_fun1, List(here_Ident)) // a(here)
-             
+
                   // blockToFunction adds "here" to the context
                   val function_here_to_code = op.blockToFunction(tree2, nodeType, tree.pos) // here=>(a)(here)
                   val apply_template        = Apply(fun_template, List(funName, function_here_to_code)) // _call  {here=>a(here)}
@@ -4673,11 +4736,11 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 		                  val nodeType     = op.sSubScriptVM_N_call_default
 		                  val fun_template = op.sSubScriptDSL_call_default
 		                  val tree2        = Apply(tree1, List(here_Ident)) // (_b(ActualValueParameter(a)))(here)
-		             
+
 		                  // blockToFunction adds "here" to the context
 		                  val function_here_to_code = op.blockToFunction(tree2, nodeType, tree.pos) // here=>(_b(ActualValueParameter(a))))(here)
 		                  val apply_template        = Apply(fun_template, List(funName, function_here_to_code)) // _call  {here=>(_b(ActualValueParameter(a)))(here)}
-		
+
 		                  // by now the ScriptApply has been rewritten into 4 nested normal Apply's, so this can be typed:
 		                  op.typed(apply_template)
 		              },
@@ -4688,18 +4751,18 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 		              }
               }
           }
-          
+
           // 3rd try: a method call
           silent(op => op.typed(copied_fun3, mode.forFunMode, funpt),
                  if (mode.inExprMode) false else context.ambiguousErrors,
                  if (mode.inExprMode) tree else context.tree) match {
             case SilentTypeError  (err)  => err_notFound_methodResolution = err
             case SilentResultValue(fun1) =>
-              
+
               val nodeType    : Tree = sSubScriptVM_N_code_normal
               val fun_template: Tree = sSubScriptDSL_N_code_normal
               val tree1       : Tree = Apply(fun1, args) //a(here.toString)
-              
+
               silent(op => op.typed(tree1)) match { // does the method with the arguments exist?
                 case SilentTypeError  (err)  => err_methodResolution = err
                 case SilentResultValue(tree2) =>
@@ -4711,12 +4774,12 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                   tree_methodResolution = typed(apply_template)
               }
           }
-          
+
           // wrap up the results
-          
+
           if   (tree_scriptResolution != null) {
             if (tree_methodResolution != null) {
-              val err = AmbiguousTypeError(tree.pos, "call may be both to a script and a method") 
+              val err = AmbiguousTypeError(tree.pos, "call may be both to a script and a method")
               onError({issue(err); setError(tree)})
             }
             else tree_scriptResolution
@@ -4763,6 +4826,12 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       def typedScriptApply(tree: ScriptApply): Tree = tree match {
         case ScriptApply(EmptyTree, fun::args) => typedScriptApply(atPos(tree.pos){ScriptApply(fun, args)})
         case ScriptApply(fun, args) => normalTypedScriptApply(tree, fun, args)
+      }
+      
+      def typedScriptVal(tree: ScriptVal): Tree = {
+        val select_at = Select(Ident(newTermName("_" + tree.name.toString)), "at")
+        val apply_at_here = Apply(select_at, List(here_Ident))
+        typed(atPos(tree.pos){Select(apply_at_here, "value")})
       }
 
       def convertToAssignment(fun: Tree, qual: Tree, name: Name, args: List[Tree]): Tree = {
@@ -5524,7 +5593,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         case tree: Bind    => typedBind(tree)
         case tree: Apply   => typedApply(tree)
         case tree: ScriptApply => typedScriptApply(tree)
-        case tree: Select  => typedSelectOrSuperCall(tree)
+        case tree: Select    => typedSelectOrSuperCall(tree)
+        case tree: ScriptVal => typedScriptVal(tree) 
         case tree: Literal => typedLiteral(tree)
         case tree: Typed   => typedTyped(tree)
         case tree: This    => typedThis(tree)  // SI-6104
