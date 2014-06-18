@@ -46,8 +46,8 @@ abstract class SimpleSubscriptApplication extends SimpleSwingApplication{
     super.startup(args)
     new Thread{override def run={live;quit}}.start()
   }
-  def _live: Script[Unit]
-  def  live: ScriptExecutor[Unit]
+  def _live: Script[Any]
+  def  live: ScriptExecutor[Any]
 }
 
 /*

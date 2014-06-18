@@ -3,6 +3,8 @@ package subscript.swing
 import java.awt.{Font, BasicStroke, Stroke, Color => AWTColor}
 import java.awt.geom.AffineTransform
 
+import javax.swing.JList
+
 import scala.collection.mutable.ListBuffer
 import scala.swing._
 
@@ -501,11 +503,11 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   val msgQueueList      = new ListBuffer[String]
   val msgLogListView    = new ListView(msgLogList) {
     font                = fixedWidthFont
-    peer.setModel(msgLogListModel)
+    peer.asInstanceOf[JList].setModel(msgLogListModel)   // Compiler throws an exception without a cast
   }
   val msgQueueListView  = new ListView(msgQueueList) {
     font                = fixedWidthFont
-    peer.setModel(msgQueueListModel)
+    peer.asInstanceOf[JList].setModel(msgQueueListModel)
   }
   val msgLogListViewScrollPane   = new ScrollPane
   {
