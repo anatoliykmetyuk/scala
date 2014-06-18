@@ -275,7 +275,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
                  else currentMessage.node
         val n = n1.asInstanceOf[CallGraphNode]
         val nameFont = t match {
-          case _:T_call | _:T_script => smallFont
+          case _:T_call[_] | _:T_script => smallFont
           case _        => normalFont
         }
 

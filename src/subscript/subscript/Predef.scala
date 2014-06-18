@@ -52,9 +52,11 @@ object Predef {
   
   def script..
     times(n:Int) = while(here.pass<n) // TBD: make here implicit
-  //delta        = (-)
-  //epsilon      = (+)
-  //nu           = (+-)
+      
+    delta        = (-)
+    epsilon      = (+)
+    nu           = (+-)
+    
     break_up(n:Int) = {!here.break_up(n)!}
     break_up1 = break_up,1
     break_up2 = break_up,2

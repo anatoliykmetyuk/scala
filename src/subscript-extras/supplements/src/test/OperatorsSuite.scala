@@ -5,7 +5,7 @@ package subscript.test
 import org.junit._
 import org.junit.runner.RunWith
 import subscript.DSL._
-import subscript.vm.{N_code_unsure, SimpleScriptDebugger}
+import subscript.vm.{N_code_unsure, SimpleScriptDebugger, Script}
 import subscript.vm.executor._
 import subscript.vm.model.template.TemplateNode.Child
 import subscript.vm.model.callgraph._
@@ -166,7 +166,7 @@ class OperatorsSuite {
   /*
    * Low level stuff
    */
-  def testScriptBehaviours(scriptDef: Script[Unit], scriptString: String, behaviours: String) {
+  def testScriptBehaviours(scriptDef: Script[Any], scriptString: String, behaviours: String) {
     
     import scala.util.matching.Regex
     val pattern = new Regex(" +") // replace all multispaces by a single space, just before splitting behaviours:
@@ -186,10 +186,10 @@ class OperatorsSuite {
   
   var expectedAtomsAtEndOfInput: Option[List[Char]] = None
   var scriptSuccessAtEndOfInput: Option[Boolean]    = None
-  var executor: ScriptExecutor = null
+  var executor: ScriptExecutor[Any] = null
   var currentTestIndex = 0
 
-  def testScriptBehaviour(scriptDef: Script[Unit], scriptString: String, input: String, expectedResult: String, expectTestFailure: Boolean) {
+  def testScriptBehaviour(scriptDef: Script[Any], scriptString: String, input: String, expectedResult: String, expectTestFailure: Boolean) {
     
     currentTestIndex += 1
     
@@ -252,12 +252,12 @@ class OperatorsSuite {
   def remove1Element[T](list: List[T], elt: T): List[T] = list diff List(elt)
   
   // add expectation of the given atom; also prepares for the symmetric to unexpect during the inevitable deactivation
-  def expect   (where: N_code_unsure, atom: Char) {where.onDeactivate(unexpect(where, atom)); expectedAtoms ::= atom}
+  def expect   (where: N_code_unsure[_], atom: Char) {where.onDeactivate(unexpect(where, atom)); expectedAtoms ::= atom}
   // remove expectation of the given atom
-  def unexpect (where: N_code_unsure, atom: Char) {expectedAtoms = remove1Element(expectedAtoms, atom)}
+  def unexpect (where: N_code_unsure[_], atom: Char) {expectedAtoms = remove1Element(expectedAtoms, atom)}
   
   // try to accept the token from the input (if any); match it to the current atom.
-  def tryAccept(where: N_code_unsure, atom: Char) {
+  def tryAccept(where: N_code_unsure[_], atom: Char) {
     if (inputStream.isEmpty || !expectedAtoms.contains(inputStream.head)) {
        where.result = ExecutionResult.Failure; 
        if (expectedAtomsAtEndOfInput== None) {
@@ -527,7 +527,7 @@ class OperatorsSuite {
   def testBehaviours: Unit = {
     val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
     for ( (key, behaviours) <- behaviours) {
-      val aScript = key.asInstanceOf[Script[Unit]]
+      val aScript = key.asInstanceOf[Script[Any]]
       val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
     }
