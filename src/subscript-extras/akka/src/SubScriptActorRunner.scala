@@ -30,7 +30,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
   
   // Don't do heavy operations until needed
   lazy val system = ActorSystem()
-  lazy val executor = ScriptExecutorFactory.createScriptExecutor(true)
+  lazy val executor = ScriptExecutorFactory.createScriptExecutor[Any](true)
   
   var launch_anchor: N_launch_anchor = null
   

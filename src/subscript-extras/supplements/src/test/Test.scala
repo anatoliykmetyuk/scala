@@ -4,7 +4,7 @@ import org.junit.runner.RunWith
 
 import subscript.Predef._
 import subscript.DSL._
-import subscript.vm.{N_code_unsure, SimpleScriptDebugger}
+import subscript.vm.{N_code_unsure, SimpleScriptDebugger, Script}
 import subscript.vm.model.callgraph._
 import subscript.vm.executor._
 
@@ -17,8 +17,8 @@ class TestC {
                                key(?c)  {println(s"key =>  $c")}
                                key('!') {println("key <= '!'")}
 
-  val times1: Int=>Script[Unit] = n=>{_script(this, 'lambda) {_while{implicit here=>pass<n}}}
-  val times2: Int=>Script[Unit] = n=> [ while(here.pass < n) ]
+  val times1: Int=>Script[Any] = n=>{_script(this, 'lambda) {script => _while{implicit here=>pass<n}}}
+  val times2: Int=>Script[Any] = n=> [ while(here.pass < n) ]
   //val times3: Int=>Script =     [ while(pass < _) ]
   //val noXml = [noXML]
 
