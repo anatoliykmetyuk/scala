@@ -637,6 +637,7 @@ trait DefaultHandlers {this: ScriptExecutor[_] with Tracer =>
     
     message.node.activationMode = ActivationMode.Active
     
+    // ??? is this right ???
     def actNext = !(activationEnded || activationEndedOptionally)
     if (n.hadFullBreak) activationEnded = true
     else if (nextActivationTemplateIndex==message.node.template.children.size) {
