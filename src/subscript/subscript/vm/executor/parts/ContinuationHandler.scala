@@ -89,19 +89,18 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
       val s = message.success
       val b = message.break
       
-      def childNodeAndActivate(msg: {def child: CallGraphNode}) {
-        activateNextOrEnded = true
-        childNode = msg.child
-      }
-      
       if (b!=null) {
-        childNodeAndActivate(b)
+        activateNextOrEnded = true
+        childNode = b.child
         if (b.activationMode==ActivationMode.Optional)
           activationEndedOptionally = true
         else node.mustBreak
       }
       
-      if (s!=null) childNodeAndActivate(s)
+      if (s!=null) {
+        activateNextOrEnded = true
+        childNode = s.child
+      }
     }
     
     private def parallel: Unit =
