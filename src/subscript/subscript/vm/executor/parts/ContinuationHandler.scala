@@ -57,9 +57,9 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     }
     
     var childNode: CallGraphNode = null // may indicate node from which the a message came
-  } 
+  }
+  
   trait ProgressState {this: Stateful =>
-    var activateNextOrEnded       = false
     var activateNext              = false
     var activationEnded           = false
     var activationEndedOptionally = false
@@ -69,6 +69,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     
     var shouldSucceed = false    
   }
+  
   trait ExclusionState {this: Stateful =>
     var nodesToBeExcluded : Seq[CallGraphNode.Child] = null
     var nodesToBeSuspended: Seq[CallGraphNode.Child] = null    
@@ -77,17 +78,14 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
 
   
   trait ProgressDecisions extends Stateful {
+    private var activateNextOrEnded = false
+    
     def decideProgress {
-      // Decide on progress type. Two cases: sequential
-      // or parallel operators.
-      if (isSequential) sequential else parallel
-      
-      // If we can progress, clarify how exactly:
-      // activateNext or activationEnded
+      if (isSequential       ) sequential else parallel
       if (activateNextOrEnded) clarifyProgress
     }
     
-    def sequential {
+    private def sequential {
       val s = message.success
       val b = message.break
       
@@ -106,7 +104,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
       if (s!=null) childNodeAndActivate(s)
     }
     
-    def parallel: Unit =
+    private def parallel: Unit =
       if (node.activationMode!=ActivationMode.Inactive)
         node.template.kind match {
 //          case "%" => parallelPercent 
@@ -140,12 +138,31 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
           case _
           => parallelOther
       }
-       
+    
+    private def clarifyProgress  {
+      // old: childNode = if (T_n_ary.isLeftMerge(node.template.kind)) node.lastActivatedChild else message.childNode ; now done before
+      nextActivationTemplateIndex = childNode.template.indexAsChild+1
+      nextActivationPass = childNode.pass
+      
+      message.node.activationMode = ActivationMode.Active
+      
+      def ackNext = !(activationEnded || activationEndedOptionally)
+      if (node.hadFullBreak) activationEnded = true
+      else if (nextActivationTemplateIndex==message.node.template.children.size) {
+        if (message.node.isIteration) {
+          nextActivationTemplateIndex = 0
+          nextActivationPass += 1
+          activateNext = ackNext
+        }
+        else activationEnded = true
+      }
+      else activateNext = ackNext
+    }
     
     /**
      * This is commented out.
      */
-    def parallelPercent {
+    private def parallelPercent {
 //      case "%" => val d = message.deactivations; 
 //                  val b = message.break
 //                  if (d!=Nil) {
@@ -159,7 +176,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     /**
      * "+" node activations may be broken by "." if no atomic actions had been activated
      */
-    def parallelPlus {
+    private def parallelPlus {
       val a = message.aaActivated
       val c = message.caActivated
       val b = message.break
@@ -171,7 +188,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
       if (activateNextOrEnded) childNode = node.lastActivatedChild         
     }
     
-    def parallelLeftMerge {
+    private def parallelLeftMerge {
        val aa = message.aaActivated
        val ca = message.caActivated
        val as = message.aaHappeneds
@@ -189,12 +206,12 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
      * (-) / . / a     => no pause; a is optional
      *  a  / . / b     => pause; after a happens / is done
      */
-    def parallelInterrupt =
-    if (
-      message.aaHappeneds.exists
-        {_.node.index > node.indexChild_marksOptionalPart} &&
-      message.deactivations==Nil
-    ) switchOptionalPart(false)
+    private def parallelInterrupt =
+      if (
+        message.aaHappeneds.exists
+          {_.node.index > node.indexChild_marksOptionalPart} &&
+        message.deactivations==Nil
+      ) switchOptionalPart(false)
     
     /**
      *       . & a     => no pause; a is optional
@@ -202,17 +219,17 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
      *  a  & . & b     => pause; after a happens b is activated as optional
      * 
      */
-    def parallelBreakPause {
+    private def parallelBreakPause {
       if (doTrace) traceAttributes(node, "A")
       switchOptionalPart(false)
     }
     
-    def parallelBreakOptional {
+    private def parallelBreakOptional {
       if (doTrace) traceAttributes(node, "B")
       switchOptionalPart(false)
     }
     
-    def parallelOther {
+    private def parallelOther {
        val b = message.break
        if (b==null) {
          if (message.aaHappeneds != Nil || message.activation != null) {
@@ -221,8 +238,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
            childNode = node.lastActivatedChild
          }
          else if (doTrace) traceAttributes(node, "D")
-  
-       } 
+       }
        else if (b.activationMode==ActivationMode.Optional) {
          if (node.aaActivated_optional) {
            if (doTrace) traceAttributes(node, "E")
@@ -244,7 +260,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     
     // TBD: come up with more meaningful names for the
     // method and its argument
-    def switchOptionalPart(toOptional: Boolean = false) {
+    private def switchOptionalPart(toOptional: Boolean = false) {
       activateNextOrEnded = true
       
       if (!toOptional) {
@@ -261,94 +277,85 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
       node.indexChild_marksPause        = -1
       childNode = node.lastActivatedChild
     }
-    
-    def clarifyProgress  {
-      // old: childNode = if (T_n_ary.isLeftMerge(node.template.kind)) node.lastActivatedChild else message.childNode ; now done before
-      nextActivationTemplateIndex = childNode.template.indexAsChild+1
-      nextActivationPass = childNode.pass
-      
-      message.node.activationMode = ActivationMode.Active
-      
-      // ??? is this right ???
-      def actNext = !(activationEnded || activationEndedOptionally)
-      if (node.hadFullBreak) activationEnded = true
-      else if (nextActivationTemplateIndex==message.node.template.children.size) {
-        if (message.node.isIteration) {
-          nextActivationTemplateIndex = 0
-          nextActivationPass += 1
-          activateNext = actNext
-        }
-        else {
-          activationEnded = true
-        }
-      }
-      else {
-        activateNext = actNext
-      }  
-    }
   }
   trait ExclusionDecisions extends Stateful {
-    def decideExclusion {
-      // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
-      node.template.kind match {
-  
-        case "/" | "|/" 
-          | "|/|"        => // deactivate to the right when one has finished successfully
-                        // TBD: something goes wrong here; LookupFrame2 does not "recover" from a Cancel search
-                            message.deactivations match {
-                              case d::tail => if (d.child.hasSuccess && !d.excluded) {
-                                nodesToBeExcluded = node.children.filter(_.index>d.child.index)
-                              }
-                              case _ =>
-                            }
-                    
-        case "&&"  | "||" 
-           | "&&:" | "||:" => val isLogicalOr = T_n_ary_op.getLogicalKind(node.template.kind)==LogicalKind.Or
-                              // TBD: better descriptive name for consideredNodes
-                              val consideredNodes = message.deactivations.map(_.child).filter(
-                                 (c: CallGraphNode) => c.hasSuccess==isLogicalOr)
-                              if (!consideredNodes.isEmpty) {
-                                nodesToBeExcluded = node.children diff consideredNodes
-                                activateNext = false
-                              }
+    
+    def decideExclusion = node.template.kind match {
+      case "/"  | "|/"  | "|/|"        => interrupt
+      case "&&" | "&&:" | "||" | "||:" => parallel
+      case _ =>
+    }
+
+    private def interrupt {
+      // deactivate to the right when one has finished successfully
+      // TBD: something goes wrong here; LookupFrame2 does not "recover" from a Cancel search
+      message.deactivations match {
+        case d::tail if d.child.hasSuccess && !d.excluded =>
+          nodesToBeExcluded = node.children.filter(_.index>d.child.index)
+        
         case _ =>
       }
     }
-  } 
-  trait SuccessDecisions extends Stateful {
-    def decideSuccess {
-      // decide further on success and resumptions
-      if (!shouldSucceed && !node.hasSuccess) { // could already have been set for .. as child of ;
+    
+    private def parallel {
+      val isLogicalOr = T_n_ary_op.getLogicalKind(node.template.kind)==LogicalKind.Or
+      /* 
+       * Result decisive nodes are the nodes that decide
+       * the result of the whole operator.
+       * For example, one single node that ended in success decides
+       * the result of an Or-parallel operator, and one single node that
+       * ended with failure decides the result of an And-parallel operator.
+       */
+      val resultDecisiveNodes = message.deactivations.
+        map(_.child).
+        filter(_.hasSuccess==isLogicalOr)
         
-        // TBD: improve
-        //var nodesToBeResumed: Buffer[CallGraphNode] = null
-        //if (message.success != null || message.aaHappeneds != Nil) {
-        node.template.kind match {
-              case ";" => shouldSucceed = activationEnded || activationEndedOptionally
-              case "/" => shouldSucceed = message.success != null ||
-                                          message.aaHappeneds.exists(_.child.index<node.rightmostChildThatEndedInSuccess_index) || 
-                                      node.nActivatedChildrenWithSuccess > 0
-              case _ =>
-                T_n_ary_op.getLogicalKind(node.template.kind) match {
-                  case LogicalKind.None =>
-                  case LogicalKind.And  => shouldSucceed = !activateNext &&
-                                                           node.nActivatedMandatoryChildrenWithoutSuccess == 0
-                  case LogicalKind.Or   => shouldSucceed = node.nActivatedChildrenWithSuccess > 0
-                    }
-        }
+      if (!resultDecisiveNodes.isEmpty) {
+        nodesToBeExcluded = node.children diff resultDecisiveNodes
+        activateNext = false
       }
     }
   }
-  trait DecisionsExecution extends Stateful {
-    def executeDecisions {  
-      // Succeed
-      if (shouldSucceed) insert(Success(node))   // TBD: prevent multiple successes at same "time"
+  trait SuccessDecisions extends Stateful {
+    
+    def decideSuccess = if (!shouldSucceed && !node.hasSuccess)
+      node.template.kind match {
+        case ";" => sequential
+        case "/" => interrupt
+        
+        case _   => T_n_ary_op.getLogicalKind(node.template.kind) match {
+          case LogicalKind.None =>
+          case LogicalKind.And  => logicalAnd
+          case LogicalKind.Or   => logicalOr
+        }
+      }
       
-      // do exclusions and suspensions
+    private def sequential = shouldSucceed = activationEnded || activationEndedOptionally
+    
+    private def interrupt  = shouldSucceed = message.success != null ||
+                                     message.aaHappeneds.exists(_.child.index<node.rightmostChildThatEndedInSuccess_index) || 
+                                     node.nActivatedChildrenWithSuccess > 0
+        
+    private def logicalAnd  = shouldSucceed = !activateNext &&
+                      node.nActivatedMandatoryChildrenWithoutSuccess == 0
+   
+    private def logicalOr   = shouldSucceed = node.nActivatedChildrenWithSuccess > 0
+  }
+  trait DecisionsExecution extends Stateful {
+    def executeDecisions {
+      succeed
+      exclude
+      activate
+    }
+    
+    private def succeed = if (shouldSucceed) insert(Success(node))   // TBD: prevent multiple successes at same "time"
+    
+    private def exclude = {
       if (nodesToBeExcluded !=null) nodesToBeExcluded .foreach(n => insert(Exclude(node, n)))
       if (nodesToBeSuspended!=null) nodesToBeSuspended.foreach(n => insert(Suspend(      n)))
-  
-      // do activation    
+    }
+    
+    private def activate {
       if (isSequential) activateNext = activateNext && node.children.isEmpty
       if (activateNext) {
         val t = message.node.template.children(nextActivationTemplateIndex)
@@ -356,15 +363,12 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
         val activation = if (message.activation != null) message.activation else Activation(message.node)
         
         val nary_op_isLeftMerge = node match {
-          case nary@N_n_ary_op (t: T_n_ary, isLeftMerge) => isLeftMerge case _ => false
+          case N_n_ary_op (t: T_n_ary, isLeftMerge) => isLeftMerge
+          case _                                    => false
         }
         if (!nary_op_isLeftMerge) insertContinuation(activation, node)
       }
-      else if (node.children.isEmpty) {
-        insertDeactivation(node, null)
-      }
-        
-      // decide on deactivation of n
+      else if (node.children.isEmpty) insertDeactivation(node, null)
     }
   }
 
