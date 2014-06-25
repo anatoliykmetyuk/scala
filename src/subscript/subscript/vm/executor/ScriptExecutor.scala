@@ -121,6 +121,7 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
   msgQueue addListener new MessageQueuedNotifier(this)
   msgHandlers sInsert defaultHandler
   msgHandlers sInsert communicationHandler
+  msgHandlers sInsert continuationHandler
   
   def run[R<:S](s: Script[R]) = {
     initializeExecution(s)
