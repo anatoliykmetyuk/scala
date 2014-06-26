@@ -1,0 +1,2782 @@
+++ 1 Activation  3 live
+-- 1 Activation  3 live
+>> 1 Activation  3 live
+++ 2 Activation  4 ||
+-- 2 Activation  4 ||
+>> 2 Activation  4 ||
+++ 3 Activation  5 ;
+++ 4 Continuation  4 || {2 Activation  4 ||,  5 ;}  4 || S=false nActivated=1 (=0S+1N)
+-- 3 Activation  5 ;
+>> 3 Activation  5 ;
+++ 5 Activation  6 ...
+++ 6 Continuation  5 ; {3 Activation  5 ;,  6 ...}  5 ; S=false nActivated=1 (=0S+1N)
+-- 5 Activation  6 ...
+>> 5 Activation  6 ...
+++ 7 Success  6 ...
+++ 8 Deactivation  6 ...
+-- 7 Success  6 ...
+>> 7 Success  6 ...
+++ 9 Success  5 ; ...
+-- 9 Success  5 ; ...
+>> 9 Success  5 ; ...
+** 6 Continuation  5 ; ... {3 Activation  5 ; ..., 9 Success  5 ; ...,  6 ...}  5 ; S=false nActivated=1 (=1S+0N)
+-- 8 Deactivation  6 ...
+>> 8 Deactivation  6 ...
+++ 10 Deactivation  5 ; ...
+-- 10 Deactivation  5 ; ...
+>> 10 Deactivation  5 ; ...
+** 6 Continuation  5 ; ... {3 Activation  5 ; ..., 10 Deactivation  5 ; ..., 9 Success  5 ; ...,  6 ...}  5 ; S=false nActivated=1 (=1S+0N)
+-- 6 Continuation  5 ; ... {3 Activation  5 ; ..., 10 Deactivation  5 ; ..., 9 Success  5 ; ...,  6 ...}  5 ; S=false nActivated=1 (=1S+0N)
+>> 6 Continuation  5 ; ... {3 Activation  5 ; ..., 10 Deactivation  5 ; ..., 9 Success  5 ; ...,  6 ...}  5 ; S=false nActivated=1 (=1S+0N)
+++ 11 Activation  7 searchSequence
+++ 12 Continuation  5 ; ... {3 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 11 Activation  7 searchSequence
+>> 11 Activation  7 searchSequence
+++ 13 Activation  8 searchSequence
+-- 13 Activation  8 searchSequence
+>> 13 Activation  8 searchSequence
+++ 14 Activation  9 ;
+-- 14 Activation  9 ;
+>> 14 Activation  9 ;
+++ 15 Activation 10 guard
+++ 16 Continuation  9 ; {14 Activation  9 ;, 10 guard}  9 ; S=false nActivated=1 (=0S+1N)
+-- 15 Activation 10 guard
+>> 15 Activation 10 guard
+++ 17 Activation 11 guard
+-- 17 Activation 11 guard
+>> 17 Activation 11 guard
+++ 18 Activation 12 ;
+-- 18 Activation 12 ;
+>> 18 Activation 12 ;
+++ 19 Activation 13 if-else
+++ 20 Continuation 12 ; {18 Activation 12 ;, 13 if-else} 12 ; S=false nActivated=1 (=0S+1N)
+-- 19 Activation 13 if-else
+>> 19 Activation 13 if-else
+++ 21 Activation 14 ...
+-- 21 Activation 14 ...
+>> 21 Activation 14 ...
+++ 22 Success 14 ...
+++ 23 Deactivation 14 ...
+-- 22 Success 14 ...
+>> 22 Success 14 ...
+++ 24 Success 13 if-else
+-- 24 Success 13 if-else
+>> 24 Success 13 if-else
+++ 25 Success 12 ; ...
+-- 25 Success 12 ; ...
+>> 25 Success 12 ; ...
+** 20 Continuation 12 ; ... {18 Activation 12 ; ..., 25 Success 12 ; ..., 13 if-else} 12 ; S=false nActivated=1 (=1S+0N)
+-- 23 Deactivation 14 ...
+>> 23 Deactivation 14 ...
+++ 26 Deactivation 13 if-else
+-- 26 Deactivation 13 if-else
+>> 26 Deactivation 13 if-else
+++ 27 Deactivation 12 ; ...
+-- 27 Deactivation 12 ; ...
+>> 27 Deactivation 12 ; ...
+** 20 Continuation 12 ; ... {18 Activation 12 ; ..., 27 Deactivation 12 ; ..., 25 Success 12 ; ..., 13 if-else} 12 ; S=false nActivated=1 (=1S+0N)
+-- 20 Continuation 12 ; ... {18 Activation 12 ; ..., 27 Deactivation 12 ; ..., 25 Success 12 ; ..., 13 if-else} 12 ; S=false nActivated=1 (=1S+0N)
+>> 20 Continuation 12 ; ... {18 Activation 12 ; ..., 27 Deactivation 12 ; ..., 25 Success 12 ; ..., 13 if-else} 12 ; S=false nActivated=1 (=1S+0N)
+++ 28 Activation 15 anyEvent
+++ 29 Continuation 12 ; ... {18 Activation 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=1S+1N)
+-- 28 Activation 15 anyEvent
+>> 28 Activation 15 anyEvent
+++ 30 Activation 16 anyEvent
+-- 30 Activation 16 anyEvent
+>> 30 Activation 16 anyEvent
+++ 31 Activation 17 event
+-- 31 Activation 17 event
+>> 31 Activation 17 event
+++ 32 Activation 18 event
+-- 32 Activation 18 event
+>> 32 Activation 18 event
+++ 33 Activation 19 @:
+-- 33 Activation 19 @:
+>> 33 Activation 19 @:
+++ 34 Activation 20 {.}
+-- 34 Activation 20 {.}
+>> 34 Activation 20 {.}
+-- 29 Continuation 12 ; ... {18 Activation 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=1S+1N)
+>> 29 Continuation 12 ; ... {18 Activation 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=1S+1N)
+-- 16 Continuation  9 ; {14 Activation  9 ;, 10 guard}  9 ; S=false nActivated=1 (=0S+1N)
+>> 16 Continuation  9 ; {14 Activation  9 ;, 10 guard}  9 ; S=false nActivated=1 (=0S+1N)
+-- 12 Continuation  5 ; ... {3 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 12 Continuation  5 ; ... {3 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 4 Continuation  4 || {2 Activation  4 ||,  5 ; ...}  4 || S=false nActivated=1 (=0S+1N)
+>> 4 Continuation  4 || {2 Activation  4 ||,  5 ; ...}  4 || S=false nActivated=1 (=0S+1N)
+++ 35 Activation 21 doExit
+++ 36 Continuation  4 || {2 Activation  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+-- 35 Activation 21 doExit
+>> 35 Activation 21 doExit
+++ 37 Activation 22 doExit
+-- 37 Activation 22 doExit
+>> 37 Activation 22 doExit
+++ 38 Activation 23 ;
+-- 38 Activation 23 ;
+>> 38 Activation 23 ;
+++ 39 Activation 24 exitCommand
+++ 40 Continuation 23 ; {38 Activation 23 ;, 24 exitCommand} 23 ; S=false nActivated=1 (=0S+1N)
+-- 39 Activation 24 exitCommand
+>> 39 Activation 24 exitCommand
+++ 41 Activation 25 exitCommand
+-- 41 Activation 25 exitCommand
+>> 41 Activation 25 exitCommand
+++ 42 Activation 26 +
+-- 42 Activation 26 +
+>> 42 Activation 26 +
+++ 43 Activation 27 exitButton
+++ 44 Continuation 26 + {42 Activation 26 +, 27 exitButton} 26 + S=false nActivated=1 (=0S+1N)
+-- 43 Activation 27 exitButton
+>> 43 Activation 27 exitButton
+++ 45 Activation 28 clicked
+-- 45 Activation 28 clicked
+>> 45 Activation 28 clicked
+++ 46 Activation 29 event
+-- 46 Activation 29 event
+>> 46 Activation 29 event
+++ 47 Activation 30 event
+-- 47 Activation 30 event
+>> 47 Activation 30 event
+++ 48 Activation 31 @:
+-- 48 Activation 31 @:
+>> 48 Activation 31 @:
+++ 49 Activation 32 {.}
+-- 49 Activation 32 {.}
+>> 49 Activation 32 {.}
+-- 44 Continuation 26 + {42 Activation 26 +, 27 exitButton} 26 + S=false nActivated=1 (=0S+1N)
+>> 44 Continuation 26 + {42 Activation 26 +, 27 exitButton} 26 + S=false nActivated=1 (=0S+1N)
+++ 50 Activation 33 windowClosing
+++ 51 Continuation 26 + {42 Activation 26 +, 26 +} 26 + S=false nActivated=2 (=0S+2N)
+-- 50 Activation 33 windowClosing
+>> 50 Activation 33 windowClosing
+++ 52 Activation 34 windowClosing
+-- 52 Activation 34 windowClosing
+>> 52 Activation 34 windowClosing
+++ 53 Activation 35 event
+-- 53 Activation 35 event
+>> 53 Activation 35 event
+++ 54 Activation 36 event
+-- 54 Activation 36 event
+>> 54 Activation 36 event
+++ 55 Activation 37 @:
+-- 55 Activation 37 @:
+>> 55 Activation 37 @:
+++ 56 Activation 38 {.}
+-- 56 Activation 38 {.}
+>> 56 Activation 38 {.}
+-- 51 Continuation 26 + {42 Activation 26 +, 26 +} 26 + S=false nActivated=2 (=0S+2N)
+>> 51 Continuation 26 + {42 Activation 26 +, 26 +} 26 + S=false nActivated=2 (=0S+2N)
+-- 40 Continuation 23 ; {38 Activation 23 ;, 24 exitCommand} 23 ; S=false nActivated=1 (=0S+1N)
+>> 40 Continuation 23 ; {38 Activation 23 ;, 24 exitCommand} 23 ; S=false nActivated=1 (=0S+1N)
+-- 36 Continuation  4 || {2 Activation  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 36 Continuation  4 || {2 Activation  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=1 (=0S+1N)
+  |    *                      10 guard
+  |     *                     11 guard
+--|------*--------------------12 ; S=false nActivated=2 (=1S+1N)
+  |       *                   15 anyEvent
+  |        *                  16 anyEvent
+  |         *                 17 event
+  |          *                18 event
+--|-----------*---------------19 @:
+  |            *              20 {.}
+   *                          21 doExit
+    *                         22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+------*-----------------------24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+        |*                    27 exitButton
+        | *                   28 clicked
+--------|--*------------------29 event
+        |   *                 30 event
+        |    *                31 @:
+        |     *               32 {.}
+         *                    33 windowClosing
+----------*-------------------34 windowClosing
+           *                  35 event
+            *                 36 event
+             *                37 @:
+              *               38 {.}
+=== Messages ===
+=== End ===
+++ 57 AAExecutionFinished 20 {.}
+-- 57 AAExecutionFinished 20 {.}
+>> 57 AAExecutionFinished 20 {.}
+++ 58 AAHappened 20 {.}
+++ 59 Success 20 {.}
+++ 60 Deactivation 20 {.}
+-- 58 AAHappened 20 {.}
+>> 58 AAHappened 20 {.}
+++ 61 AAHappened 19 @:
+-- 61 AAHappened 19 @:
+>> 61 AAHappened 19 @:
+++ 62 AAHappened 18 event
+-- 62 AAHappened 18 event
+>> 62 AAHappened 18 event
+++ 63 AAHappened 17 event
+-- 63 AAHappened 17 event
+>> 63 AAHappened 17 event
+++ 64 AAHappened 16 anyEvent
+-- 64 AAHappened 16 anyEvent
+>> 64 AAHappened 16 anyEvent
+++ 65 AAHappened 15 anyEvent
+-- 65 AAHappened 15 anyEvent
+>> 65 AAHappened 15 anyEvent
+++ 66 AAHappened 12 ; ...
+-- 66 AAHappened 12 ; ...
+>> 66 AAHappened 12 ; ...
+++ 67 Continuation 12 ; ... {66 AAHappened 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=1S+1N)
+++ 68 AAHappened 11 guard
+-- 68 AAHappened 11 guard
+>> 68 AAHappened 11 guard
+++ 69 AAHappened 10 guard
+-- 69 AAHappened 10 guard
+>> 69 AAHappened 10 guard
+++ 70 AAHappened  9 ;
+-- 70 AAHappened  9 ;
+>> 70 AAHappened  9 ;
+++ 71 Continuation  9 ; {70 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=1 (=0S+1N)
+++ 72 AAHappened  8 searchSequence
+-- 72 AAHappened  8 searchSequence
+>> 72 AAHappened  8 searchSequence
+++ 73 AAHappened  7 searchSequence
+-- 73 AAHappened  7 searchSequence
+>> 73 AAHappened  7 searchSequence
+++ 74 AAHappened  5 ; ...
+-- 74 AAHappened  5 ; ...
+>> 74 AAHappened  5 ; ...
+++ 75 Continuation  5 ; ... {74 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 76 AAHappened  4 ||
+-- 76 AAHappened  4 ||
+>> 76 AAHappened  4 ||
+++ 77 Continuation  4 || {76 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 78 AAHappened  3 live
+-- 78 AAHappened  3 live
+>> 78 AAHappened  3 live
+++ 79 AAHappened  2 <root>
+-- 79 AAHappened  2 <root>
+>> 79 AAHappened  2 <root>
+++ 80 AAHappened  1 **
+-- 80 AAHappened  1 **
+>> 80 AAHappened  1 **
+-- 59 Success 20 {.}
+>> 59 Success 20 {.}
+++ 81 Success 19 @:
+-- 81 Success 19 @:
+>> 81 Success 19 @:
+++ 82 Success 18 event
+-- 82 Success 18 event
+>> 82 Success 18 event
+++ 83 Success 17 event
+-- 83 Success 17 event
+>> 83 Success 17 event
+++ 84 Success 16 anyEvent
+-- 84 Success 16 anyEvent
+>> 84 Success 16 anyEvent
+++ 85 Success 15 anyEvent
+-- 85 Success 15 anyEvent
+>> 85 Success 15 anyEvent
+++ 86 Success 12 ; ...
+-- 86 Success 12 ; ...
+>> 86 Success 12 ; ...
+** 67 Continuation 12 ; ... {86 Success 12 ; ..., 66 AAHappened 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=2S+0N)
+-- 60 Deactivation 20 {.}
+>> 60 Deactivation 20 {.}
+++ 87 Deactivation 19 @:
+-- 87 Deactivation 19 @:
+>> 87 Deactivation 19 @:
+++ 88 Deactivation 18 event
+-- 88 Deactivation 18 event
+>> 88 Deactivation 18 event
+++ 89 Deactivation 17 event
+-- 89 Deactivation 17 event
+>> 89 Deactivation 17 event
+++ 90 Deactivation 16 anyEvent
+-- 90 Deactivation 16 anyEvent
+>> 90 Deactivation 16 anyEvent
+++ 91 Deactivation 15 anyEvent
+-- 91 Deactivation 15 anyEvent
+>> 91 Deactivation 15 anyEvent
+++ 92 Deactivation 12 ; ...
+-- 92 Deactivation 12 ; ...
+>> 92 Deactivation 12 ; ...
+** 67 Continuation 12 ; ... {92 Deactivation 12 ; ..., 86 Success 12 ; ..., 66 AAHappened 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=2S+0N)
+-- 67 Continuation 12 ; ... {92 Deactivation 12 ; ..., 86 Success 12 ; ..., 66 AAHappened 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=2S+0N)
+>> 67 Continuation 12 ; ... {92 Deactivation 12 ; ..., 86 Success 12 ; ..., 66 AAHappened 12 ; ..., 12 ; ...} 12 ; S=false nActivated=2 (=2S+0N)
+++ 93 Activation 39 if-else
+++ 94 Continuation 12 ; ... {-1 Activation 12 ; ..., 12 ; ...} 12 ; S=false nActivated=3 (=2S+1N)
+-- 93 Activation 39 if-else
+>> 93 Activation 39 if-else
+++ 95 Activation 40 ..
+-- 95 Activation 40 ..
+>> 95 Activation 40 ..
+++ 96 Success 40 ..
+++ 97 Deactivation 40 ..
+++ 98 Break 40 ..
+-- 98 Break 40 ..
+>> 98 Break 40 ..
+++ 99 Break 39 if-else
+-- 99 Break 39 if-else
+>> 99 Break 39 if-else
+++ 100 Break 12 ; ...
+-- 100 Break 12 ; ...
+>> 100 Break 12 ; ...
+** 94 Continuation 12 ; ... {-1 Activation 12 ; ..., 100 Break 12 ; ..., 12 ; ...} 12 ; S=false nActivated=3 (=2S+1N)
+-- 96 Success 40 ..
+>> 96 Success 40 ..
+++ 101 Success 39 if-else
+-- 101 Success 39 if-else
+>> 101 Success 39 if-else
+++ 102 Success 12 ; ...
+-- 102 Success 12 ; ...
+>> 102 Success 12 ; ...
+** 94 Continuation 12 ; ... {-1 Activation 12 ; ..., 102 Success 12 ; ..., 100 Break 12 ; ..., 12 ; ...} 12 ; S=false nActivated=3 (=3S+0N)
+-- 97 Deactivation 40 ..
+>> 97 Deactivation 40 ..
+++ 103 Deactivation 39 if-else
+-- 103 Deactivation 39 if-else
+>> 103 Deactivation 39 if-else
+++ 104 Deactivation 12 ; ...
+-- 104 Deactivation 12 ; ...
+>> 104 Deactivation 12 ; ...
+** 94 Continuation 12 ; ... {-1 Activation 12 ; ..., 104 Deactivation 12 ; ..., 102 Success 12 ; ..., 100 Break 12 ; ..., 12 ; ...} 12 ; S=false nActivated=3 (=3S+0N)
+-- 94 Continuation 12 ; ... {-1 Activation 12 ; ..., 104 Deactivation 12 ; ..., 102 Success 12 ; ..., 100 Break 12 ; ..., 12 ; ...} 12 ; S=false nActivated=3 (=3S+0N)
+>> 94 Continuation 12 ; ... {-1 Activation 12 ; ..., 104 Deactivation 12 ; ..., 102 Success 12 ; ..., 100 Break 12 ; ..., 12 ; ...} 12 ; S=false nActivated=3 (=3S+0N)
+++ 105 Activation 41 anyEvent
+++ 106 Continuation 12 ; ... {-1 Activation 12 ; ..., 12 ; ...} 12 ; S=false nActivated=4 (=3S+1N)
+++ 107 Success 12 ; ...
+-- 107 Success 12 ; ...
+>> 107 Success 12 ; ...
+++ 108 Success 11 guard
+-- 108 Success 11 guard
+>> 108 Success 11 guard
+++ 109 Success 10 guard
+-- 109 Success 10 guard
+>> 109 Success 10 guard
+++ 110 Success  9 ;
+-- 110 Success  9 ;
+>> 110 Success  9 ;
+** 71 Continuation  9 ; {110 Success  9 ;, 70 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=1 (=1S+0N)
+-- 105 Activation 41 anyEvent
+>> 105 Activation 41 anyEvent
+++ 111 Activation 42 anyEvent
+-- 111 Activation 42 anyEvent
+>> 111 Activation 42 anyEvent
+++ 112 Activation 43 event
+-- 112 Activation 43 event
+>> 112 Activation 43 event
+++ 113 Activation 44 event
+-- 113 Activation 44 event
+>> 113 Activation 44 event
+++ 114 Activation 45 @:
+-- 114 Activation 45 @:
+>> 114 Activation 45 @:
+++ 115 Activation 46 {.}
+-- 115 Activation 46 {.}
+>> 115 Activation 46 {.}
+-- 106 Continuation 12 ; ... {-1 Activation 12 ; ..., 12 ; ...} 12 ; S=true nActivated=4 (=3S+1N)
+>> 106 Continuation 12 ; ... {-1 Activation 12 ; ..., 12 ; ...} 12 ; S=true nActivated=4 (=3S+1N)
+-- 71 Continuation  9 ; {110 Success  9 ;, 70 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=1 (=1S+0N)
+>> 71 Continuation  9 ; {110 Success  9 ;, 70 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=1 (=1S+0N)
+++ 116 Activation 47 searchCommand
+++ 117 Continuation  9 ; {-1 Activation  9 ;,  9 ;}  9 ; S=false nActivated=2 (=1S+1N)
+-- 116 Activation 47 searchCommand
+>> 116 Activation 47 searchCommand
+++ 118 Activation 48 searchCommand
+-- 118 Activation 48 searchCommand
+>> 118 Activation 48 searchCommand
+++ 119 Activation 49 +
+-- 119 Activation 49 +
+>> 119 Activation 49 +
+++ 120 Activation 50 searchButton
+++ 121 Continuation 49 + {119 Activation 49 +, 50 searchButton} 49 + S=false nActivated=1 (=0S+1N)
+-- 120 Activation 50 searchButton
+>> 120 Activation 50 searchButton
+++ 122 Activation 51 clicked
+-- 122 Activation 51 clicked
+>> 122 Activation 51 clicked
+++ 123 Activation 52 event
+-- 123 Activation 52 event
+>> 123 Activation 52 event
+++ 124 Activation 53 event
+-- 124 Activation 53 event
+>> 124 Activation 53 event
+++ 125 Activation 54 @:
+-- 125 Activation 54 @:
+>> 125 Activation 54 @:
+++ 126 Activation 55 {.}
+-- 126 Activation 55 {.}
+>> 126 Activation 55 {.}
+-- 121 Continuation 49 + {119 Activation 49 +, 50 searchButton} 49 + S=false nActivated=1 (=0S+1N)
+>> 121 Continuation 49 + {119 Activation 49 +, 50 searchButton} 49 + S=false nActivated=1 (=0S+1N)
+++ 127 Activation 56 Enter
+++ 128 Continuation 49 + {119 Activation 49 +, 49 +} 49 + S=false nActivated=2 (=0S+2N)
+-- 127 Activation 56 Enter
+>> 127 Activation 56 Enter
+++ 129 Activation 57 vkey
+-- 129 Activation 57 vkey
+>> 129 Activation 57 vkey
+++ 130 Activation 58 vkey2
+-- 130 Activation 58 vkey2
+>> 130 Activation 58 vkey2
+++ 131 Activation 59 vkey2
+-- 131 Activation 59 vkey2
+>> 131 Activation 59 vkey2
+++ 132 Activation 60 event
+-- 132 Activation 60 event
+>> 132 Activation 60 event
+++ 133 Activation 61 event
+-- 133 Activation 61 event
+>> 133 Activation 61 event
+++ 134 Activation 62 @:
+-- 134 Activation 62 @:
+>> 134 Activation 62 @:
+++ 135 Activation 63 {.}
+-- 135 Activation 63 {.}
+>> 135 Activation 63 {.}
+-- 128 Continuation 49 + {119 Activation 49 +, 49 +} 49 + S=false nActivated=2 (=0S+2N)
+>> 128 Continuation 49 + {119 Activation 49 +, 49 +} 49 + S=false nActivated=2 (=0S+2N)
+-- 117 Continuation  9 ; {-1 Activation  9 ;,  9 ;}  9 ; S=false nActivated=2 (=1S+1N)
+>> 117 Continuation  9 ; {-1 Activation  9 ;,  9 ;}  9 ; S=false nActivated=2 (=1S+1N)
+-- 75 Continuation  5 ; ... {74 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 75 Continuation  5 ; ... {74 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 77 Continuation  4 || {76 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 77 Continuation  4 || {76 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=2 (=1S+1N)
+  |   |*                      10 guard
+  |   | *                     11 guard
+--|---|--*--------------------12 ; S=true nActivated=4 (=3S+1N)
+  |   |   *                   41 anyEvent
+  |   |    *                  42 anyEvent
+  |   |     *                 43 event
+  |   |      *                44 event
+--|---|-------*---------------45 @:
+  |   |        *              46 {.}
+  |    *                      47 searchCommand
+  |     *                     48 searchCommand
+  |      *                    49 + S=false nActivated=2 (=0S+2N)
+--|------|*-------------------50 searchButton
+  |      | *                  51 clicked
+  |      |  *                 52 event
+  |      |   *                53 event
+  |      |    *               54 @:
+--|------|-----*--------------55 {.}
+  |       *                   56 Enter
+  |        *                  57 vkey
+  |         *                 58 vkey2
+  |          *                59 vkey2
+--|-----------*---------------60 event
+  |            *              61 event
+  |             *             62 @:
+  |              *            63 {.}
+   *                          21 doExit
+----*-------------------------22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+      *                       24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+--------|*--------------------27 exitButton
+        | *                   28 clicked
+        |  *                  29 event
+        |   *                 30 event
+        |    *                31 @:
+--------|-----*---------------32 {.}
+         *                    33 windowClosing
+          *                   34 windowClosing
+           *                  35 event
+            *                 36 event
+-------------*----------------37 @:
+              *               38 {.}
+=== Messages ===
+=== End ===
+++ 136 AAExecutionFinished 55 {.}
+-- 136 AAExecutionFinished 55 {.}
+>> 136 AAExecutionFinished 55 {.}
+++ 137 AAHappened 55 {.}
+++ 138 Success 55 {.}
+++ 139 Deactivation 55 {.}
+-- 137 AAHappened 55 {.}
+>> 137 AAHappened 55 {.}
+++ 140 AAHappened 54 @:
+-- 140 AAHappened 54 @:
+>> 140 AAHappened 54 @:
+++ 141 AAHappened 53 event
+-- 141 AAHappened 53 event
+>> 141 AAHappened 53 event
+++ 142 AAHappened 52 event
+-- 142 AAHappened 52 event
+>> 142 AAHappened 52 event
+++ 143 AAHappened 51 clicked
+-- 143 AAHappened 51 clicked
+>> 143 AAHappened 51 clicked
+++ 144 AAHappened 50 searchButton
+-- 144 AAHappened 50 searchButton
+>> 144 AAHappened 50 searchButton
+++ 145 AAHappened 49 +
+-- 145 AAHappened 49 +
+>> 145 AAHappened 49 +
+++ 146 Continuation 49 + {145 AAHappened 49 +, 49 +} 49 + S=false nActivated=2 (=0S+2N)
+++ 147 Exclude 56 Enter
+++ 148 AAHappened 48 searchCommand
+-- 148 AAHappened 48 searchCommand
+>> 148 AAHappened 48 searchCommand
+++ 149 AAHappened 47 searchCommand
+-- 149 AAHappened 47 searchCommand
+>> 149 AAHappened 47 searchCommand
+++ 150 AAHappened  9 ;
+-- 150 AAHappened  9 ;
+>> 150 AAHappened  9 ;
+++ 151 Continuation  9 ; {150 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=2 (=1S+1N)
+++ 152 Exclude 10 guard
+++ 153 AAHappened  8 searchSequence
+-- 153 AAHappened  8 searchSequence
+>> 153 AAHappened  8 searchSequence
+++ 154 AAHappened  7 searchSequence
+-- 154 AAHappened  7 searchSequence
+>> 154 AAHappened  7 searchSequence
+++ 155 AAHappened  5 ; ...
+-- 155 AAHappened  5 ; ...
+>> 155 AAHappened  5 ; ...
+++ 156 Continuation  5 ; ... {155 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 157 AAHappened  4 ||
+-- 157 AAHappened  4 ||
+>> 157 AAHappened  4 ||
+++ 158 Continuation  4 || {157 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 159 AAHappened  3 live
+-- 159 AAHappened  3 live
+>> 159 AAHappened  3 live
+++ 160 AAHappened  2 <root>
+-- 160 AAHappened  2 <root>
+>> 160 AAHappened  2 <root>
+++ 161 AAHappened  1 **
+-- 161 AAHappened  1 **
+>> 161 AAHappened  1 **
+-- 138 Success 55 {.}
+>> 138 Success 55 {.}
+++ 162 Success 54 @:
+-- 162 Success 54 @:
+>> 162 Success 54 @:
+++ 163 Success 53 event
+-- 163 Success 53 event
+>> 163 Success 53 event
+++ 164 Success 52 event
+-- 164 Success 52 event
+>> 164 Success 52 event
+++ 165 Success 51 clicked
+-- 165 Success 51 clicked
+>> 165 Success 51 clicked
+++ 166 Success 50 searchButton
+-- 166 Success 50 searchButton
+>> 166 Success 50 searchButton
+++ 167 Success 49 +
+-- 167 Success 49 +
+>> 167 Success 49 +
+** 146 Continuation 49 + {167 Success 49 +, 145 AAHappened 49 +, 49 +} 49 + S=false nActivated=2 (=1S+1N)
+-- 152 Exclude 10 guard
+>> 152 Exclude 10 guard
+++ 168 Exclude 11 guard
+-- 168 Exclude 11 guard
+>> 168 Exclude 11 guard
+++ 169 Exclude 12 ; ...
+-- 169 Exclude 12 ; ...
+>> 169 Exclude 12 ; ...
+++ 170 Exclude 41 anyEvent
+-- 170 Exclude 41 anyEvent
+>> 170 Exclude 41 anyEvent
+++ 171 Exclude 42 anyEvent
+-- 171 Exclude 42 anyEvent
+>> 171 Exclude 42 anyEvent
+++ 172 Exclude 43 event
+-- 172 Exclude 43 event
+>> 172 Exclude 43 event
+++ 173 Exclude 44 event
+-- 173 Exclude 44 event
+>> 173 Exclude 44 event
+++ 174 Exclude 45 @:
+-- 174 Exclude 45 @:
+>> 174 Exclude 45 @:
+++ 175 Exclude 46 {.}
+-- 175 Exclude 46 {.}
+>> 175 Exclude 46 {.}
+++ 176 Deactivation 46 {.}
+-- 147 Exclude 56 Enter
+>> 147 Exclude 56 Enter
+++ 177 Exclude 57 vkey
+-- 177 Exclude 57 vkey
+>> 177 Exclude 57 vkey
+++ 178 Exclude 58 vkey2
+-- 178 Exclude 58 vkey2
+>> 178 Exclude 58 vkey2
+++ 179 Exclude 59 vkey2
+-- 179 Exclude 59 vkey2
+>> 179 Exclude 59 vkey2
+++ 180 Exclude 60 event
+-- 180 Exclude 60 event
+>> 180 Exclude 60 event
+++ 181 Exclude 61 event
+-- 181 Exclude 61 event
+>> 181 Exclude 61 event
+++ 182 Exclude 62 @:
+-- 182 Exclude 62 @:
+>> 182 Exclude 62 @:
+++ 183 Exclude 63 {.}
+-- 183 Exclude 63 {.}
+>> 183 Exclude 63 {.}
+++ 184 Deactivation 63 {.}
+-- 176 Deactivation 46 {.}
+>> 176 Deactivation 46 {.}
+++ 185 Deactivation 45 @:
+-- 185 Deactivation 45 @:
+>> 185 Deactivation 45 @:
+++ 186 Deactivation 44 event
+-- 186 Deactivation 44 event
+>> 186 Deactivation 44 event
+++ 187 Deactivation 43 event
+-- 187 Deactivation 43 event
+>> 187 Deactivation 43 event
+++ 188 Deactivation 42 anyEvent
+-- 188 Deactivation 42 anyEvent
+>> 188 Deactivation 42 anyEvent
+++ 189 Deactivation 41 anyEvent
+-- 189 Deactivation 41 anyEvent
+>> 189 Deactivation 41 anyEvent
+++ 190 Deactivation 12 ; ...
+-- 190 Deactivation 12 ; ...
+>> 190 Deactivation 12 ; ...
+++ 191 Continuation 12 ; ... {190 Deactivation 12 ; ..., 12 ; ...} 12 ; S=true nActivated=4 (=3S+1N)
+-- 139 Deactivation 55 {.}
+>> 139 Deactivation 55 {.}
+++ 192 Deactivation 54 @:
+-- 192 Deactivation 54 @:
+>> 192 Deactivation 54 @:
+++ 193 Deactivation 53 event
+-- 193 Deactivation 53 event
+>> 193 Deactivation 53 event
+++ 194 Deactivation 52 event
+-- 194 Deactivation 52 event
+>> 194 Deactivation 52 event
+++ 195 Deactivation 51 clicked
+-- 195 Deactivation 51 clicked
+>> 195 Deactivation 51 clicked
+++ 196 Deactivation 50 searchButton
+-- 196 Deactivation 50 searchButton
+>> 196 Deactivation 50 searchButton
+++ 197 Deactivation 49 +
+-- 197 Deactivation 49 +
+>> 197 Deactivation 49 +
+** 146 Continuation 49 + {197 Deactivation 49 +, 167 Success 49 +, 145 AAHappened 49 +, 49 +} 49 + S=false nActivated=2 (=1S+1N)
+-- 184 Deactivation 63 {.}
+>> 184 Deactivation 63 {.}
+++ 198 Deactivation 62 @:
+-- 198 Deactivation 62 @:
+>> 198 Deactivation 62 @:
+++ 199 Deactivation 61 event
+-- 199 Deactivation 61 event
+>> 199 Deactivation 61 event
+++ 200 Deactivation 60 event
+-- 200 Deactivation 60 event
+>> 200 Deactivation 60 event
+++ 201 Deactivation 59 vkey2
+-- 201 Deactivation 59 vkey2
+>> 201 Deactivation 59 vkey2
+++ 202 Deactivation 58 vkey2
+-- 202 Deactivation 58 vkey2
+>> 202 Deactivation 58 vkey2
+++ 203 Deactivation 57 vkey
+-- 203 Deactivation 57 vkey
+>> 203 Deactivation 57 vkey
+++ 204 Deactivation 56 Enter
+-- 204 Deactivation 56 Enter
+>> 204 Deactivation 56 Enter
+++ 205 Deactivation 49 +
+-- 205 Deactivation 49 +
+>> 205 Deactivation 49 +
+** 146 Continuation 49 + {205 Deactivation 49 +197 Deactivation 49 +, 167 Success 49 +, 145 AAHappened 49 +, 49 +} 49 + S=false nActivated=2 (=1S+1N)
+-- 146 Continuation 49 + {205 Deactivation 49 +197 Deactivation 49 +, 167 Success 49 +, 145 AAHappened 49 +, 49 +} 49 + S=false nActivated=2 (=1S+1N)
+>> 146 Continuation 49 + {205 Deactivation 49 +197 Deactivation 49 +, 167 Success 49 +, 145 AAHappened 49 +, 49 +} 49 + S=false nActivated=2 (=1S+1N)
+++ 206 Deactivation 49 +
+++ 207 Success 49 +
+-- 207 Success 49 +
+>> 207 Success 49 +
+++ 208 Success 48 searchCommand
+-- 208 Success 48 searchCommand
+>> 208 Success 48 searchCommand
+++ 209 Success 47 searchCommand
+-- 209 Success 47 searchCommand
+>> 209 Success 47 searchCommand
+++ 210 Success  9 ;
+-- 210 Success  9 ;
+>> 210 Success  9 ;
+** 151 Continuation  9 ; {210 Success  9 ;, 150 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=2 (=2S+0N)
+-- 206 Deactivation 49 +
+>> 206 Deactivation 49 +
+++ 211 Deactivation 48 searchCommand
+-- 211 Deactivation 48 searchCommand
+>> 211 Deactivation 48 searchCommand
+++ 212 Deactivation 47 searchCommand
+-- 212 Deactivation 47 searchCommand
+>> 212 Deactivation 47 searchCommand
+++ 213 Deactivation  9 ;
+-- 213 Deactivation  9 ;
+>> 213 Deactivation  9 ;
+** 151 Continuation  9 ; {213 Deactivation  9 ;, 210 Success  9 ;, 150 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=2 (=2S+0N)
+-- 191 Continuation 12 ; ... {190 Deactivation 12 ; ..., 12 ; ...} 12 ; S=true nActivated=4 (=3S+1N)
+>> 191 Continuation 12 ; ... {190 Deactivation 12 ; ..., 12 ; ...} 12 ; S=true nActivated=4 (=3S+1N)
+++ 214 Deactivation 12 ; ...
+-- 214 Deactivation 12 ; ...
+>> 214 Deactivation 12 ; ...
+++ 215 Deactivation 11 guard
+-- 215 Deactivation 11 guard
+>> 215 Deactivation 11 guard
+++ 216 Deactivation 10 guard
+-- 216 Deactivation 10 guard
+>> 216 Deactivation 10 guard
+++ 217 Deactivation  9 ;
+-- 217 Deactivation  9 ;
+>> 217 Deactivation  9 ;
+** 151 Continuation  9 ; {217 Deactivation  9 ;213 Deactivation  9 ;, 210 Success  9 ;, 150 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=2 (=2S+0N)
+-- 151 Continuation  9 ; {217 Deactivation  9 ;213 Deactivation  9 ;, 210 Success  9 ;, 150 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=2 (=2S+0N)
+>> 151 Continuation  9 ; {217 Deactivation  9 ;213 Deactivation  9 ;, 210 Success  9 ;, 150 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=2 (=2S+0N)
+++ 218 Activation 64 /
+++ 219 Continuation  9 ; {-1 Activation  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+-- 218 Activation 64 /
+>> 218 Activation 64 /
+++ 220 Activation 65 ;
+++ 221 Continuation 64 / {218 Activation 64 /, 65 ;} 64 / S=false nActivated=1 (=0S+1N)
+-- 220 Activation 65 ;
+>> 220 Activation 65 ;
+++ 222 Activation 66 showSearchingText
+++ 223 Continuation 65 ; {220 Activation 65 ;, 66 showSearchingText} 65 ; S=false nActivated=1 (=0S+1N)
+-- 222 Activation 66 showSearchingText
+>> 222 Activation 66 showSearchingText
+++ 224 Activation 67 showSearchingText
+-- 224 Activation 67 showSearchingText
+>> 224 Activation 67 showSearchingText
+++ 225 Activation 68 @:
+-- 225 Activation 68 @:
+>> 225 Activation 68 @:
+++ 226 Activation 69 {}
+-- 226 Activation 69 {}
+>> 226 Activation 69 {}
+++ 227 AAActivated 69 {}
+++ 228 AAToBeExecuted 69 {}
+-- 227 AAActivated 69 {}
+>> 227 AAActivated 69 {}
+++ 229 AAActivated 68 @:
+-- 229 AAActivated 68 @:
+>> 229 AAActivated 68 @:
+++ 230 AAActivated 67 showSearchingText
+-- 230 AAActivated 67 showSearchingText
+>> 230 AAActivated 67 showSearchingText
+++ 231 AAActivated 66 showSearchingText
+-- 231 AAActivated 66 showSearchingText
+>> 231 AAActivated 66 showSearchingText
+++ 232 AAActivated 65 ;
+-- 232 AAActivated 65 ;
+>> 232 AAActivated 65 ;
+** 223 Continuation 65 ; {220 Activation 65 ;, 232 AAActivated 65 ;, 66 showSearchingText} 65 ; S=false nActivated=1 (=0S+1N)
+++ 233 AAActivated 64 /
+-- 233 AAActivated 64 /
+>> 233 AAActivated 64 /
+** 221 Continuation 64 / {218 Activation 64 /, 233 AAActivated 64 /, 65 ;} 64 / S=false nActivated=1 (=0S+1N)
+++ 234 AAActivated  9 ;
+-- 234 AAActivated  9 ;
+>> 234 AAActivated  9 ;
+** 219 Continuation  9 ; {-1 Activation  9 ;, 234 AAActivated  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 235 AAActivated  8 searchSequence
+-- 235 AAActivated  8 searchSequence
+>> 235 AAActivated  8 searchSequence
+++ 236 AAActivated  7 searchSequence
+-- 236 AAActivated  7 searchSequence
+>> 236 AAActivated  7 searchSequence
+++ 237 AAActivated  5 ; ...
+-- 237 AAActivated  5 ; ...
+>> 237 AAActivated  5 ; ...
+** 156 Continuation  5 ; ... {237 AAActivated  5 ; ..., 155 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 238 AAActivated  4 ||
+-- 238 AAActivated  4 ||
+>> 238 AAActivated  4 ||
+** 158 Continuation  4 || {238 AAActivated  4 ||, 157 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 239 AAActivated  3 live
+-- 239 AAActivated  3 live
+>> 239 AAActivated  3 live
+++ 240 AAActivated  2 <root>
+-- 240 AAActivated  2 <root>
+>> 240 AAActivated  2 <root>
+++ 241 AAActivated  1 **
+-- 241 AAActivated  1 **
+>> 241 AAActivated  1 **
+-- 223 Continuation 65 ; {220 Activation 65 ;, 232 AAActivated 65 ;, 66 showSearchingText} 65 ; S=false nActivated=1 (=0S+1N)
+>> 223 Continuation 65 ; {220 Activation 65 ;, 232 AAActivated 65 ;, 66 showSearchingText} 65 ; S=false nActivated=1 (=0S+1N)
+-- 221 Continuation 64 / {218 Activation 64 /, 233 AAActivated 64 /, 65 ;} 64 / S=false nActivated=1 (=0S+1N)
+>> 221 Continuation 64 / {218 Activation 64 /, 233 AAActivated 64 /, 65 ;} 64 / S=false nActivated=1 (=0S+1N)
+++ 242 Activation 70 cancelSearch
+++ 243 Continuation 64 / {218 Activation 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+-- 242 Activation 70 cancelSearch
+>> 242 Activation 70 cancelSearch
+++ 244 Activation 71 cancelSearch
+-- 244 Activation 71 cancelSearch
+>> 244 Activation 71 cancelSearch
+++ 245 Activation 72 ;
+-- 245 Activation 72 ;
+>> 245 Activation 72 ;
+++ 246 Activation 73 cancelCommand
+++ 247 Continuation 72 ; {245 Activation 72 ;, 73 cancelCommand} 72 ; S=false nActivated=1 (=0S+1N)
+-- 246 Activation 73 cancelCommand
+>> 246 Activation 73 cancelCommand
+++ 248 Activation 74 cancelCommand
+-- 248 Activation 74 cancelCommand
+>> 248 Activation 74 cancelCommand
+++ 249 Activation 75 +
+-- 249 Activation 75 +
+>> 249 Activation 75 +
+++ 250 Activation 76 cancelButton
+++ 251 Continuation 75 + {249 Activation 75 +, 76 cancelButton} 75 + S=false nActivated=1 (=0S+1N)
+-- 250 Activation 76 cancelButton
+>> 250 Activation 76 cancelButton
+++ 252 Activation 77 clicked
+-- 252 Activation 77 clicked
+>> 252 Activation 77 clicked
+++ 253 Activation 78 event
+-- 253 Activation 78 event
+>> 253 Activation 78 event
+++ 254 Activation 79 event
+-- 254 Activation 79 event
+>> 254 Activation 79 event
+++ 255 Activation 80 @:
+-- 255 Activation 80 @:
+>> 255 Activation 80 @:
+++ 256 Activation 81 {.}
+-- 256 Activation 81 {.}
+>> 256 Activation 81 {.}
+-- 251 Continuation 75 + {249 Activation 75 +, 76 cancelButton} 75 + S=false nActivated=1 (=0S+1N)
+>> 251 Continuation 75 + {249 Activation 75 +, 76 cancelButton} 75 + S=false nActivated=1 (=0S+1N)
+++ 257 Activation 82 Escape
+++ 258 Continuation 75 + {249 Activation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+-- 257 Activation 82 Escape
+>> 257 Activation 82 Escape
+++ 259 Activation 83 vkey
+-- 259 Activation 83 vkey
+>> 259 Activation 83 vkey
+++ 260 Activation 84 vkey2
+-- 260 Activation 84 vkey2
+>> 260 Activation 84 vkey2
+++ 261 Activation 85 vkey2
+-- 261 Activation 85 vkey2
+>> 261 Activation 85 vkey2
+++ 262 Activation 86 event
+-- 262 Activation 86 event
+>> 262 Activation 86 event
+++ 263 Activation 87 event
+-- 263 Activation 87 event
+>> 263 Activation 87 event
+++ 264 Activation 88 @:
+-- 264 Activation 88 @:
+>> 264 Activation 88 @:
+++ 265 Activation 89 {.}
+-- 265 Activation 89 {.}
+>> 265 Activation 89 {.}
+-- 258 Continuation 75 + {249 Activation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+>> 258 Continuation 75 + {249 Activation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+-- 247 Continuation 72 ; {245 Activation 72 ;, 73 cancelCommand} 72 ; S=false nActivated=1 (=0S+1N)
+>> 247 Continuation 72 ; {245 Activation 72 ;, 73 cancelCommand} 72 ; S=false nActivated=1 (=0S+1N)
+-- 243 Continuation 64 / {218 Activation 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+>> 243 Continuation 64 / {218 Activation 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+-- 219 Continuation  9 ; {-1 Activation  9 ;, 234 AAActivated  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+>> 219 Continuation  9 ; {-1 Activation  9 ;, 234 AAActivated  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+-- 156 Continuation  5 ; ... {237 AAActivated  5 ; ..., 155 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 156 Continuation  5 ; ... {237 AAActivated  5 ; ..., 155 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 158 Continuation  4 || {238 AAActivated  4 ||, 157 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 158 Continuation  4 || {238 AAActivated  4 ||, 157 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+-- 228 AAToBeExecuted 69 {}
+>> 228 AAToBeExecuted 69 {}
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=3 (=2S+1N)
+  |    *                      64 / S=false nActivated=2 (=0S+2N)
+  |    |*                     65 ; S=false nActivated=1 (=0S+1N)
+--|----|-*--------------------66 showSearchingText
+  |    |  *                   67 showSearchingText
+  |    |   *                  68 @:
+  |    |    *                 69 {}
+  |     *                     70 cancelSearch
+--|------*--------------------71 cancelSearch
+  |       *                   72 ; S=false nActivated=1 (=0S+1N)
+  |        *                  73 cancelCommand
+  |         *                 74 cancelCommand
+  |          *                75 + S=false nActivated=2 (=0S+2N)
+--|----------|*---------------76 cancelButton
+  |          | *              77 clicked
+  |          |  *             78 event
+  |          |   *            79 event
+  |          |    *           80 @:
+--|----------|-----*----------81 {.}
+  |           *               82 Escape
+  |            *              83 vkey
+  |             *             84 vkey2
+  |              *            85 vkey2
+--|---------------*-----------86 event
+  |                *          87 event
+  |                 *         88 @:
+  |                  *        89 {.}
+   *                          21 doExit
+----*-------------------------22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+      *                       24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+--------|*--------------------27 exitButton
+        | *                   28 clicked
+        |  *                  29 event
+        |   *                 30 event
+        |    *                31 @:
+--------|-----*---------------32 {.}
+         *                    33 windowClosing
+          *                   34 windowClosing
+           *                  35 event
+            *                 36 event
+-------------*----------------37 @:
+              *               38 {.}
+=== Messages ===
+=== End ===
+++ 266 AAHappened 69 {}
+-- 266 AAHappened 69 {}
+>> 266 AAHappened 69 {}
+++ 267 AAHappened 68 @:
+-- 267 AAHappened 68 @:
+>> 267 AAHappened 68 @:
+++ 268 AAExecutionFinished 69 {}
+++ 269 AAHappened 67 showSearchingText
+-- 269 AAHappened 67 showSearchingText
+>> 269 AAHappened 67 showSearchingText
+++ 270 AAHappened 66 showSearchingText
+-- 270 AAHappened 66 showSearchingText
+>> 270 AAHappened 66 showSearchingText
+++ 271 AAHappened 65 ;
+-- 271 AAHappened 65 ;
+>> 271 AAHappened 65 ;
+++ 272 Continuation 65 ; {271 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=1 (=0S+1N)
+++ 273 AAHappened 64 /
+-- 273 AAHappened 64 /
+>> 273 AAHappened 64 /
+++ 274 Continuation 64 / {273 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 275 AAHappened  9 ;
+-- 275 AAHappened  9 ;
+>> 275 AAHappened  9 ;
+++ 276 Continuation  9 ; {275 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 277 AAHappened  8 searchSequence
+-- 277 AAHappened  8 searchSequence
+>> 277 AAHappened  8 searchSequence
+++ 278 AAHappened  7 searchSequence
+-- 278 AAHappened  7 searchSequence
+>> 278 AAHappened  7 searchSequence
+++ 279 AAHappened  5 ; ...
+-- 279 AAHappened  5 ; ...
+>> 279 AAHappened  5 ; ...
+++ 280 Continuation  5 ; ... {279 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 281 AAHappened  4 ||
+-- 281 AAHappened  4 ||
+>> 281 AAHappened  4 ||
+++ 282 Continuation  4 || {281 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 283 AAHappened  3 live
+-- 283 AAHappened  3 live
+>> 283 AAHappened  3 live
+++ 284 AAHappened  2 <root>
+-- 284 AAHappened  2 <root>
+>> 284 AAHappened  2 <root>
+++ 285 AAHappened  1 **
+-- 285 AAHappened  1 **
+>> 285 AAHappened  1 **
+-- 268 AAExecutionFinished 69 {}
+>> 268 AAExecutionFinished 69 {}
+++ 286 AAHappened 69 {}
+++ 287 Success 69 {}
+++ 288 Deactivation 69 {}
+-- 286 AAHappened 69 {}
+>> 286 AAHappened 69 {}
+++ 289 AAHappened 68 @:
+-- 289 AAHappened 68 @:
+>> 289 AAHappened 68 @:
+++ 290 AAHappened 67 showSearchingText
+-- 290 AAHappened 67 showSearchingText
+>> 290 AAHappened 67 showSearchingText
+++ 291 AAHappened 66 showSearchingText
+-- 291 AAHappened 66 showSearchingText
+>> 291 AAHappened 66 showSearchingText
+++ 292 AAHappened 65 ;
+-- 292 AAHappened 65 ;
+>> 292 AAHappened 65 ;
+** 272 Continuation 65 ; {292 AAHappened 65 ;271 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=1 (=0S+1N)
+++ 293 AAHappened 64 /
+-- 293 AAHappened 64 /
+>> 293 AAHappened 64 /
+** 274 Continuation 64 / {293 AAHappened 64 /273 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 294 AAHappened  9 ;
+-- 294 AAHappened  9 ;
+>> 294 AAHappened  9 ;
+** 276 Continuation  9 ; {294 AAHappened  9 ;275 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 295 AAHappened  8 searchSequence
+-- 295 AAHappened  8 searchSequence
+>> 295 AAHappened  8 searchSequence
+++ 296 AAHappened  7 searchSequence
+-- 296 AAHappened  7 searchSequence
+>> 296 AAHappened  7 searchSequence
+++ 297 AAHappened  5 ; ...
+-- 297 AAHappened  5 ; ...
+>> 297 AAHappened  5 ; ...
+** 280 Continuation  5 ; ... {297 AAHappened  5 ; ...279 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 298 AAHappened  4 ||
+-- 298 AAHappened  4 ||
+>> 298 AAHappened  4 ||
+** 282 Continuation  4 || {298 AAHappened  4 ||281 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 299 AAHappened  3 live
+-- 299 AAHappened  3 live
+>> 299 AAHappened  3 live
+++ 300 AAHappened  2 <root>
+-- 300 AAHappened  2 <root>
+>> 300 AAHappened  2 <root>
+++ 301 AAHappened  1 **
+-- 301 AAHappened  1 **
+>> 301 AAHappened  1 **
+-- 287 Success 69 {}
+>> 287 Success 69 {}
+++ 302 Success 68 @:
+-- 302 Success 68 @:
+>> 302 Success 68 @:
+++ 303 Success 67 showSearchingText
+-- 303 Success 67 showSearchingText
+>> 303 Success 67 showSearchingText
+++ 304 Success 66 showSearchingText
+-- 304 Success 66 showSearchingText
+>> 304 Success 66 showSearchingText
+++ 305 Success 65 ;
+-- 305 Success 65 ;
+>> 305 Success 65 ;
+** 272 Continuation 65 ; {305 Success 65 ;, 292 AAHappened 65 ;271 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=1 (=1S+0N)
+-- 288 Deactivation 69 {}
+>> 288 Deactivation 69 {}
+++ 306 Deactivation 68 @:
+-- 306 Deactivation 68 @:
+>> 306 Deactivation 68 @:
+++ 307 Deactivation 67 showSearchingText
+-- 307 Deactivation 67 showSearchingText
+>> 307 Deactivation 67 showSearchingText
+++ 308 Deactivation 66 showSearchingText
+-- 308 Deactivation 66 showSearchingText
+>> 308 Deactivation 66 showSearchingText
+++ 309 Deactivation 65 ;
+-- 309 Deactivation 65 ;
+>> 309 Deactivation 65 ;
+** 272 Continuation 65 ; {309 Deactivation 65 ;, 305 Success 65 ;, 292 AAHappened 65 ;271 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=1 (=1S+0N)
+-- 272 Continuation 65 ; {309 Deactivation 65 ;, 305 Success 65 ;, 292 AAHappened 65 ;271 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=1 (=1S+0N)
+>> 272 Continuation 65 ; {309 Deactivation 65 ;, 305 Success 65 ;, 292 AAHappened 65 ;271 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=1 (=1S+0N)
+++ 310 Activation 90 searchInDatabase
+++ 311 Continuation 65 ; {-1 Activation 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+-- 310 Activation 90 searchInDatabase
+>> 310 Activation 90 searchInDatabase
+++ 312 Activation 91 searchInDatabase
+-- 312 Activation 91 searchInDatabase
+>> 312 Activation 91 searchInDatabase
+++ 313 Activation 92 ||
+-- 313 Activation 92 ||
+>> 313 Activation 92 ||
+++ 314 Activation 93 {**}
+++ 315 Continuation 92 || {313 Activation 92 ||, 93 {**}} 92 || S=false nActivated=1 (=0S+1N)
+-- 314 Activation 93 {**}
+>> 314 Activation 93 {**}
+++ 316 AAActivated 93 {**}
+++ 317 AAToBeExecuted 93 {**}
+-- 316 AAActivated 93 {**}
+>> 316 AAActivated 93 {**}
+++ 318 AAActivated 92 ||
+-- 318 AAActivated 92 ||
+>> 318 AAActivated 92 ||
+** 315 Continuation 92 || {313 Activation 92 ||, 318 AAActivated 92 ||, 93 {**}} 92 || S=false nActivated=1 (=0S+1N)
+++ 319 AAActivated 91 searchInDatabase
+-- 319 AAActivated 91 searchInDatabase
+>> 319 AAActivated 91 searchInDatabase
+++ 320 AAActivated 90 searchInDatabase
+-- 320 AAActivated 90 searchInDatabase
+>> 320 AAActivated 90 searchInDatabase
+++ 321 AAActivated 65 ;
+-- 321 AAActivated 65 ;
+>> 321 AAActivated 65 ;
+** 311 Continuation 65 ; {-1 Activation 65 ;, 321 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+++ 322 AAActivated 64 /
+-- 322 AAActivated 64 /
+>> 322 AAActivated 64 /
+** 274 Continuation 64 / {322 AAActivated 64 /, 293 AAHappened 64 /273 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 323 AAActivated  9 ;
+-- 323 AAActivated  9 ;
+>> 323 AAActivated  9 ;
+** 276 Continuation  9 ; {323 AAActivated  9 ;, 294 AAHappened  9 ;275 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 324 AAActivated  8 searchSequence
+-- 324 AAActivated  8 searchSequence
+>> 324 AAActivated  8 searchSequence
+++ 325 AAActivated  7 searchSequence
+-- 325 AAActivated  7 searchSequence
+>> 325 AAActivated  7 searchSequence
+++ 326 AAActivated  5 ; ...
+-- 326 AAActivated  5 ; ...
+>> 326 AAActivated  5 ; ...
+** 280 Continuation  5 ; ... {326 AAActivated  5 ; ..., 297 AAHappened  5 ; ...279 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 327 AAActivated  4 ||
+-- 327 AAActivated  4 ||
+>> 327 AAActivated  4 ||
+** 282 Continuation  4 || {327 AAActivated  4 ||, 298 AAHappened  4 ||281 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 328 AAActivated  3 live
+-- 328 AAActivated  3 live
+>> 328 AAActivated  3 live
+++ 329 AAActivated  2 <root>
+-- 329 AAActivated  2 <root>
+>> 329 AAActivated  2 <root>
+++ 330 AAActivated  1 **
+-- 330 AAActivated  1 **
+>> 330 AAActivated  1 **
+-- 315 Continuation 92 || {313 Activation 92 ||, 318 AAActivated 92 ||, 93 {**}} 92 || S=false nActivated=1 (=0S+1N)
+>> 315 Continuation 92 || {313 Activation 92 ||, 318 AAActivated 92 ||, 93 {**}} 92 || S=false nActivated=1 (=0S+1N)
+++ 331 Activation 94 progressMonitor
+++ 332 Continuation 92 || {313 Activation 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+-- 331 Activation 94 progressMonitor
+>> 331 Activation 94 progressMonitor
+++ 333 Activation 95 progressMonitor
+-- 333 Activation 95 progressMonitor
+>> 333 Activation 95 progressMonitor
+++ 334 Activation 96 ;
+-- 334 Activation 96 ;
+>> 334 Activation 96 ;
+++ 335 Activation 97 ...
+++ 336 Continuation 96 ; {334 Activation 96 ;, 97 ...} 96 ; S=false nActivated=1 (=0S+1N)
+-- 335 Activation 97 ...
+>> 335 Activation 97 ...
+++ 337 Success 97 ...
+++ 338 Deactivation 97 ...
+-- 337 Success 97 ...
+>> 337 Success 97 ...
+++ 339 Success 96 ; ...
+-- 339 Success 96 ; ...
+>> 339 Success 96 ; ...
+** 336 Continuation 96 ; ... {334 Activation 96 ; ..., 339 Success 96 ; ..., 97 ...} 96 ; S=false nActivated=1 (=1S+0N)
+-- 338 Deactivation 97 ...
+>> 338 Deactivation 97 ...
+++ 340 Deactivation 96 ; ...
+-- 340 Deactivation 96 ; ...
+>> 340 Deactivation 96 ; ...
+** 336 Continuation 96 ; ... {334 Activation 96 ; ..., 340 Deactivation 96 ; ..., 339 Success 96 ; ..., 97 ...} 96 ; S=false nActivated=1 (=1S+0N)
+-- 336 Continuation 96 ; ... {334 Activation 96 ; ..., 340 Deactivation 96 ; ..., 339 Success 96 ; ..., 97 ...} 96 ; S=false nActivated=1 (=1S+0N)
+>> 336 Continuation 96 ; ... {334 Activation 96 ; ..., 340 Deactivation 96 ; ..., 339 Success 96 ; ..., 97 ...} 96 ; S=false nActivated=1 (=1S+0N)
+++ 341 Activation 98 @:
+++ 342 Continuation 96 ; ... {334 Activation 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=1S+1N)
+-- 341 Activation 98 @:
+>> 341 Activation 98 @:
+++ 343 Activation 99 {}
+-- 343 Activation 99 {}
+>> 343 Activation 99 {}
+++ 344 AAActivated 99 {}
+++ 345 AAToBeExecuted 99 {}
+-- 344 AAActivated 99 {}
+>> 344 AAActivated 99 {}
+++ 346 AAActivated 98 @:
+-- 346 AAActivated 98 @:
+>> 346 AAActivated 98 @:
+++ 347 AAActivated 96 ; ...
+-- 347 AAActivated 96 ; ...
+>> 347 AAActivated 96 ; ...
+** 342 Continuation 96 ; ... {334 Activation 96 ; ..., 347 AAActivated 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=1S+1N)
+++ 348 AAActivated 95 progressMonitor
+-- 348 AAActivated 95 progressMonitor
+>> 348 AAActivated 95 progressMonitor
+++ 349 AAActivated 94 progressMonitor
+-- 349 AAActivated 94 progressMonitor
+>> 349 AAActivated 94 progressMonitor
+++ 350 AAActivated 92 ||
+-- 350 AAActivated 92 ||
+>> 350 AAActivated 92 ||
+** 332 Continuation 92 || {313 Activation 92 ||, 350 AAActivated 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+++ 351 AAActivated 91 searchInDatabase
+-- 351 AAActivated 91 searchInDatabase
+>> 351 AAActivated 91 searchInDatabase
+++ 352 AAActivated 90 searchInDatabase
+-- 352 AAActivated 90 searchInDatabase
+>> 352 AAActivated 90 searchInDatabase
+++ 353 AAActivated 65 ;
+-- 353 AAActivated 65 ;
+>> 353 AAActivated 65 ;
+** 311 Continuation 65 ; {-1 Activation 65 ;, 353 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+++ 354 AAActivated 64 /
+-- 354 AAActivated 64 /
+>> 354 AAActivated 64 /
+** 274 Continuation 64 / {354 AAActivated 64 /, 293 AAHappened 64 /273 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 355 AAActivated  9 ;
+-- 355 AAActivated  9 ;
+>> 355 AAActivated  9 ;
+** 276 Continuation  9 ; {355 AAActivated  9 ;, 294 AAHappened  9 ;275 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 356 AAActivated  8 searchSequence
+-- 356 AAActivated  8 searchSequence
+>> 356 AAActivated  8 searchSequence
+++ 357 AAActivated  7 searchSequence
+-- 357 AAActivated  7 searchSequence
+>> 357 AAActivated  7 searchSequence
+++ 358 AAActivated  5 ; ...
+-- 358 AAActivated  5 ; ...
+>> 358 AAActivated  5 ; ...
+** 280 Continuation  5 ; ... {358 AAActivated  5 ; ..., 297 AAHappened  5 ; ...279 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 359 AAActivated  4 ||
+-- 359 AAActivated  4 ||
+>> 359 AAActivated  4 ||
+** 282 Continuation  4 || {359 AAActivated  4 ||, 298 AAHappened  4 ||281 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 360 AAActivated  3 live
+-- 360 AAActivated  3 live
+>> 360 AAActivated  3 live
+++ 361 AAActivated  2 <root>
+-- 361 AAActivated  2 <root>
+>> 361 AAActivated  2 <root>
+++ 362 AAActivated  1 **
+-- 362 AAActivated  1 **
+>> 362 AAActivated  1 **
+-- 342 Continuation 96 ; ... {334 Activation 96 ; ..., 347 AAActivated 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=1S+1N)
+>> 342 Continuation 96 ; ... {334 Activation 96 ; ..., 347 AAActivated 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=1S+1N)
+-- 332 Continuation 92 || {313 Activation 92 ||, 350 AAActivated 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+>> 332 Continuation 92 || {313 Activation 92 ||, 350 AAActivated 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+-- 311 Continuation 65 ; {-1 Activation 65 ;, 353 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+>> 311 Continuation 65 ; {-1 Activation 65 ;, 353 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+-- 274 Continuation 64 / {354 AAActivated 64 /, 293 AAHappened 64 /273 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+>> 274 Continuation 64 / {354 AAActivated 64 /, 293 AAHappened 64 /273 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+-- 276 Continuation  9 ; {355 AAActivated  9 ;, 294 AAHappened  9 ;275 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+>> 276 Continuation  9 ; {355 AAActivated  9 ;, 294 AAHappened  9 ;275 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+-- 280 Continuation  5 ; ... {358 AAActivated  5 ; ..., 297 AAHappened  5 ; ...279 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 280 Continuation  5 ; ... {358 AAActivated  5 ; ..., 297 AAHappened  5 ; ...279 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 282 Continuation  4 || {359 AAActivated  4 ||, 298 AAHappened  4 ||281 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 282 Continuation  4 || {359 AAActivated  4 ||, 298 AAHappened  4 ||281 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+-- 317 AAToBeExecuted 93 {**}
+>> 317 AAToBeExecuted 93 {**}
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=3 (=2S+1N)
+  |    *                      64 / S=false nActivated=2 (=0S+2N)
+  |    |*                     65 ; S=false nActivated=2 (=1S+1N)
+--|----|-*--------------------90 searchInDatabase
+  |    |  *                   91 searchInDatabase
+  |    |   *                  92 || S=false nActivated=2 (=0S+2N)
+  |    |   |*                 93 {**}
+  |    |    *                 94 progressMonitor
+--|----|-----*----------------95 progressMonitor
+  |    |      *               96 ; S=false nActivated=2 (=1S+1N)
+  |    |       *              98 @:
+  |    |        *             99 {}
+  |     *                     70 cancelSearch
+--|------*--------------------71 cancelSearch
+  |       *                   72 ; S=false nActivated=1 (=0S+1N)
+  |        *                  73 cancelCommand
+  |         *                 74 cancelCommand
+  |          *                75 + S=false nActivated=2 (=0S+2N)
+--|----------|*---------------76 cancelButton
+  |          | *              77 clicked
+  |          |  *             78 event
+  |          |   *            79 event
+  |          |    *           80 @:
+--|----------|-----*----------81 {.}
+  |           *               82 Escape
+  |            *              83 vkey
+  |             *             84 vkey2
+  |              *            85 vkey2
+--|---------------*-----------86 event
+  |                *          87 event
+  |                 *         88 @:
+  |                  *        89 {.}
+   *                          21 doExit
+----*-------------------------22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+      *                       24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+--------|*--------------------27 exitButton
+        | *                   28 clicked
+        |  *                  29 event
+        |   *                 30 event
+        |    *                31 @:
+--------|-----*---------------32 {.}
+         *                    33 windowClosing
+          *                   34 windowClosing
+           *                  35 event
+            *                 36 event
+-------------*----------------37 @:
+              *               38 {.}
+=== Messages ===
+345 AAToBeExecuted 99 {}
+=== End ===
+++ 363 AAHappened 93 {**}
+-- 363 AAHappened 93 {**}
+>> 363 AAHappened 93 {**}
+++ 364 AAHappened 92 ||
+-- 364 AAHappened 92 ||
+>> 364 AAHappened 92 ||
+++ 365 Continuation 92 || {364 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+++ 366 AAHappened 91 searchInDatabase
+-- 366 AAHappened 91 searchInDatabase
+>> 366 AAHappened 91 searchInDatabase
+++ 367 AAHappened 90 searchInDatabase
+-- 367 AAHappened 90 searchInDatabase
+>> 367 AAHappened 90 searchInDatabase
+++ 368 AAHappened 65 ;
+-- 368 AAHappened 65 ;
+>> 368 AAHappened 65 ;
+++ 369 Continuation 65 ; {368 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+++ 370 AAHappened 64 /
+-- 370 AAHappened 64 /
+>> 370 AAHappened 64 /
+++ 371 Continuation 64 / {370 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 372 AAHappened  9 ;
+-- 372 AAHappened  9 ;
+>> 372 AAHappened  9 ;
+++ 373 Continuation  9 ; {372 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 374 AAHappened  8 searchSequence
+-- 374 AAHappened  8 searchSequence
+>> 374 AAHappened  8 searchSequence
+++ 375 AAHappened  7 searchSequence
+-- 375 AAHappened  7 searchSequence
+>> 375 AAHappened  7 searchSequence
+++ 376 AAHappened  5 ; ...
+-- 376 AAHappened  5 ; ...
+>> 376 AAHappened  5 ; ...
+++ 377 Continuation  5 ; ... {376 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 378 AAHappened  4 ||
+-- 378 AAHappened  4 ||
+>> 378 AAHappened  4 ||
+++ 379 Continuation  4 || {378 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 380 AAHappened  3 live
+-- 380 AAHappened  3 live
+>> 380 AAHappened  3 live
+++ 381 AAHappened  2 <root>
+-- 381 AAHappened  2 <root>
+>> 381 AAHappened  2 <root>
+++ 382 AAHappened  1 **
+-- 382 AAHappened  1 **
+>> 382 AAHappened  1 **
+-- 365 Continuation 92 || {364 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+>> 365 Continuation 92 || {364 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=0S+2N)
+-- 369 Continuation 65 ; {368 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+>> 369 Continuation 65 ; {368 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+-- 371 Continuation 64 / {370 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+>> 371 Continuation 64 / {370 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+-- 373 Continuation  9 ; {372 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+>> 373 Continuation  9 ; {372 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+-- 377 Continuation  5 ; ... {376 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 377 Continuation  5 ; ... {376 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 379 Continuation  4 || {378 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 379 Continuation  4 || {378 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+-- 345 AAToBeExecuted 99 {}
+>> 345 AAToBeExecuted 99 {}
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=3 (=2S+1N)
+  |    *                      64 / S=false nActivated=2 (=0S+2N)
+  |    |*                     65 ; S=false nActivated=2 (=1S+1N)
+--|----|-*--------------------90 searchInDatabase
+  |    |  *                   91 searchInDatabase
+  |    |   *                  92 || S=false nActivated=2 (=1S+1N)
+  |    |   |*                 93 {**}
+  |    |    *                 94 progressMonitor
+--|----|-----*----------------95 progressMonitor
+  |    |      *               96 ; S=false nActivated=2 (=1S+1N)
+  |    |       *              98 @:
+  |    |        *             99 {}
+  |     *                     70 cancelSearch
+--|------*--------------------71 cancelSearch
+  |       *                   72 ; S=false nActivated=1 (=0S+1N)
+  |        *                  73 cancelCommand
+  |         *                 74 cancelCommand
+  |          *                75 + S=false nActivated=2 (=0S+2N)
+--|----------|*---------------76 cancelButton
+  |          | *              77 clicked
+  |          |  *             78 event
+  |          |   *            79 event
+  |          |    *           80 @:
+--|----------|-----*----------81 {.}
+  |           *               82 Escape
+  |            *              83 vkey
+  |             *             84 vkey2
+  |              *            85 vkey2
+--|---------------*-----------86 event
+  |                *          87 event
+  |                 *         88 @:
+  |                  *        89 {.}
+   *                          21 doExit
+----*-------------------------22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+      *                       24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+--------|*--------------------27 exitButton
+        | *                   28 clicked
+        |  *                  29 event
+        |   *                 30 event
+        |    *                31 @:
+--------|-----*---------------32 {.}
+         *                    33 windowClosing
+          *                   34 windowClosing
+           *                  35 event
+            *                 36 event
+-------------*----------------37 @:
+              *               38 {.}
+=== Messages ===
+=== End ===
+++ 383 AAHappened 99 {}
+-- 383 AAHappened 99 {}
+>> 383 AAHappened 99 {}
+++ 384 AAExecutionFinished 99 {}
+++ 385 AAHappened 98 @:
+-- 385 AAHappened 98 @:
+>> 385 AAHappened 98 @:
+++ 386 AAHappened 96 ; ...
+-- 386 AAHappened 96 ; ...
+>> 386 AAHappened 96 ; ...
+++ 387 Continuation 96 ; ... {386 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=1S+1N)
+++ 388 AAHappened 95 progressMonitor
+-- 388 AAHappened 95 progressMonitor
+>> 388 AAHappened 95 progressMonitor
+++ 389 AAHappened 94 progressMonitor
+-- 389 AAHappened 94 progressMonitor
+>> 389 AAHappened 94 progressMonitor
+++ 390 AAHappened 92 ||
+-- 390 AAHappened 92 ||
+>> 390 AAHappened 92 ||
+++ 391 Continuation 92 || {390 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+++ 392 AAHappened 91 searchInDatabase
+-- 392 AAHappened 91 searchInDatabase
+>> 392 AAHappened 91 searchInDatabase
+++ 393 AAHappened 90 searchInDatabase
+-- 393 AAHappened 90 searchInDatabase
+>> 393 AAHappened 90 searchInDatabase
+++ 394 AAHappened 65 ;
+-- 394 AAHappened 65 ;
+>> 394 AAHappened 65 ;
+++ 395 Continuation 65 ; {394 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+++ 396 AAHappened 64 /
+-- 396 AAHappened 64 /
+>> 396 AAHappened 64 /
+++ 397 Continuation 64 / {396 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 398 AAHappened  9 ;
+-- 398 AAHappened  9 ;
+>> 398 AAHappened  9 ;
+++ 399 Continuation  9 ; {398 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 400 AAHappened  8 searchSequence
+-- 400 AAHappened  8 searchSequence
+>> 400 AAHappened  8 searchSequence
+++ 401 AAHappened  7 searchSequence
+-- 401 AAHappened  7 searchSequence
+>> 401 AAHappened  7 searchSequence
+++ 402 AAHappened  5 ; ...
+-- 402 AAHappened  5 ; ...
+>> 402 AAHappened  5 ; ...
+++ 403 Continuation  5 ; ... {402 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 404 AAHappened  4 ||
+-- 404 AAHappened  4 ||
+>> 404 AAHappened  4 ||
+++ 405 Continuation  4 || {404 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 406 AAHappened  3 live
+-- 406 AAHappened  3 live
+>> 406 AAHappened  3 live
+++ 407 AAHappened  2 <root>
+-- 407 AAHappened  2 <root>
+>> 407 AAHappened  2 <root>
+++ 408 AAHappened  1 **
+-- 408 AAHappened  1 **
+>> 408 AAHappened  1 **
+-- 384 AAExecutionFinished 99 {}
+>> 384 AAExecutionFinished 99 {}
+++ 409 AAHappened 99 {}
+++ 410 Success 99 {}
+++ 411 Deactivation 99 {}
+-- 409 AAHappened 99 {}
+>> 409 AAHappened 99 {}
+++ 412 AAHappened 98 @:
+-- 412 AAHappened 98 @:
+>> 412 AAHappened 98 @:
+++ 413 AAHappened 96 ; ...
+-- 413 AAHappened 96 ; ...
+>> 413 AAHappened 96 ; ...
+** 387 Continuation 96 ; ... {413 AAHappened 96 ; ...386 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=1S+1N)
+++ 414 AAHappened 95 progressMonitor
+-- 414 AAHappened 95 progressMonitor
+>> 414 AAHappened 95 progressMonitor
+++ 415 AAHappened 94 progressMonitor
+-- 415 AAHappened 94 progressMonitor
+>> 415 AAHappened 94 progressMonitor
+++ 416 AAHappened 92 ||
+-- 416 AAHappened 92 ||
+>> 416 AAHappened 92 ||
+** 391 Continuation 92 || {416 AAHappened 92 ||390 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+++ 417 AAHappened 91 searchInDatabase
+-- 417 AAHappened 91 searchInDatabase
+>> 417 AAHappened 91 searchInDatabase
+++ 418 AAHappened 90 searchInDatabase
+-- 418 AAHappened 90 searchInDatabase
+>> 418 AAHappened 90 searchInDatabase
+++ 419 AAHappened 65 ;
+-- 419 AAHappened 65 ;
+>> 419 AAHappened 65 ;
+** 395 Continuation 65 ; {419 AAHappened 65 ;394 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+++ 420 AAHappened 64 /
+-- 420 AAHappened 64 /
+>> 420 AAHappened 64 /
+** 397 Continuation 64 / {420 AAHappened 64 /396 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 421 AAHappened  9 ;
+-- 421 AAHappened  9 ;
+>> 421 AAHappened  9 ;
+** 399 Continuation  9 ; {421 AAHappened  9 ;398 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 422 AAHappened  8 searchSequence
+-- 422 AAHappened  8 searchSequence
+>> 422 AAHappened  8 searchSequence
+++ 423 AAHappened  7 searchSequence
+-- 423 AAHappened  7 searchSequence
+>> 423 AAHappened  7 searchSequence
+++ 424 AAHappened  5 ; ...
+-- 424 AAHappened  5 ; ...
+>> 424 AAHappened  5 ; ...
+** 403 Continuation  5 ; ... {424 AAHappened  5 ; ...402 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 425 AAHappened  4 ||
+-- 425 AAHappened  4 ||
+>> 425 AAHappened  4 ||
+** 405 Continuation  4 || {425 AAHappened  4 ||404 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 426 AAHappened  3 live
+-- 426 AAHappened  3 live
+>> 426 AAHappened  3 live
+++ 427 AAHappened  2 <root>
+-- 427 AAHappened  2 <root>
+>> 427 AAHappened  2 <root>
+++ 428 AAHappened  1 **
+-- 428 AAHappened  1 **
+>> 428 AAHappened  1 **
+-- 410 Success 99 {}
+>> 410 Success 99 {}
+++ 429 Success 98 @:
+-- 429 Success 98 @:
+>> 429 Success 98 @:
+++ 430 Success 96 ; ...
+-- 430 Success 96 ; ...
+>> 430 Success 96 ; ...
+** 387 Continuation 96 ; ... {430 Success 96 ; ..., 413 AAHappened 96 ; ...386 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=2S+0N)
+-- 411 Deactivation 99 {}
+>> 411 Deactivation 99 {}
+++ 431 Deactivation 98 @:
+-- 431 Deactivation 98 @:
+>> 431 Deactivation 98 @:
+++ 432 Deactivation 96 ; ...
+-- 432 Deactivation 96 ; ...
+>> 432 Deactivation 96 ; ...
+** 387 Continuation 96 ; ... {432 Deactivation 96 ; ..., 430 Success 96 ; ..., 413 AAHappened 96 ; ...386 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=2S+0N)
+-- 387 Continuation 96 ; ... {432 Deactivation 96 ; ..., 430 Success 96 ; ..., 413 AAHappened 96 ; ...386 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=2S+0N)
+>> 387 Continuation 96 ; ... {432 Deactivation 96 ; ..., 430 Success 96 ; ..., 413 AAHappened 96 ; ...386 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=2 (=2S+0N)
+++ 433 Activation 100 {**}
+++ 434 Continuation 96 ; ... {-1 Activation 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=2S+1N)
+-- 433 Activation 100 {**}
+>> 433 Activation 100 {**}
+++ 435 AAActivated 100 {**}
+++ 436 AAToBeExecuted 100 {**}
+-- 435 AAActivated 100 {**}
+>> 435 AAActivated 100 {**}
+++ 437 AAActivated 96 ; ...
+-- 437 AAActivated 96 ; ...
+>> 437 AAActivated 96 ; ...
+** 434 Continuation 96 ; ... {-1 Activation 96 ; ..., 437 AAActivated 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=2S+1N)
+++ 438 AAActivated 95 progressMonitor
+-- 438 AAActivated 95 progressMonitor
+>> 438 AAActivated 95 progressMonitor
+++ 439 AAActivated 94 progressMonitor
+-- 439 AAActivated 94 progressMonitor
+>> 439 AAActivated 94 progressMonitor
+++ 440 AAActivated 92 ||
+-- 440 AAActivated 92 ||
+>> 440 AAActivated 92 ||
+** 391 Continuation 92 || {440 AAActivated 92 ||, 416 AAHappened 92 ||390 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+++ 441 AAActivated 91 searchInDatabase
+-- 441 AAActivated 91 searchInDatabase
+>> 441 AAActivated 91 searchInDatabase
+++ 442 AAActivated 90 searchInDatabase
+-- 442 AAActivated 90 searchInDatabase
+>> 442 AAActivated 90 searchInDatabase
+++ 443 AAActivated 65 ;
+-- 443 AAActivated 65 ;
+>> 443 AAActivated 65 ;
+** 395 Continuation 65 ; {443 AAActivated 65 ;, 419 AAHappened 65 ;394 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=1S+1N)
+++ 444 AAActivated 64 /
+-- 444 AAActivated 64 /
+>> 444 AAActivated 64 /
+** 397 Continuation 64 / {444 AAActivated 64 /, 420 AAHappened 64 /396 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 445 AAActivated  9 ;
+-- 445 AAActivated  9 ;
+>> 445 AAActivated  9 ;
+** 399 Continuation  9 ; {445 AAActivated  9 ;, 421 AAHappened  9 ;398 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 446 AAActivated  8 searchSequence
+-- 446 AAActivated  8 searchSequence
+>> 446 AAActivated  8 searchSequence
+++ 447 AAActivated  7 searchSequence
+-- 447 AAActivated  7 searchSequence
+>> 447 AAActivated  7 searchSequence
+++ 448 AAActivated  5 ; ...
+-- 448 AAActivated  5 ; ...
+>> 448 AAActivated  5 ; ...
+** 403 Continuation  5 ; ... {448 AAActivated  5 ; ..., 424 AAHappened  5 ; ...402 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 449 AAActivated  4 ||
+-- 449 AAActivated  4 ||
+>> 449 AAActivated  4 ||
+** 405 Continuation  4 || {449 AAActivated  4 ||, 425 AAHappened  4 ||404 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 450 AAActivated  3 live
+-- 450 AAActivated  3 live
+>> 450 AAActivated  3 live
+++ 451 AAActivated  2 <root>
+-- 451 AAActivated  2 <root>
+>> 451 AAActivated  2 <root>
+++ 452 AAActivated  1 **
+-- 452 AAActivated  1 **
+>> 452 AAActivated  1 **
+-- 434 Continuation 96 ; ... {-1 Activation 96 ; ..., 437 AAActivated 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=2S+1N)
+>> 434 Continuation 96 ; ... {-1 Activation 96 ; ..., 437 AAActivated 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=2S+1N)
+-- 391 Continuation 92 || {440 AAActivated 92 ||, 416 AAHappened 92 ||390 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+>> 391 Continuation 92 || {440 AAActivated 92 ||, 416 AAHappened 92 ||390 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+++ 453 Success 92 ||
+-- 453 Success 92 ||
+>> 453 Success 92 ||
+++ 454 Success 91 searchInDatabase
+-- 454 Success 91 searchInDatabase
+>> 454 Success 91 searchInDatabase
+++ 455 Success 90 searchInDatabase
+-- 455 Success 90 searchInDatabase
+>> 455 Success 90 searchInDatabase
+++ 456 Success 65 ;
+-- 456 Success 65 ;
+>> 456 Success 65 ;
+** 395 Continuation 65 ; {456 Success 65 ;, 443 AAActivated 65 ;, 419 AAHappened 65 ;394 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=2S+0N)
+-- 395 Continuation 65 ; {456 Success 65 ;, 443 AAActivated 65 ;, 419 AAHappened 65 ;394 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=2S+0N)
+>> 395 Continuation 65 ; {456 Success 65 ;, 443 AAActivated 65 ;, 419 AAHappened 65 ;394 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=2 (=2S+0N)
+++ 457 Activation 101 showSearchResults
+++ 458 Continuation 65 ; {-1 Activation 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+-- 457 Activation 101 showSearchResults
+>> 457 Activation 101 showSearchResults
+++ 459 Activation 102 showSearchResults
+-- 459 Activation 102 showSearchResults
+>> 459 Activation 102 showSearchResults
+++ 460 Activation 103 @:
+-- 460 Activation 103 @:
+>> 460 Activation 103 @:
+++ 461 Activation 104 {}
+-- 461 Activation 104 {}
+>> 461 Activation 104 {}
+++ 462 AAActivated 104 {}
+++ 463 AAToBeExecuted 104 {}
+-- 462 AAActivated 104 {}
+>> 462 AAActivated 104 {}
+++ 464 AAActivated 103 @:
+-- 464 AAActivated 103 @:
+>> 464 AAActivated 103 @:
+++ 465 AAActivated 102 showSearchResults
+-- 465 AAActivated 102 showSearchResults
+>> 465 AAActivated 102 showSearchResults
+++ 466 AAActivated 101 showSearchResults
+-- 466 AAActivated 101 showSearchResults
+>> 466 AAActivated 101 showSearchResults
+++ 467 AAActivated 65 ;
+-- 467 AAActivated 65 ;
+>> 467 AAActivated 65 ;
+** 458 Continuation 65 ; {-1 Activation 65 ;, 467 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+++ 468 AAActivated 64 /
+-- 468 AAActivated 64 /
+>> 468 AAActivated 64 /
+** 397 Continuation 64 / {468 AAActivated 64 /, 420 AAHappened 64 /396 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 469 AAActivated  9 ;
+-- 469 AAActivated  9 ;
+>> 469 AAActivated  9 ;
+** 399 Continuation  9 ; {469 AAActivated  9 ;, 421 AAHappened  9 ;398 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 470 AAActivated  8 searchSequence
+-- 470 AAActivated  8 searchSequence
+>> 470 AAActivated  8 searchSequence
+++ 471 AAActivated  7 searchSequence
+-- 471 AAActivated  7 searchSequence
+>> 471 AAActivated  7 searchSequence
+++ 472 AAActivated  5 ; ...
+-- 472 AAActivated  5 ; ...
+>> 472 AAActivated  5 ; ...
+** 403 Continuation  5 ; ... {472 AAActivated  5 ; ..., 424 AAHappened  5 ; ...402 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 473 AAActivated  4 ||
+-- 473 AAActivated  4 ||
+>> 473 AAActivated  4 ||
+** 405 Continuation  4 || {473 AAActivated  4 ||, 425 AAHappened  4 ||404 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 474 AAActivated  3 live
+-- 474 AAActivated  3 live
+>> 474 AAActivated  3 live
+++ 475 AAActivated  2 <root>
+-- 475 AAActivated  2 <root>
+>> 475 AAActivated  2 <root>
+++ 476 AAActivated  1 **
+-- 476 AAActivated  1 **
+>> 476 AAActivated  1 **
+-- 458 Continuation 65 ; {-1 Activation 65 ;, 467 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+>> 458 Continuation 65 ; {-1 Activation 65 ;, 467 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+-- 397 Continuation 64 / {468 AAActivated 64 /, 420 AAHappened 64 /396 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+>> 397 Continuation 64 / {468 AAActivated 64 /, 420 AAHappened 64 /396 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+-- 399 Continuation  9 ; {469 AAActivated  9 ;, 421 AAHappened  9 ;398 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+>> 399 Continuation  9 ; {469 AAActivated  9 ;, 421 AAHappened  9 ;398 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+-- 403 Continuation  5 ; ... {472 AAActivated  5 ; ..., 424 AAHappened  5 ; ...402 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 403 Continuation  5 ; ... {472 AAActivated  5 ; ..., 424 AAHappened  5 ; ...402 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 405 Continuation  4 || {473 AAActivated  4 ||, 425 AAHappened  4 ||404 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 405 Continuation  4 || {473 AAActivated  4 ||, 425 AAHappened  4 ||404 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+-- 436 AAToBeExecuted 100 {**}
+>> 436 AAToBeExecuted 100 {**}
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=3 (=2S+1N)
+  |    *                      64 / S=false nActivated=2 (=0S+2N)
+  |    |*                     65 ; S=false nActivated=3 (=2S+1N)
+--|----|-*--------------------90 searchInDatabase
+  |    |  *                   91 searchInDatabase
+  |    |   *                  92 || S=true nActivated=2 (=1S+1N)
+  |    |   |*                 93 {**}
+  |    |    *                 94 progressMonitor
+--|----|-----*----------------95 progressMonitor
+  |    |      *               96 ; S=false nActivated=3 (=2S+1N)
+  |    |       *              100 {**}
+  |    | *                    101 showSearchResults
+  |    |  *                   102 showSearchResults
+--|----|---*------------------103 @:
+  |    |    *                 104 {}
+  |     *                     70 cancelSearch
+  |      *                    71 cancelSearch
+  |       *                   72 ; S=false nActivated=1 (=0S+1N)
+--|--------*------------------73 cancelCommand
+  |         *                 74 cancelCommand
+  |          *                75 + S=false nActivated=2 (=0S+2N)
+  |          |*               76 cancelButton
+  |          | *              77 clicked
+--|----------|--*-------------78 event
+  |          |   *            79 event
+  |          |    *           80 @:
+  |          |     *          81 {.}
+  |           *               82 Escape
+--|------------*--------------83 vkey
+  |             *             84 vkey2
+  |              *            85 vkey2
+  |               *           86 event
+  |                *          87 event
+--|-----------------*---------88 @:
+  |                  *        89 {.}
+   *                          21 doExit
+    *                         22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+------*-----------------------24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+        |*                    27 exitButton
+        | *                   28 clicked
+--------|--*------------------29 event
+        |   *                 30 event
+        |    *                31 @:
+        |     *               32 {.}
+         *                    33 windowClosing
+----------*-------------------34 windowClosing
+           *                  35 event
+            *                 36 event
+             *                37 @:
+              *               38 {.}
+=== Messages ===
+463 AAToBeExecuted 104 {}
+=== End ===
+++ 477 AAHappened 100 {**}
+-- 477 AAHappened 100 {**}
+>> 477 AAHappened 100 {**}
+++ 478 AAHappened 96 ; ...
+-- 478 AAHappened 96 ; ...
+>> 478 AAHappened 96 ; ...
+++ 479 Continuation 96 ; ... {478 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=2S+1N)
+++ 480 AAHappened 95 progressMonitor
+-- 480 AAHappened 95 progressMonitor
+>> 480 AAHappened 95 progressMonitor
+++ 481 AAHappened 94 progressMonitor
+-- 481 AAHappened 94 progressMonitor
+>> 481 AAHappened 94 progressMonitor
+++ 482 AAHappened 92 ||
+-- 482 AAHappened 92 ||
+>> 482 AAHappened 92 ||
+++ 483 Continuation 92 || {482 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+++ 484 AAHappened 91 searchInDatabase
+-- 484 AAHappened 91 searchInDatabase
+>> 484 AAHappened 91 searchInDatabase
+++ 485 AAHappened 90 searchInDatabase
+-- 485 AAHappened 90 searchInDatabase
+>> 485 AAHappened 90 searchInDatabase
+++ 486 AAHappened 65 ;
+-- 486 AAHappened 65 ;
+>> 486 AAHappened 65 ;
+++ 487 Continuation 65 ; {486 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=3 (=1S+2N)
+++ 488 Exclude 101 showSearchResults
+++ 489 AAHappened 64 /
+-- 489 AAHappened 64 /
+>> 489 AAHappened 64 /
+++ 490 Continuation 64 / {489 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 491 AAHappened  9 ;
+-- 491 AAHappened  9 ;
+>> 491 AAHappened  9 ;
+++ 492 Continuation  9 ; {491 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 493 AAHappened  8 searchSequence
+-- 493 AAHappened  8 searchSequence
+>> 493 AAHappened  8 searchSequence
+++ 494 AAHappened  7 searchSequence
+-- 494 AAHappened  7 searchSequence
+>> 494 AAHappened  7 searchSequence
+++ 495 AAHappened  5 ; ...
+-- 495 AAHappened  5 ; ...
+>> 495 AAHappened  5 ; ...
+++ 496 Continuation  5 ; ... {495 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 497 AAHappened  4 ||
+-- 497 AAHappened  4 ||
+>> 497 AAHappened  4 ||
+++ 498 Continuation  4 || {497 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 499 AAHappened  3 live
+-- 499 AAHappened  3 live
+>> 499 AAHappened  3 live
+++ 500 AAHappened  2 <root>
+-- 500 AAHappened  2 <root>
+>> 500 AAHappened  2 <root>
+++ 501 AAHappened  1 **
+-- 501 AAHappened  1 **
+>> 501 AAHappened  1 **
+-- 488 Exclude 101 showSearchResults
+>> 488 Exclude 101 showSearchResults
+++ 502 Exclude 102 showSearchResults
+-- 502 Exclude 102 showSearchResults
+>> 502 Exclude 102 showSearchResults
+++ 503 Exclude 103 @:
+-- 503 Exclude 103 @:
+>> 503 Exclude 103 @:
+++ 504 Exclude 104 {}
+-- 504 Exclude 104 {}
+>> 504 Exclude 104 {}
+-- 504 Exclude 104 {}
+++ 505 Deactivation 104 {}
+-- 505 Deactivation 104 {}
+>> 505 Deactivation 104 {}
+++ 506 Deactivation 103 @:
+-- 506 Deactivation 103 @:
+>> 506 Deactivation 103 @:
+++ 507 Deactivation 102 showSearchResults
+-- 507 Deactivation 102 showSearchResults
+>> 507 Deactivation 102 showSearchResults
+++ 508 Deactivation 101 showSearchResults
+-- 508 Deactivation 101 showSearchResults
+>> 508 Deactivation 101 showSearchResults
+++ 509 Deactivation 65 ;
+-- 509 Deactivation 65 ;
+>> 509 Deactivation 65 ;
+** 487 Continuation 65 ; {509 Deactivation 65 ;, 486 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=3 (=1S+2N)
+-- 479 Continuation 96 ; ... {478 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=3S+0N)
+>> 479 Continuation 96 ; ... {478 AAHappened 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=3S+0N)
+-- 483 Continuation 92 || {482 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+>> 483 Continuation 92 || {482 AAHappened 92 ||, 92 ||} 92 || S=false nActivated=2 (=1S+1N)
+++ 510 Success 92 ||
+-- 510 Success 92 ||
+>> 510 Success 92 ||
+++ 511 Success 91 searchInDatabase
+-- 511 Success 91 searchInDatabase
+>> 511 Success 91 searchInDatabase
+++ 512 Success 90 searchInDatabase
+-- 512 Success 90 searchInDatabase
+>> 512 Success 90 searchInDatabase
+++ 513 Success 65 ;
+-- 513 Success 65 ;
+>> 513 Success 65 ;
+** 487 Continuation 65 ; {509 Deactivation 65 ;, 513 Success 65 ;, 486 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+-- 487 Continuation 65 ; {509 Deactivation 65 ;, 513 Success 65 ;, 486 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+>> 487 Continuation 65 ; {509 Deactivation 65 ;, 513 Success 65 ;, 486 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=3 (=2S+1N)
+++ 514 Activation 105 showSearchResults
+++ 515 Continuation 65 ; {-1 Activation 65 ;, 65 ;} 65 ; S=false nActivated=4 (=2S+2N)
+-- 514 Activation 105 showSearchResults
+>> 514 Activation 105 showSearchResults
+++ 516 Activation 106 showSearchResults
+-- 516 Activation 106 showSearchResults
+>> 516 Activation 106 showSearchResults
+++ 517 Activation 107 @:
+-- 517 Activation 107 @:
+>> 517 Activation 107 @:
+++ 518 Activation 108 {}
+-- 518 Activation 108 {}
+>> 518 Activation 108 {}
+++ 519 AAActivated 108 {}
+++ 520 AAToBeExecuted 108 {}
+-- 519 AAActivated 108 {}
+>> 519 AAActivated 108 {}
+++ 521 AAActivated 107 @:
+-- 521 AAActivated 107 @:
+>> 521 AAActivated 107 @:
+++ 522 AAActivated 106 showSearchResults
+-- 522 AAActivated 106 showSearchResults
+>> 522 AAActivated 106 showSearchResults
+++ 523 AAActivated 105 showSearchResults
+-- 523 AAActivated 105 showSearchResults
+>> 523 AAActivated 105 showSearchResults
+++ 524 AAActivated 65 ;
+-- 524 AAActivated 65 ;
+>> 524 AAActivated 65 ;
+** 515 Continuation 65 ; {-1 Activation 65 ;, 524 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=4 (=2S+2N)
+++ 525 AAActivated 64 /
+-- 525 AAActivated 64 /
+>> 525 AAActivated 64 /
+** 490 Continuation 64 / {525 AAActivated 64 /, 489 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 526 AAActivated  9 ;
+-- 526 AAActivated  9 ;
+>> 526 AAActivated  9 ;
+** 492 Continuation  9 ; {526 AAActivated  9 ;, 491 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 527 AAActivated  8 searchSequence
+-- 527 AAActivated  8 searchSequence
+>> 527 AAActivated  8 searchSequence
+++ 528 AAActivated  7 searchSequence
+-- 528 AAActivated  7 searchSequence
+>> 528 AAActivated  7 searchSequence
+++ 529 AAActivated  5 ; ...
+-- 529 AAActivated  5 ; ...
+>> 529 AAActivated  5 ; ...
+** 496 Continuation  5 ; ... {529 AAActivated  5 ; ..., 495 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 530 AAActivated  4 ||
+-- 530 AAActivated  4 ||
+>> 530 AAActivated  4 ||
+** 498 Continuation  4 || {530 AAActivated  4 ||, 497 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 531 AAActivated  3 live
+-- 531 AAActivated  3 live
+>> 531 AAActivated  3 live
+++ 532 AAActivated  2 <root>
+-- 532 AAActivated  2 <root>
+>> 532 AAActivated  2 <root>
+++ 533 AAActivated  1 **
+-- 533 AAActivated  1 **
+>> 533 AAActivated  1 **
+-- 515 Continuation 65 ; {-1 Activation 65 ;, 524 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=4 (=2S+2N)
+>> 515 Continuation 65 ; {-1 Activation 65 ;, 524 AAActivated 65 ;, 65 ;} 65 ; S=false nActivated=4 (=2S+2N)
+-- 490 Continuation 64 / {525 AAActivated 64 /, 489 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+>> 490 Continuation 64 / {525 AAActivated 64 /, 489 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+-- 492 Continuation  9 ; {526 AAActivated  9 ;, 491 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+>> 492 Continuation  9 ; {526 AAActivated  9 ;, 491 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+-- 496 Continuation  5 ; ... {529 AAActivated  5 ; ..., 495 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+>> 496 Continuation  5 ; ... {529 AAActivated  5 ; ..., 495 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+-- 498 Continuation  4 || {530 AAActivated  4 ||, 497 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 498 Continuation  4 || {530 AAActivated  4 ||, 497 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+-- 463 AAToBeExecuted 104 {}
+>> 463 AAToBeExecuted 104 {}
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=3 (=2S+1N)
+  |    *                      64 / S=false nActivated=2 (=0S+2N)
+  |    |*                     65 ; S=false nActivated=4 (=2S+2N)
+--|----|-*--------------------90 searchInDatabase
+  |    |  *                   91 searchInDatabase
+  |    |   *                  92 || S=true nActivated=2 (=1S+1N)
+  |    |   |*                 93 {**}
+  |    |    *                 94 progressMonitor
+--|----|-----*----------------95 progressMonitor
+  |    |      *               96 ; S=false nActivated=3 (=3S+0N)
+  |    |       *              100 {**}
+  |    | *                    105 showSearchResults
+  |    |  *                   106 showSearchResults
+--|----|---*------------------107 @:
+  |    |    *                 108 {}
+  |     *                     70 cancelSearch
+  |      *                    71 cancelSearch
+  |       *                   72 ; S=false nActivated=1 (=0S+1N)
+--|--------*------------------73 cancelCommand
+  |         *                 74 cancelCommand
+  |          *                75 + S=false nActivated=2 (=0S+2N)
+  |          |*               76 cancelButton
+  |          | *              77 clicked
+--|----------|--*-------------78 event
+  |          |   *            79 event
+  |          |    *           80 @:
+  |          |     *          81 {.}
+  |           *               82 Escape
+--|------------*--------------83 vkey
+  |             *             84 vkey2
+  |              *            85 vkey2
+  |               *           86 event
+  |                *          87 event
+--|-----------------*---------88 @:
+  |                  *        89 {.}
+   *                          21 doExit
+    *                         22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+------*-----------------------24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+        |*                    27 exitButton
+        | *                   28 clicked
+--------|--*------------------29 event
+        |   *                 30 event
+        |    *                31 @:
+        |     *               32 {.}
+         *                    33 windowClosing
+----------*-------------------34 windowClosing
+           *                  35 event
+            *                 36 event
+             *                37 @:
+              *               38 {.}
+=== Messages ===
+520 AAToBeExecuted 108 {}
+=== End ===
+-- 520 AAToBeExecuted 108 {}
+>> 520 AAToBeExecuted 108 {}
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=2 (=1S+1N)
+--|-*------------------------- 7 searchSequence
+  |  *                         8 searchSequence
+  |   *                        9 ; S=false nActivated=3 (=2S+1N)
+  |    *                      64 / S=false nActivated=2 (=0S+2N)
+  |    |*                     65 ; S=false nActivated=4 (=2S+2N)
+--|----|-*--------------------90 searchInDatabase
+  |    |  *                   91 searchInDatabase
+  |    |   *                  92 || S=true nActivated=2 (=1S+1N)
+  |    |   |*                 93 {**}
+  |    |    *                 94 progressMonitor
+--|----|-----*----------------95 progressMonitor
+  |    |      *               96 ; S=false nActivated=3 (=3S+0N)
+  |    |       *              100 {**}
+  |    | *                    105 showSearchResults
+  |    |  *                   106 showSearchResults
+--|----|---*------------------107 @:
+  |    |    *                 108 {}
+  |     *                     70 cancelSearch
+  |      *                    71 cancelSearch
+  |       *                   72 ; S=false nActivated=1 (=0S+1N)
+--|--------*------------------73 cancelCommand
+  |         *                 74 cancelCommand
+  |          *                75 + S=false nActivated=2 (=0S+2N)
+  |          |*               76 cancelButton
+  |          | *              77 clicked
+--|----------|--*-------------78 event
+  |          |   *            79 event
+  |          |    *           80 @:
+  |          |     *          81 {.}
+  |           *               82 Escape
+--|------------*--------------83 vkey
+  |             *             84 vkey2
+  |              *            85 vkey2
+  |               *           86 event
+  |                *          87 event
+--|-----------------*---------88 @:
+  |                  *        89 {.}
+   *                          21 doExit
+    *                         22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+------*-----------------------24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+        |*                    27 exitButton
+        | *                   28 clicked
+--------|--*------------------29 event
+        |   *                 30 event
+        |    *                31 @:
+        |     *               32 {.}
+         *                    33 windowClosing
+----------*-------------------34 windowClosing
+           *                  35 event
+            *                 36 event
+             *                37 @:
+              *               38 {.}
+=== Messages ===
+=== End ===
+++ 534 AAHappened 108 {}
+-- 534 AAHappened 108 {}
+>> 534 AAHappened 108 {}
+++ 535 AAExecutionFinished 108 {}
+++ 536 AAHappened 107 @:
+-- 536 AAHappened 107 @:
+>> 536 AAHappened 107 @:
+++ 537 AAHappened 106 showSearchResults
+-- 537 AAHappened 106 showSearchResults
+>> 537 AAHappened 106 showSearchResults
+++ 538 AAHappened 105 showSearchResults
+-- 538 AAHappened 105 showSearchResults
+>> 538 AAHappened 105 showSearchResults
+++ 539 AAHappened 65 ;
+-- 539 AAHappened 65 ;
+>> 539 AAHappened 65 ;
+++ 540 Continuation 65 ; {539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=2S+2N)
+++ 541 Exclude 90 searchInDatabase
+++ 542 AAHappened 64 /
+-- 542 AAHappened 64 /
+>> 542 AAHappened 64 /
+++ 543 Continuation 64 / {542 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 544 AAHappened  9 ;
+-- 544 AAHappened  9 ;
+>> 544 AAHappened  9 ;
+++ 545 Continuation  9 ; {544 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 546 AAHappened  8 searchSequence
+-- 546 AAHappened  8 searchSequence
+>> 546 AAHappened  8 searchSequence
+++ 547 AAHappened  7 searchSequence
+-- 547 AAHappened  7 searchSequence
+>> 547 AAHappened  7 searchSequence
+++ 548 AAHappened  5 ; ...
+-- 548 AAHappened  5 ; ...
+>> 548 AAHappened  5 ; ...
+++ 549 Continuation  5 ; ... {548 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 550 AAHappened  4 ||
+-- 550 AAHappened  4 ||
+>> 550 AAHappened  4 ||
+++ 551 Continuation  4 || {550 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 552 AAHappened  3 live
+-- 552 AAHappened  3 live
+>> 552 AAHappened  3 live
+++ 553 AAHappened  2 <root>
+-- 553 AAHappened  2 <root>
+>> 553 AAHappened  2 <root>
+++ 554 AAHappened  1 **
+-- 554 AAHappened  1 **
+>> 554 AAHappened  1 **
+-- 541 Exclude 90 searchInDatabase
+>> 541 Exclude 90 searchInDatabase
+++ 555 Exclude 91 searchInDatabase
+-- 555 Exclude 91 searchInDatabase
+>> 555 Exclude 91 searchInDatabase
+++ 556 Exclude 92 ||
+-- 556 Exclude 92 ||
+>> 556 Exclude 92 ||
+++ 557 Exclude 93 {**}
+++ 558 Exclude 94 progressMonitor
+-- 557 Exclude 93 {**}
+>> 557 Exclude 93 {**}
+++ 559 AAExecutionFinished 93 {**}
+++ 560 Deactivation 93 {**}
+-- 558 Exclude 94 progressMonitor
+>> 558 Exclude 94 progressMonitor
+++ 561 Exclude 95 progressMonitor
+-- 561 Exclude 95 progressMonitor
+>> 561 Exclude 95 progressMonitor
+++ 562 Exclude 96 ; ...
+-- 562 Exclude 96 ; ...
+>> 562 Exclude 96 ; ...
+++ 563 Exclude 100 {**}
+-- 563 Exclude 100 {**}
+>> 563 Exclude 100 {**}
+++ 564 AAExecutionFinished 100 {**}
+++ 565 Deactivation 100 {**}
+-- 560 Deactivation 93 {**}
+>> 560 Deactivation 93 {**}
+++ 566 Deactivation 92 ||
+-- 566 Deactivation 92 ||
+>> 566 Deactivation 92 ||
+++ 567 Continuation 92 || {566 Deactivation 92 ||, 92 ||} 92 || S=true nActivated=2 (=1S+1N)
+-- 565 Deactivation 100 {**}
+>> 565 Deactivation 100 {**}
+++ 568 Deactivation 96 ; ...
+-- 568 Deactivation 96 ; ...
+>> 568 Deactivation 96 ; ...
+++ 569 Continuation 96 ; ... {568 Deactivation 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=3S+0N)
+-- 559 AAExecutionFinished 93 {**}
+>> 559 AAExecutionFinished 93 {**}
+-- 564 AAExecutionFinished 100 {**}
+>> 564 AAExecutionFinished 100 {**}
+-- 535 AAExecutionFinished 108 {}
+>> 535 AAExecutionFinished 108 {}
+++ 570 AAHappened 108 {}
+++ 571 Success 108 {}
+++ 572 Deactivation 108 {}
+-- 570 AAHappened 108 {}
+>> 570 AAHappened 108 {}
+++ 573 AAHappened 107 @:
+-- 573 AAHappened 107 @:
+>> 573 AAHappened 107 @:
+++ 574 AAHappened 106 showSearchResults
+-- 574 AAHappened 106 showSearchResults
+>> 574 AAHappened 106 showSearchResults
+++ 575 AAHappened 105 showSearchResults
+-- 575 AAHappened 105 showSearchResults
+>> 575 AAHappened 105 showSearchResults
+++ 576 AAHappened 65 ;
+-- 576 AAHappened 65 ;
+>> 576 AAHappened 65 ;
+** 540 Continuation 65 ; {576 AAHappened 65 ;539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=2S+2N)
+++ 577 Exclude 90 searchInDatabase
+++ 578 AAHappened 64 /
+-- 578 AAHappened 64 /
+>> 578 AAHappened 64 /
+** 543 Continuation 64 / {578 AAHappened 64 /542 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=0S+2N)
+++ 579 AAHappened  9 ;
+-- 579 AAHappened  9 ;
+>> 579 AAHappened  9 ;
+** 545 Continuation  9 ; {579 AAHappened  9 ;544 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=2S+1N)
+++ 580 AAHappened  8 searchSequence
+-- 580 AAHappened  8 searchSequence
+>> 580 AAHappened  8 searchSequence
+++ 581 AAHappened  7 searchSequence
+-- 581 AAHappened  7 searchSequence
+>> 581 AAHappened  7 searchSequence
+++ 582 AAHappened  5 ; ...
+-- 582 AAHappened  5 ; ...
+>> 582 AAHappened  5 ; ...
+** 549 Continuation  5 ; ... {582 AAHappened  5 ; ...548 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=1S+1N)
+++ 583 AAHappened  4 ||
+-- 583 AAHappened  4 ||
+>> 583 AAHappened  4 ||
+** 551 Continuation  4 || {583 AAHappened  4 ||550 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+++ 584 AAHappened  3 live
+-- 584 AAHappened  3 live
+>> 584 AAHappened  3 live
+++ 585 AAHappened  2 <root>
+-- 585 AAHappened  2 <root>
+>> 585 AAHappened  2 <root>
+++ 586 AAHappened  1 **
+-- 586 AAHappened  1 **
+>> 586 AAHappened  1 **
+-- 571 Success 108 {}
+>> 571 Success 108 {}
+++ 587 Success 107 @:
+-- 587 Success 107 @:
+>> 587 Success 107 @:
+++ 588 Success 106 showSearchResults
+-- 588 Success 106 showSearchResults
+>> 588 Success 106 showSearchResults
+++ 589 Success 105 showSearchResults
+-- 589 Success 105 showSearchResults
+>> 589 Success 105 showSearchResults
+++ 590 Success 65 ;
+-- 590 Success 65 ;
+>> 590 Success 65 ;
+** 540 Continuation 65 ; {590 Success 65 ;, 576 AAHappened 65 ;539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=3S+1N)
+-- 577 Exclude 90 searchInDatabase
+>> 577 Exclude 90 searchInDatabase
+++ 591 Exclude 91 searchInDatabase
+-- 591 Exclude 91 searchInDatabase
+>> 591 Exclude 91 searchInDatabase
+++ 592 Exclude 92 ||
+-- 592 Exclude 92 ||
+>> 592 Exclude 92 ||
+++ 593 Exclude 94 progressMonitor
+-- 593 Exclude 94 progressMonitor
+>> 593 Exclude 94 progressMonitor
+++ 594 Exclude 95 progressMonitor
+-- 594 Exclude 95 progressMonitor
+>> 594 Exclude 95 progressMonitor
+++ 595 Exclude 96 ; ...
+-- 595 Exclude 96 ; ...
+>> 595 Exclude 96 ; ...
+-- 572 Deactivation 108 {}
+>> 572 Deactivation 108 {}
+++ 596 Deactivation 107 @:
+-- 596 Deactivation 107 @:
+>> 596 Deactivation 107 @:
+++ 597 Deactivation 106 showSearchResults
+-- 597 Deactivation 106 showSearchResults
+>> 597 Deactivation 106 showSearchResults
+++ 598 Deactivation 105 showSearchResults
+-- 598 Deactivation 105 showSearchResults
+>> 598 Deactivation 105 showSearchResults
+++ 599 Deactivation 65 ;
+-- 599 Deactivation 65 ;
+>> 599 Deactivation 65 ;
+** 540 Continuation 65 ; {599 Deactivation 65 ;, 590 Success 65 ;, 576 AAHappened 65 ;539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=3S+1N)
+-- 569 Continuation 96 ; ... {568 Deactivation 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=3S+0N)
+>> 569 Continuation 96 ; ... {568 Deactivation 96 ; ..., 96 ; ...} 96 ; S=false nActivated=3 (=3S+0N)
+++ 600 Deactivation 96 ; ...
+-- 600 Deactivation 96 ; ...
+>> 600 Deactivation 96 ; ...
+++ 601 Deactivation 95 progressMonitor
+-- 601 Deactivation 95 progressMonitor
+>> 601 Deactivation 95 progressMonitor
+++ 602 Deactivation 94 progressMonitor
+-- 602 Deactivation 94 progressMonitor
+>> 602 Deactivation 94 progressMonitor
+++ 603 Deactivation 92 ||
+-- 603 Deactivation 92 ||
+>> 603 Deactivation 92 ||
+** 567 Continuation 92 || {603 Deactivation 92 ||566 Deactivation 92 ||, 92 ||} 92 || S=true nActivated=2 (=1S+1N)
+-- 567 Continuation 92 || {603 Deactivation 92 ||566 Deactivation 92 ||, 92 ||} 92 || S=true nActivated=2 (=1S+1N)
+>> 567 Continuation 92 || {603 Deactivation 92 ||566 Deactivation 92 ||, 92 ||} 92 || S=true nActivated=2 (=1S+1N)
+++ 604 Deactivation 92 ||
+-- 604 Deactivation 92 ||
+>> 604 Deactivation 92 ||
+++ 605 Deactivation 91 searchInDatabase
+-- 605 Deactivation 91 searchInDatabase
+>> 605 Deactivation 91 searchInDatabase
+++ 606 Deactivation 90 searchInDatabase
+-- 606 Deactivation 90 searchInDatabase
+>> 606 Deactivation 90 searchInDatabase
+++ 607 Deactivation 65 ;
+-- 607 Deactivation 65 ;
+>> 607 Deactivation 65 ;
+** 540 Continuation 65 ; {607 Deactivation 65 ;599 Deactivation 65 ;, 590 Success 65 ;, 576 AAHappened 65 ;539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=3S+1N)
+-- 540 Continuation 65 ; {607 Deactivation 65 ;599 Deactivation 65 ;, 590 Success 65 ;, 576 AAHappened 65 ;539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=3S+1N)
+>> 540 Continuation 65 ; {607 Deactivation 65 ;599 Deactivation 65 ;, 590 Success 65 ;, 576 AAHappened 65 ;539 AAHappened 65 ;, 65 ;} 65 ; S=false nActivated=4 (=3S+1N)
+++ 608 Deactivation 65 ;
+++ 609 Success 65 ;
+-- 609 Success 65 ;
+>> 609 Success 65 ;
+++ 610 Success 64 /
+-- 610 Success 64 /
+>> 610 Success 64 /
+** 543 Continuation 64 / {610 Success 64 /, 578 AAHappened 64 /542 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=1S+1N)
+-- 608 Deactivation 65 ;
+>> 608 Deactivation 65 ;
+++ 611 Deactivation 64 /
+-- 611 Deactivation 64 /
+>> 611 Deactivation 64 /
+** 543 Continuation 64 / {611 Deactivation 64 /, 610 Success 64 /, 578 AAHappened 64 /542 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=1S+1N)
+-- 543 Continuation 64 / {611 Deactivation 64 /, 610 Success 64 /, 578 AAHappened 64 /542 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=1S+1N)
+>> 543 Continuation 64 / {611 Deactivation 64 /, 610 Success 64 /, 578 AAHappened 64 /542 AAHappened 64 /, 64 /} 64 / S=false nActivated=2 (=1S+1N)
+++ 612 Success 64 /
+++ 613 Exclude 70 cancelSearch
+-- 612 Success 64 /
+>> 612 Success 64 /
+++ 614 Success  9 ;
+-- 614 Success  9 ;
+>> 614 Success  9 ;
+** 545 Continuation  9 ; {614 Success  9 ;, 579 AAHappened  9 ;544 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=3S+0N)
+-- 613 Exclude 70 cancelSearch
+>> 613 Exclude 70 cancelSearch
+++ 615 Exclude 71 cancelSearch
+-- 615 Exclude 71 cancelSearch
+>> 615 Exclude 71 cancelSearch
+++ 616 Exclude 72 ;
+-- 616 Exclude 72 ;
+>> 616 Exclude 72 ;
+++ 617 Exclude 73 cancelCommand
+-- 617 Exclude 73 cancelCommand
+>> 617 Exclude 73 cancelCommand
+++ 618 Exclude 74 cancelCommand
+-- 618 Exclude 74 cancelCommand
+>> 618 Exclude 74 cancelCommand
+++ 619 Exclude 75 +
+-- 619 Exclude 75 +
+>> 619 Exclude 75 +
+++ 620 Exclude 76 cancelButton
+++ 621 Exclude 82 Escape
+-- 620 Exclude 76 cancelButton
+>> 620 Exclude 76 cancelButton
+++ 622 Exclude 77 clicked
+-- 622 Exclude 77 clicked
+>> 622 Exclude 77 clicked
+++ 623 Exclude 78 event
+-- 623 Exclude 78 event
+>> 623 Exclude 78 event
+++ 624 Exclude 79 event
+-- 624 Exclude 79 event
+>> 624 Exclude 79 event
+++ 625 Exclude 80 @:
+-- 625 Exclude 80 @:
+>> 625 Exclude 80 @:
+++ 626 Exclude 81 {.}
+-- 626 Exclude 81 {.}
+>> 626 Exclude 81 {.}
+++ 627 Deactivation 81 {.}
+-- 621 Exclude 82 Escape
+>> 621 Exclude 82 Escape
+++ 628 Exclude 83 vkey
+-- 628 Exclude 83 vkey
+>> 628 Exclude 83 vkey
+++ 629 Exclude 84 vkey2
+-- 629 Exclude 84 vkey2
+>> 629 Exclude 84 vkey2
+++ 630 Exclude 85 vkey2
+-- 630 Exclude 85 vkey2
+>> 630 Exclude 85 vkey2
+++ 631 Exclude 86 event
+-- 631 Exclude 86 event
+>> 631 Exclude 86 event
+++ 632 Exclude 87 event
+-- 632 Exclude 87 event
+>> 632 Exclude 87 event
+++ 633 Exclude 88 @:
+-- 633 Exclude 88 @:
+>> 633 Exclude 88 @:
+++ 634 Exclude 89 {.}
+-- 634 Exclude 89 {.}
+>> 634 Exclude 89 {.}
+++ 635 Deactivation 89 {.}
+-- 627 Deactivation 81 {.}
+>> 627 Deactivation 81 {.}
+++ 636 Deactivation 80 @:
+-- 636 Deactivation 80 @:
+>> 636 Deactivation 80 @:
+++ 637 Deactivation 79 event
+-- 637 Deactivation 79 event
+>> 637 Deactivation 79 event
+++ 638 Deactivation 78 event
+-- 638 Deactivation 78 event
+>> 638 Deactivation 78 event
+++ 639 Deactivation 77 clicked
+-- 639 Deactivation 77 clicked
+>> 639 Deactivation 77 clicked
+++ 640 Deactivation 76 cancelButton
+-- 640 Deactivation 76 cancelButton
+>> 640 Deactivation 76 cancelButton
+++ 641 Deactivation 75 +
+-- 641 Deactivation 75 +
+>> 641 Deactivation 75 +
+++ 642 Continuation 75 + {641 Deactivation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+-- 635 Deactivation 89 {.}
+>> 635 Deactivation 89 {.}
+++ 643 Deactivation 88 @:
+-- 643 Deactivation 88 @:
+>> 643 Deactivation 88 @:
+++ 644 Deactivation 87 event
+-- 644 Deactivation 87 event
+>> 644 Deactivation 87 event
+++ 645 Deactivation 86 event
+-- 645 Deactivation 86 event
+>> 645 Deactivation 86 event
+++ 646 Deactivation 85 vkey2
+-- 646 Deactivation 85 vkey2
+>> 646 Deactivation 85 vkey2
+++ 647 Deactivation 84 vkey2
+-- 647 Deactivation 84 vkey2
+>> 647 Deactivation 84 vkey2
+++ 648 Deactivation 83 vkey
+-- 648 Deactivation 83 vkey
+>> 648 Deactivation 83 vkey
+++ 649 Deactivation 82 Escape
+-- 649 Deactivation 82 Escape
+>> 649 Deactivation 82 Escape
+++ 650 Deactivation 75 +
+-- 650 Deactivation 75 +
+>> 650 Deactivation 75 +
+** 642 Continuation 75 + {650 Deactivation 75 +641 Deactivation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+-- 642 Continuation 75 + {650 Deactivation 75 +641 Deactivation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+>> 642 Continuation 75 + {650 Deactivation 75 +641 Deactivation 75 +, 75 +} 75 + S=false nActivated=2 (=0S+2N)
+++ 651 Deactivation 75 +
+-- 651 Deactivation 75 +
+>> 651 Deactivation 75 +
+++ 652 Deactivation 74 cancelCommand
+-- 652 Deactivation 74 cancelCommand
+>> 652 Deactivation 74 cancelCommand
+++ 653 Deactivation 73 cancelCommand
+-- 653 Deactivation 73 cancelCommand
+>> 653 Deactivation 73 cancelCommand
+++ 654 Deactivation 72 ;
+-- 654 Deactivation 72 ;
+>> 654 Deactivation 72 ;
+++ 655 Continuation 72 ; {654 Deactivation 72 ;, 72 ;} 72 ; S=false nActivated=1 (=0S+1N)
+-- 655 Continuation 72 ; {654 Deactivation 72 ;, 72 ;} 72 ; S=false nActivated=1 (=0S+1N)
+>> 655 Continuation 72 ; {654 Deactivation 72 ;, 72 ;} 72 ; S=false nActivated=1 (=0S+1N)
+++ 656 Deactivation 72 ;
+-- 656 Deactivation 72 ;
+>> 656 Deactivation 72 ;
+++ 657 Deactivation 71 cancelSearch
+-- 657 Deactivation 71 cancelSearch
+>> 657 Deactivation 71 cancelSearch
+++ 658 Deactivation 70 cancelSearch
+-- 658 Deactivation 70 cancelSearch
+>> 658 Deactivation 70 cancelSearch
+++ 659 Deactivation 64 /
+-- 659 Deactivation 64 /
+>> 659 Deactivation 64 /
+++ 660 Continuation 64 / {659 Deactivation 64 /, 64 /} 64 / S=true nActivated=2 (=1S+1N)
+-- 660 Continuation 64 / {659 Deactivation 64 /, 64 /} 64 / S=true nActivated=2 (=1S+1N)
+>> 660 Continuation 64 / {659 Deactivation 64 /, 64 /} 64 / S=true nActivated=2 (=1S+1N)
+++ 661 Deactivation 64 /
+-- 661 Deactivation 64 /
+>> 661 Deactivation 64 /
+++ 662 Deactivation  9 ;
+-- 662 Deactivation  9 ;
+>> 662 Deactivation  9 ;
+** 545 Continuation  9 ; {662 Deactivation  9 ;, 614 Success  9 ;, 579 AAHappened  9 ;544 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=3S+0N)
+-- 545 Continuation  9 ; {662 Deactivation  9 ;, 614 Success  9 ;, 579 AAHappened  9 ;544 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=3S+0N)
+>> 545 Continuation  9 ; {662 Deactivation  9 ;, 614 Success  9 ;, 579 AAHappened  9 ;544 AAHappened  9 ;,  9 ;}  9 ; S=false nActivated=3 (=3S+0N)
+++ 663 Deactivation  9 ;
+++ 664 Success  9 ;
+-- 664 Success  9 ;
+>> 664 Success  9 ;
+++ 665 Success  8 searchSequence
+-- 665 Success  8 searchSequence
+>> 665 Success  8 searchSequence
+++ 666 Success  7 searchSequence
+-- 666 Success  7 searchSequence
+>> 666 Success  7 searchSequence
+++ 667 Success  5 ; ...
+-- 667 Success  5 ; ...
+>> 667 Success  5 ; ...
+** 549 Continuation  5 ; ... {667 Success  5 ; ..., 582 AAHappened  5 ; ...548 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=2S+0N)
+-- 663 Deactivation  9 ;
+>> 663 Deactivation  9 ;
+++ 668 Deactivation  8 searchSequence
+-- 668 Deactivation  8 searchSequence
+>> 668 Deactivation  8 searchSequence
+++ 669 Deactivation  7 searchSequence
+-- 669 Deactivation  7 searchSequence
+>> 669 Deactivation  7 searchSequence
+++ 670 Deactivation  5 ; ...
+-- 670 Deactivation  5 ; ...
+>> 670 Deactivation  5 ; ...
+** 549 Continuation  5 ; ... {670 Deactivation  5 ; ..., 667 Success  5 ; ..., 582 AAHappened  5 ; ...548 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=2S+0N)
+-- 549 Continuation  5 ; ... {670 Deactivation  5 ; ..., 667 Success  5 ; ..., 582 AAHappened  5 ; ...548 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=2S+0N)
+>> 549 Continuation  5 ; ... {670 Deactivation  5 ; ..., 667 Success  5 ; ..., 582 AAHappened  5 ; ...548 AAHappened  5 ; ...,  5 ; ...}  5 ; S=false nActivated=2 (=2S+0N)
+++ 671 Activation 109 ...
+++ 672 Continuation  5 ; ... {-1 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=3 (=2S+1N)
+-- 671 Activation 109 ...
+>> 671 Activation 109 ...
+++ 673 Success 109 ...
+++ 674 Deactivation 109 ...
+-- 673 Success 109 ...
+>> 673 Success 109 ...
+++ 675 Success  5 ; ...
+-- 675 Success  5 ; ...
+>> 675 Success  5 ; ...
+** 672 Continuation  5 ; ... {-1 Activation  5 ; ..., 675 Success  5 ; ...,  5 ; ...}  5 ; S=false nActivated=3 (=3S+0N)
+-- 674 Deactivation 109 ...
+>> 674 Deactivation 109 ...
+++ 676 Deactivation  5 ; ...
+-- 676 Deactivation  5 ; ...
+>> 676 Deactivation  5 ; ...
+** 672 Continuation  5 ; ... {-1 Activation  5 ; ..., 676 Deactivation  5 ; ..., 675 Success  5 ; ...,  5 ; ...}  5 ; S=false nActivated=3 (=3S+0N)
+-- 672 Continuation  5 ; ... {-1 Activation  5 ; ..., 676 Deactivation  5 ; ..., 675 Success  5 ; ...,  5 ; ...}  5 ; S=false nActivated=3 (=3S+0N)
+>> 672 Continuation  5 ; ... {-1 Activation  5 ; ..., 676 Deactivation  5 ; ..., 675 Success  5 ; ...,  5 ; ...}  5 ; S=false nActivated=3 (=3S+0N)
+++ 677 Activation 110 searchSequence
+++ 678 Continuation  5 ; ... {-1 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=4 (=3S+1N)
+-- 677 Activation 110 searchSequence
+>> 677 Activation 110 searchSequence
+++ 679 Activation 111 searchSequence
+-- 679 Activation 111 searchSequence
+>> 679 Activation 111 searchSequence
+++ 680 Activation 112 ;
+-- 680 Activation 112 ;
+>> 680 Activation 112 ;
+++ 681 Activation 113 guard
+++ 682 Continuation 112 ; {680 Activation 112 ;, 113 guard} 112 ; S=false nActivated=1 (=0S+1N)
+-- 681 Activation 113 guard
+>> 681 Activation 113 guard
+++ 683 Activation 114 guard
+-- 683 Activation 114 guard
+>> 683 Activation 114 guard
+++ 684 Activation 115 ;
+-- 684 Activation 115 ;
+>> 684 Activation 115 ;
+++ 685 Activation 116 if-else
+++ 686 Continuation 115 ; {684 Activation 115 ;, 116 if-else} 115 ; S=false nActivated=1 (=0S+1N)
+-- 685 Activation 116 if-else
+>> 685 Activation 116 if-else
+++ 687 Activation 117 ..
+-- 687 Activation 117 ..
+>> 687 Activation 117 ..
+++ 688 Success 117 ..
+++ 689 Deactivation 117 ..
+++ 690 Break 117 ..
+-- 690 Break 117 ..
+>> 690 Break 117 ..
+++ 691 Break 116 if-else
+-- 691 Break 116 if-else
+>> 691 Break 116 if-else
+++ 692 Break 115 ; ...
+-- 692 Break 115 ; ...
+>> 692 Break 115 ; ...
+** 686 Continuation 115 ; ... {684 Activation 115 ; ..., 692 Break 115 ; ..., 116 if-else} 115 ; S=false nActivated=1 (=0S+1N)
+-- 688 Success 117 ..
+>> 688 Success 117 ..
+++ 693 Success 116 if-else
+-- 693 Success 116 if-else
+>> 693 Success 116 if-else
+++ 694 Success 115 ; ...
+-- 694 Success 115 ; ...
+>> 694 Success 115 ; ...
+** 686 Continuation 115 ; ... {684 Activation 115 ; ..., 694 Success 115 ; ..., 692 Break 115 ; ..., 116 if-else} 115 ; S=false nActivated=1 (=1S+0N)
+-- 689 Deactivation 117 ..
+>> 689 Deactivation 117 ..
+++ 695 Deactivation 116 if-else
+-- 695 Deactivation 116 if-else
+>> 695 Deactivation 116 if-else
+++ 696 Deactivation 115 ; ...
+-- 696 Deactivation 115 ; ...
+>> 696 Deactivation 115 ; ...
+** 686 Continuation 115 ; ... {684 Activation 115 ; ..., 696 Deactivation 115 ; ..., 694 Success 115 ; ..., 692 Break 115 ; ..., 116 if-else} 115 ; S=false nActivated=1 (=1S+0N)
+-- 686 Continuation 115 ; ... {684 Activation 115 ; ..., 696 Deactivation 115 ; ..., 694 Success 115 ; ..., 692 Break 115 ; ..., 116 if-else} 115 ; S=false nActivated=1 (=1S+0N)
+>> 686 Continuation 115 ; ... {684 Activation 115 ; ..., 696 Deactivation 115 ; ..., 694 Success 115 ; ..., 692 Break 115 ; ..., 116 if-else} 115 ; S=false nActivated=1 (=1S+0N)
+++ 697 Activation 118 anyEvent
+++ 698 Continuation 115 ; ... {684 Activation 115 ; ..., 115 ; ...} 115 ; S=false nActivated=2 (=1S+1N)
+++ 699 Success 115 ; ...
+-- 699 Success 115 ; ...
+>> 699 Success 115 ; ...
+++ 700 Success 114 guard
+-- 700 Success 114 guard
+>> 700 Success 114 guard
+++ 701 Success 113 guard
+-- 701 Success 113 guard
+>> 701 Success 113 guard
+++ 702 Success 112 ;
+-- 702 Success 112 ;
+>> 702 Success 112 ;
+** 682 Continuation 112 ; {680 Activation 112 ;, 702 Success 112 ;, 113 guard} 112 ; S=false nActivated=1 (=1S+0N)
+-- 697 Activation 118 anyEvent
+>> 697 Activation 118 anyEvent
+++ 703 Activation 119 anyEvent
+-- 703 Activation 119 anyEvent
+>> 703 Activation 119 anyEvent
+++ 704 Activation 120 event
+-- 704 Activation 120 event
+>> 704 Activation 120 event
+++ 705 Activation 121 event
+-- 705 Activation 121 event
+>> 705 Activation 121 event
+++ 706 Activation 122 @:
+-- 706 Activation 122 @:
+>> 706 Activation 122 @:
+++ 707 Activation 123 {.}
+-- 707 Activation 123 {.}
+>> 707 Activation 123 {.}
+-- 698 Continuation 115 ; ... {684 Activation 115 ; ..., 115 ; ...} 115 ; S=true nActivated=2 (=1S+1N)
+>> 698 Continuation 115 ; ... {684 Activation 115 ; ..., 115 ; ...} 115 ; S=true nActivated=2 (=1S+1N)
+-- 682 Continuation 112 ; {680 Activation 112 ;, 702 Success 112 ;, 113 guard} 112 ; S=false nActivated=1 (=1S+0N)
+>> 682 Continuation 112 ; {680 Activation 112 ;, 702 Success 112 ;, 113 guard} 112 ; S=false nActivated=1 (=1S+0N)
+++ 708 Activation 124 searchCommand
+++ 709 Continuation 112 ; {680 Activation 112 ;, 112 ;} 112 ; S=false nActivated=2 (=1S+1N)
+-- 708 Activation 124 searchCommand
+>> 708 Activation 124 searchCommand
+++ 710 Activation 125 searchCommand
+-- 710 Activation 125 searchCommand
+>> 710 Activation 125 searchCommand
+++ 711 Activation 126 +
+-- 711 Activation 126 +
+>> 711 Activation 126 +
+++ 712 Activation 127 searchButton
+++ 713 Continuation 126 + {711 Activation 126 +, 127 searchButton} 126 + S=false nActivated=1 (=0S+1N)
+-- 712 Activation 127 searchButton
+>> 712 Activation 127 searchButton
+++ 714 Activation 128 clicked
+-- 714 Activation 128 clicked
+>> 714 Activation 128 clicked
+++ 715 Activation 129 event
+-- 715 Activation 129 event
+>> 715 Activation 129 event
+++ 716 Activation 130 event
+-- 716 Activation 130 event
+>> 716 Activation 130 event
+++ 717 Activation 131 @:
+-- 717 Activation 131 @:
+>> 717 Activation 131 @:
+++ 718 Activation 132 {.}
+-- 718 Activation 132 {.}
+>> 718 Activation 132 {.}
+-- 713 Continuation 126 + {711 Activation 126 +, 127 searchButton} 126 + S=false nActivated=1 (=0S+1N)
+>> 713 Continuation 126 + {711 Activation 126 +, 127 searchButton} 126 + S=false nActivated=1 (=0S+1N)
+++ 719 Activation 133 Enter
+++ 720 Continuation 126 + {711 Activation 126 +, 126 +} 126 + S=false nActivated=2 (=0S+2N)
+-- 719 Activation 133 Enter
+>> 719 Activation 133 Enter
+++ 721 Activation 134 vkey
+-- 721 Activation 134 vkey
+>> 721 Activation 134 vkey
+++ 722 Activation 135 vkey2
+-- 722 Activation 135 vkey2
+>> 722 Activation 135 vkey2
+++ 723 Activation 136 vkey2
+-- 723 Activation 136 vkey2
+>> 723 Activation 136 vkey2
+++ 724 Activation 137 event
+-- 724 Activation 137 event
+>> 724 Activation 137 event
+++ 725 Activation 138 event
+-- 725 Activation 138 event
+>> 725 Activation 138 event
+++ 726 Activation 139 @:
+-- 726 Activation 139 @:
+>> 726 Activation 139 @:
+++ 727 Activation 140 {.}
+-- 727 Activation 140 {.}
+>> 727 Activation 140 {.}
+-- 720 Continuation 126 + {711 Activation 126 +, 126 +} 126 + S=false nActivated=2 (=0S+2N)
+>> 720 Continuation 126 + {711 Activation 126 +, 126 +} 126 + S=false nActivated=2 (=0S+2N)
+-- 709 Continuation 112 ; {680 Activation 112 ;, 112 ;} 112 ; S=false nActivated=2 (=1S+1N)
+>> 709 Continuation 112 ; {680 Activation 112 ;, 112 ;} 112 ; S=false nActivated=2 (=1S+1N)
+-- 678 Continuation  5 ; ... {-1 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=4 (=3S+1N)
+>> 678 Continuation  5 ; ... {-1 Activation  5 ; ...,  5 ; ...}  5 ; S=false nActivated=4 (=3S+1N)
+-- 551 Continuation  4 || {583 AAHappened  4 ||550 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+>> 551 Continuation  4 || {583 AAHappened  4 ||550 AAHappened  4 ||,  4 ||}  4 || S=false nActivated=2 (=0S+2N)
+------------------------------ 1 ** S=false nActivated=1 (=0S+1N)
+*                              2 <root>
+ *                             3 live
+  *                            4 || S=false nActivated=2 (=0S+2N)
+  |*                           5 ; S=false nActivated=4 (=3S+1N)
+--|-*-------------------------110 searchSequence
+  |  *                        111 searchSequence
+  |   *                       112 ; S=false nActivated=2 (=1S+1N)
+  |   |*                      113 guard
+  |   | *                     114 guard
+--|---|--*--------------------115 ; S=true nActivated=2 (=1S+1N)
+  |   |   *                   118 anyEvent
+  |   |    *                  119 anyEvent
+  |   |     *                 120 event
+  |   |      *                121 event
+--|---|-------*---------------122 @:
+  |   |        *              123 {.}
+  |    *                      124 searchCommand
+  |     *                     125 searchCommand
+  |      *                    126 + S=false nActivated=2 (=0S+2N)
+--|------|*-------------------127 searchButton
+  |      | *                  128 clicked
+  |      |  *                 129 event
+  |      |   *                130 event
+  |      |    *               131 @:
+--|------|-----*--------------132 {.}
+  |       *                   133 Enter
+  |        *                  134 vkey
+  |         *                 135 vkey2
+  |          *                136 vkey2
+--|-----------*---------------137 event
+  |            *              138 event
+  |             *             139 @:
+  |              *            140 {.}
+   *                          21 doExit
+----*-------------------------22 doExit
+     *                        23 ; S=false nActivated=1 (=0S+1N)
+      *                       24 exitCommand
+       *                      25 exitCommand
+        *                     26 + S=false nActivated=2 (=0S+2N)
+--------|*--------------------27 exitButton
+        | *                   28 clicked
+        |  *                  29 event
+        |   *                 30 event
+        |    *                31 @:
+--------|-----*---------------32 {.}
+         *                    33 windowClosing
+          *                   34 windowClosing
+           *                  35 event
+            *                 36 event
+-------------*----------------37 @:
+              *               38 {.}
+=== Messages ===
+=== End ===
