@@ -148,6 +148,7 @@ class NormalCodeFragmentExecutor[R](n: N_code_fragment[R], scriptExecutor: Scrip
 }
 class UnsureCodeFragmentExecutor[R](n: N_code_unsure[R], scriptExecutor: ScriptExecutor[_]) extends AACodeFragmentExecutor[R](n, scriptExecutor)  {
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = {
+    super.executeAA(lowLevelCodeExecutor)
     doCodeExecutionIn(lowLevelCodeExecutor)
   }
   override def afterExecuteAA = {
