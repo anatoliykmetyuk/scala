@@ -42,6 +42,9 @@ object CodeExecutor {
     }
   }
 
+  def executeCodeDirectly[N <: CallGraphNode, R](n: N): R =
+    n.template.asInstanceOf[TemplateCodeHolder[R, N]].code(n)
+
   def executeCode[N <: CallGraphNode, R](n: N): R = {
     val template = n.template.asInstanceOf[TemplateCodeHolder[R,N]]
     executeCode(n, template.code(n))
@@ -99,7 +102,7 @@ abstract class AACodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor
       n.isExecuting = true
       n.$           = null
 
-      try   {val r = CodeExecutor executeCode n
+      try   {val r = CodeExecutor executeCodeDirectly n
              if (n.hasSuccess) n.$ = scala.util.Success(r)
             }
       catch {case f : Throwable => n.$ = Failure(f) }
