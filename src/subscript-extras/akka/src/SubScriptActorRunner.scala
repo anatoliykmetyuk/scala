@@ -13,33 +13,33 @@ import scala.language.postfixOps
 
 
 trait SubScriptActorRunner {
-  
+
   def launch(s: Script[_])
-  
+
   def execute(debugger: MsgListener)
-  
+
   def system: ActorSystem
- 
+
   def executor: CommonScriptExecutor[_]
-  
+
   def doScriptSteps
-  
+
 }
 
 object SSARunnerV1Scheduler extends SubScriptActorRunner {
-  
+
   // Don't do heavy operations until needed
   lazy val system = ActorSystem()
   lazy val executor = ScriptExecutorFactory.createScriptExecutor[Any](true)
-  
+
   var launch_anchor: N_launch_anchor = null
-  
+
   def scheduledTaskDelay = 1 milliseconds
-  
+
   def launch(s: Script[_]) = executor.invokeFromET {launch_anchor.launch(s)}
-  
+
   def script..
-     // make a local anchor for launched actor processes, 
+     // make a local anchor for launched actor processes,
      // so that we will be able to kill those here using the || and / operators
      live = @{launch_anchor=there}: (** {. .} **)
 
@@ -48,6 +48,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
     executor.addHandler(synchMsgHandler)
     executor.initializeExecution(_live())
     doScriptSteps_loop
+//    executor run _live()
   }
 
   def doScriptSteps_loop: Unit = {
@@ -58,7 +59,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
     }
   }
 
-  def doScriptSteps = {    
+  def doScriptSteps = {
     executor.updateCollections()
     var handledMessage = executor.tryHandleMessage(minimalPriorityForAA = Int.MinValue)
     while (handledMessage!=null) {
@@ -67,7 +68,7 @@ object SSARunnerV1Scheduler extends SubScriptActorRunner {
     }
     executor.messageAwaiting
   }
-  
+
   val synchMsgHandler: PartialFunction[CallGraphMessage, Unit] = {
     case SynchronizationMessage(_, lock) => lock.synchronized(lock.notify())
   }

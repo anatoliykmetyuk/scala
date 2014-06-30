@@ -27,37 +27,37 @@ class Logger(tag: String) {
   def doError  (b: => Unit) = if (lev > 0) b
 }
 trait SubScriptActor extends Actor {
-  
+
   val runner: SubScriptActorRunner = SSARunnerV1Scheduler
-  
+
   private object Terminator { // TBD: find better name; something with Blocker
     var executor: EventHandlingCodeFragmentExecutor[Any] = null
-    
+
     def script block = @{executor = new EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)}: {. .}
     def release = executor.executeMatching(isMatching=true)
   }
-  
+
   private val callHandlers = ListBuffer[PartialFunction[Any, Unit]]()
 
-  
-  
+
+
   // Scripts
   def _live(): Script[Any]
   private def script terminate = Terminator.block
   private def script die       = {if (context ne null) context stop self}
-  
-  def script r$(handler: PartialFunction[Any, Script[Any]]) 
+
+  def script r$(handler: PartialFunction[Any, Script[Any]])
   = var s:Script[Any]=null
     @{val here = there.parent.asInstanceOf[CallGraphTreeNode] // Bug: here is not yet known; is needed to access local variable s
       there.codeExecutor = EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)
       val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.codeExecutor.executeAA}}
                           synchronized {callHandlers += handlerWithExecuteAA}
       there.onDeactivate {synchronized {callHandlers -= handlerWithExecuteAA}}
-    }: 
+    }:
     {. Debug.info(s"$this.r$$") .}
     if s != null then s
-  
-  
+
+
   // Callbacks
   override def aroundPreStart() {
     Debug.info(s"$this aroundPreStart INIT")
@@ -65,35 +65,35 @@ trait SubScriptActor extends Actor {
     runner.launch([lifecycle])
     super.aroundPreStart()
     Debug.info(s"$this aroundPreStart EXIT")
-  } 
-  
-  override def aroundReceive(receive: Actor.Receive, msg: Any) {    
+  }
+
+  override def aroundReceive(receive: Actor.Receive, msg: Any) {
     synchronized {
       sendSynchronizationMessage(this)
       wait()
     }
-    
+
     runner.doScriptSteps
     callHandlers.synchronized { // TBD: why is synchronized needed
       callHandlers.collectFirst { case handler if handler isDefinedAt msg => handler(msg) } match {
         case None    => super.aroundReceive( receive        , msg); Debug.info(s"$this aroundReceive did NOT handle msg   sender: $sender msg: $msg")
         case Some(_) => super.aroundReceive({case _: Any =>}, msg); Debug.info(s"$this aroundReceive handled  sender: $sender msg: $msg")
-          			     runner.doScriptSteps
+//          			     runner.doScriptSteps
       }
     }
   }
-  
+
   override def aroundPostStop() {
     Terminator.release
     super.aroundPostStop()
   }
-  
-  final def receive: Actor.Receive = {case _ =>} 
-  
-    
+
+  final def receive: Actor.Receive = {case _ =>}
+
+
   def sendSynchronizationMessage(lock: AnyRef) {
     val vm = runner.executor
-    vm insert SynchronizationMessage(vm.rootNode, lock)    
+    vm insert SynchronizationMessage(vm.rootNode, lock)
   }
 
 }
