@@ -231,11 +231,16 @@ class SwingCodeExecutorAdapter[R,CE<:CodeExecutorTrait] extends CodeExecutorAdap
 }
 case class EventHandlingCodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor: ScriptExecutor[_])
    extends AACodeFragmentExecutor[R](_n, _scriptExecutor)  {
+
+  private var busy = false
+
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = executeMatching(true) // dummy method needed because of a flaw in the class hierarchy
   def executeMatching(isMatching: Boolean): Unit = {  // not to be called by scriptExecutor, but by application code
+    if (busy) return
     _n.hasSuccess = isMatching
     if (isMatching)
     {
+      busy = true
       _n.hasSuccess  = true
       _n.isExecuting = true
       _n.$           = null
@@ -263,6 +268,7 @@ case class EventHandlingCodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptE
           deactivate
 
         case eh:N_code_eventhandling_loop[_] =>
+             busy = false   // ??? should the same executor really be able to "fire" twice ???
              aaHappened(AtomicCodeFragmentExecuted)
              eh.result match {
                 case ExecutionResult.Success       =>

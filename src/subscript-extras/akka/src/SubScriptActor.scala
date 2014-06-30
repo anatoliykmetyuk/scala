@@ -73,7 +73,7 @@ trait SubScriptActor extends Actor {
       wait()
     }
 
-    runner.doScriptSteps
+//    runner.doScriptSteps
     callHandlers.synchronized { // TBD: why is synchronized needed
       callHandlers.collectFirst { case handler if handler isDefinedAt msg => handler(msg) } match {
         case None    => super.aroundReceive( receive        , msg); Debug.info(s"$this aroundReceive did NOT handle msg   sender: $sender msg: $msg")
