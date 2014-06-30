@@ -49,8 +49,7 @@ trait SubScriptActor extends Actor {
   def script r$(handler: PartialFunction[Any, Script[Any]])
   = var s:Script[Any]=null
     @{val here = there.parent.asInstanceOf[CallGraphTreeNode] // Bug: here is not yet known; is needed to access local variable s
-      there.codeExecutor = EventHandlingCodeFragmentExecutor(there, there.scriptExecutor)
-      val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.codeExecutor.executeAA}}
+      val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.eventHappened}}
                           synchronized {callHandlers += handlerWithExecuteAA}
       there.onDeactivate {synchronized {callHandlers -= handlerWithExecuteAA}}
     }:
@@ -73,12 +72,10 @@ trait SubScriptActor extends Actor {
       wait()
     }
 
-//    runner.doScriptSteps
     callHandlers.synchronized { // TBD: why is synchronized needed
       callHandlers.collectFirst { case handler if handler isDefinedAt msg => handler(msg) } match {
         case None    => super.aroundReceive( receive        , msg); Debug.info(s"$this aroundReceive did NOT handle msg   sender: $sender msg: $msg")
         case Some(_) => super.aroundReceive({case _: Any =>}, msg); Debug.info(s"$this aroundReceive handled  sender: $sender msg: $msg")
-//          			     runner.doScriptSteps
       }
     }
   }
