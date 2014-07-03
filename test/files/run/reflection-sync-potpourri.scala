@@ -16,7 +16,7 @@ object Test extends App {
     () => typeOf[scala.io.Codec])
   val perms = types.permutations.toList
   def force(lazytpe: () => Type): String = {
-    lazytpe().typeSymbol.typeSignature
+    lazytpe().typeSymbol.info
     lazytpe().toString
   }
   val diceRolls = List.fill(n)(rng.nextInt(perms.length))
@@ -24,7 +24,7 @@ object Test extends App {
     override def run(): Unit = {
       val s1 = foo("42")
       val s2 = perms(diceRolls(i - 1)).map(x => force(x)).sorted.mkString(", ")
-      assert(s1 == "java.lang.String")
+      assert(s1 == "String" || s1 == "java.lang.String")
       assert(s2 == "java.lang.annotation.Annotation, java.lang.reflect.Method, scala.io.BufferedSource, scala.io.Codec")
     }
   })

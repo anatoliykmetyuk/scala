@@ -211,6 +211,11 @@ class MutableSettings(val errorFn: String => Unit)
     add(new ChoiceSetting(name, helpArg, descr, choices, default))
   def IntSetting(name: String, descr: String, default: Int, range: Option[(Int, Int)], parser: String => Option[Int]) = add(new IntSetting(name, descr, default, range, parser))
   def MultiStringSetting(name: String, arg: String, descr: String) = add(new MultiStringSetting(name, arg, descr))
+  def MultiChoiceSetting(name: String, helpArg: String, descr: String, choices: List[String]): MultiChoiceSetting = {
+    val fullChoix = choices.mkString(": ", ",", ".")
+    val fullDescr = s"$descr$fullChoix"
+    add(new MultiChoiceSetting(name, helpArg, fullDescr, choices))
+  }
   def OutputSetting(outputDirs: OutputDirs, default: String) = add(new OutputSetting(outputDirs, default))
   def PhasesSetting(name: String, descr: String, default: String = "") = add(new PhasesSetting(name, descr, default))
   def StringSetting(name: String, arg: String, descr: String, default: String) = add(new StringSetting(name, arg, descr, default))
@@ -438,6 +443,17 @@ class MutableSettings(val errorFn: String => Unit)
     override def tryToSetFromPropertyValue(s : String) { // used from ide
       value = s.equalsIgnoreCase("true")
     }
+    override def tryToSetColon(args: List[String]) = args match {
+      case Nil => tryToSet(Nil)
+      case List(x) =>
+        if (x.equalsIgnoreCase("true")) {
+          value = true
+          Some(Nil)
+        } else if (x.equalsIgnoreCase("false")) {
+          value = false
+          Some(Nil)
+        } else errorAndValue("'" + x + "' is not a valid choice for '" + name + "'", None)
+    }
   }
 
   /** A special setting for accumulating arguments like -Dfoo=bar. */
@@ -537,8 +553,16 @@ class MutableSettings(val errorFn: String => Unit)
       }
   }
 
+  class MultiChoiceSetting private[nsc](
+    name: String,
+    arg: String,
+    descr: String,
+    override val choices: List[String])
+  extends MultiStringSetting(name, arg, descr)
+
   /** A setting that accumulates all strings supplied to it,
-   *  until it encounters one starting with a '-'. */
+   *  until it encounters one starting with a '-'.
+   */
   class MultiStringSetting private[nsc](
     name: String,
     val arg: String,
@@ -547,17 +571,23 @@ class MutableSettings(val errorFn: String => Unit)
     type T = List[String]
     protected var v: T = Nil
     def appendToValue(str: String) { value ++= List(str) }
+    def badChoice(s: String, n: String) = errorFn(s"'$s' is not a valid choice for '$name'")
 
     def tryToSet(args: List[String]) = {
       val (strings, rest) = args span (x => !x.startsWith("-"))
-      strings foreach appendToValue
-
+      strings foreach {
+        case "_" if choices.nonEmpty => choices foreach appendToValue
+        case s if choices.isEmpty || (choices contains s) => appendToValue(s)
+        case s => badChoice(s, name)
+      }
       Some(rest)
     }
     override def tryToSetColon(args: List[String]) = tryToSet(args)
     override def tryToSetFromPropertyValue(s: String) = tryToSet(s.trim.split(',').toList) // used from ide
     def clear(): Unit = (v = Nil)
     def unparse: List[String] = value map (name + ":" + _)
+
+    def contains(s: String) = value contains s
 
     withHelpSyntax(name + ":<" + arg + ">")
   }
@@ -668,4 +698,14 @@ class MutableSettings(val errorFn: String => Unit)
       else name + "[:phases]"
     )
   }
+
+  /** Internal use - syntax enhancements. */
+  protected class EnableSettings[T <: BooleanSetting](val s: T) {
+    def enablingIfNotSetByUser(toEnable: List[BooleanSetting]): s.type = s withPostSetHook (_ => toEnable foreach (sett => if (!sett.isSetByUser) sett.value = s.value))
+    def enabling(toEnable: List[BooleanSetting]): s.type = s withPostSetHook (_ => toEnable foreach (_.value = s.value))
+    def disabling(toDisable: List[BooleanSetting]): s.type = s withPostSetHook (_ => toDisable foreach (_.value = !s.value))
+    def andThen(f: s.T => Unit): s.type = s withPostSetHook (setting => f(setting.value))
+  }
+  import scala.language.implicitConversions
+  protected implicit def installEnableSettings[T <: BooleanSetting](s: T): EnableSettings[T] = new EnableSettings(s)
 }

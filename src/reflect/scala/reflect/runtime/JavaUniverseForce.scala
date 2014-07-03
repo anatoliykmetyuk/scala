@@ -26,41 +26,23 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     TypeTag.Null.tpe
 
     this.settings
+    this.internal
     this.treeInfo
-    // inaccessible: this.scala$reflect$runtime$Gil$$gil
-    // inaccessible: this.uniqueLock
-    // inaccessible: this._skolemizationLevel
-    // inaccessible: this._undoLog
-    // inaccessible: this._intersectionWitness
-    // inaccessible: this._volatileRecursions
-    // inaccessible: this._pendingVolatiles
-    // inaccessible: this._subsametypeRecursions
-    // inaccessible: this._pendingSubTypes
-    // inaccessible: this._basetypeRecursions
-    // inaccessible: this._pendingBaseTypes
-    // inaccessible: this._lubResults
-    // inaccessible: this._glbResults
-    // inaccessible: this._indent
-    // inaccessible: this._tostringRecursions
-    // inaccessible: this.atomicIds
-    // inaccessible: this.atomicExistentialIds
-    // inaccessible: this._recursionTable
-    // inaccessible: this.mirrors
     this.rootMirror
-    this.treeBuild
-    // inaccessible: this.SimpleNameOrdering
     this.traceSymbols
     this.perRunCaches
+    this.compat
+    this.treeBuild
     this.FreshNameExtractor
     this.FixedMirrorTreeCreator
     this.FixedMirrorTypeCreator
     this.CompoundTypeTreeOriginalAttachment
     this.BackquotedIdentifierAttachment
     this.ForAttachment
+    this.SyntheticUnitAttachment
     this.SubpatternsAttachment
     this.noPrint
     this.typeDebug
-    // inaccessible: this.maxFree
     this.Range
     // inaccessible: this.posAssigner
     this.ConsoleWriter
@@ -116,7 +98,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     this.pendingSuperCall
     this.emptyValDef
     this.EmptyTreeTypeSubstituter
-    // inaccessible: this.duplicator
     this.UnmappableAnnotArg
     this.LiteralAnnotArg
     this.ArrayAnnotArg
@@ -127,10 +108,11 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     this.UnmappableAnnotation
     this.ErroneousAnnotation
     this.ThrownException
-    // inaccessible: this.compactify
+    this.typeNames
     this.tpnme
     this.fulltpnme
     this.binarynme
+    this.termNames
     this.nme
     this.sn
     this.Constant
@@ -147,7 +129,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     this.ProperTypeKind
     this.TypeConKind
     this.inferKind
-    // inaccessible: this.substTypeMapCache
     this.UnmappableTree
     this.ErrorType
     this.WildcardType
@@ -169,6 +150,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     this.PolyType
     this.ExistentialType
     this.OverloadedType
+    this.ImportType
     this.AntiPolyType
     this.HasTypeMember
     this.ArrayTypeRef
@@ -183,9 +165,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     this.unwrapToStableClass
     this.unwrapWrapperTypes
     this.RecoverableCyclicReference
-    // inaccessible: this._undoLog
-    // inaccessible: this.numericLoBound
-    // inaccessible: this.numericHiBound
     this.TypeConstraint
     this.normalizeAliases
     this.dropSingletonType
@@ -197,17 +176,16 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     this.typeVarToOriginMap
     this.ErroneousCollector
     this.adaptToNewRunMap
-    // inaccessible: this.commonOwnerMapObj
+    this.SubTypePair
     this.SymbolKind
     this.NoSymbol
     this.CyclicReference
-    // inaccessible: this.TypeHistory
+    this.SymbolOps
     this.TermName
     this.TypeName
     this.Liftable
     this.Unliftable
     this.BooleanFlag
-    // inaccessible: this.CachedNames
     this.WeakTypeTag
     this.TypeTag
     this.Expr
@@ -273,6 +251,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.ComparableClass
     definitions.JavaCloneableClass
     definitions.JavaNumberClass
+    definitions.JavaEnumClass
     definitions.RemoteInterfaceClass
     definitions.RemoteExceptionClass
     definitions.ByNameParamClass
@@ -304,6 +283,7 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.ReflectPackage
     definitions.ReflectApiPackage
     definitions.ReflectRuntimePackage
+    definitions.UniverseClass
     definitions.PartialManifestModule
     definitions.FullManifestClass
     definitions.FullManifestModule
@@ -319,8 +299,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.MirrorClass
     definitions.TypeCreatorClass
     definitions.TreeCreatorClass
-    definitions.BlackboxMacroClass
-    definitions.WhiteboxMacroClass
     definitions.BlackboxContextClass
     definitions.WhiteboxContextClass
     definitions.MacroImplAnnotation
@@ -431,7 +409,6 @@ trait JavaUniverseForce { self: runtime.JavaUniverse  =>
     definitions.hijackedCoreClasses
     definitions.symbolsNotPresentInBytecode
     definitions.isPossibleSyntheticParent
-    // inaccessible: definitions.boxedValueClassesSet
     definitions.abbrvTag
     definitions.numericWeight
     definitions.boxedModule

@@ -13,13 +13,12 @@ import scala.collection.{ mutable, immutable }
 import scala.collection.mutable.{ ListBuffer, Buffer }
 import scala.tools.nsc.symtab._
 import scala.annotation.switch
-import PartialFunction._
 
 /**
  *  @author  Iulian Dragos
  *  @version 1.0
  */
-abstract class GenICode extends SubComponent  {
+abstract class GenICode extends SubComponent {
   import global._
   import icodes._
   import icodes.opcodes._
@@ -29,6 +28,9 @@ abstract class GenICode extends SubComponent  {
     isUniversalEqualityOp, isReferenceEqualityOp
   }
   import platform.isMaybeBoxed
+
+  private val bCodeICodeCommon: jvm.BCodeICodeCommon[global.type] = new jvm.BCodeICodeCommon(global)
+  import bCodeICodeCommon._
 
   val phaseName = "icode"
 
@@ -46,8 +48,10 @@ abstract class GenICode extends SubComponent  {
     var unit: CompilationUnit = NoCompilationUnit
 
     override def run() {
-      scalaPrimitives.init()
-      classes.clear()
+      if (!settings.isBCodeActive) {
+        scalaPrimitives.init()
+        classes.clear()
+      }
       super.run()
     }
 
@@ -793,10 +797,7 @@ abstract class GenICode extends SubComponent  {
                 case _ =>
               }
               ctx1.bb.emit(cm, tree.pos)
-
-              if (sym == ctx1.method.symbol) {
-                ctx1.method.recursive = true
-              }
+              ctx1.method.updateRecursive(sym)
               generatedType =
                 if (sym.isClassConstructor) UNIT
                 else toTypeKind(sym.info.resultType)
@@ -870,7 +871,7 @@ abstract class GenICode extends SubComponent  {
         case Ident(name) =>
           def genLoadIdent = {
             val sym = tree.symbol
-            if (!sym.isPackage) {
+            if (!sym.hasPackageFlag) {
               if (sym.isModule) {
                 genLoadModule(ctx, tree)
                 generatedType = toTypeKind(sym.info)
@@ -1010,8 +1011,16 @@ abstract class GenICode extends SubComponent  {
       }
 
       // emit conversion
-      if (generatedType != expectedType)
-        adapt(generatedType, expectedType, resCtx, tree.pos)
+      if (generatedType != expectedType) {
+        tree match {
+          case Literal(Constant(null)) if generatedType == NullReference && expectedType != UNIT =>
+            // literal null on the stack (as opposed to a boxed null, see SI-8233),
+            // we can bypass `adapt` which would otherwise emitt a redundant [DROP, CONSTANT(null)]
+            // except one case: when expected type is UNIT (unboxed) where we need to emit just a DROP
+          case _ =>
+            adapt(generatedType, expectedType, resCtx, tree.pos)
+        }
+      }
 
       resCtx
     }
@@ -1061,6 +1070,9 @@ abstract class GenICode extends SubComponent  {
         case (NothingReference, _) =>
           ctx.bb.emit(THROW(ThrowableClass))
           ctx.bb.enterIgnoreMode()
+        case (NullReference, REFERENCE(_)) =>
+          // SI-8223 we can't assume that the stack contains a `null`, it might contain a Null$
+          ctx.bb.emit(Seq(DROP(from), CONSTANT(Constant(null))))
         case _ if from isAssignabledTo to =>
           ()
         case (_, UNIT) =>
@@ -1315,15 +1327,6 @@ abstract class GenICode extends SubComponent  {
       case _ =>
         List(tree)
     }
-
-    /** Some useful equality helpers.
-     */
-    def isNull(t: Tree) = cond(t) { case Literal(Constant(null)) => true }
-    def isLiteral(t: Tree) = cond(t) { case Literal(_) => true }
-    def isNonNullExpr(t: Tree) = isLiteral(t) || ((t.symbol ne null) && t.symbol.isModule)
-
-    /* If l or r is constant null, returns the other ; otherwise null */
-    def ifOneIsNull(l: Tree, r: Tree) = if (isNull(l)) r else if (isNull(r)) l else null
 
     /**
      * Find the label denoted by `lsym` and enter it in context `ctx`.

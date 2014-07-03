@@ -51,6 +51,11 @@ abstract class TreeInfo {
     case _ => false
   }
 
+  def isConstructorWithDefault(t: Tree) = t match {
+    case DefDef(_, nme.CONSTRUCTOR, _, vparamss, _, _)  => mexists(vparamss)(_.mods.hasDefault)
+    case _                                              => false
+  }
+
   /** Is tree a pure (i.e. non-side-effecting) definition?
    */
   def isPureDef(tree: Tree): Boolean = tree match {
@@ -98,7 +103,7 @@ abstract class TreeInfo {
    */
   def isStableIdentifier(tree: Tree, allowVolatile: Boolean): Boolean =
     tree match {
-      case i @ Ident(_)    => isStableIdent(i)
+      case i @ Ident(_)    => isStableIdent(i, allowVolatile)
       case Select(qual, _) => isStableMemberOf(tree.symbol, qual, allowVolatile) && isPath(qual, allowVolatile)
       case Apply(Select(free @ Ident(_), nme.apply), _) if free.symbol.name endsWith nme.REIFY_FREE_VALUE_SUFFIX =>
         // see a detailed explanation of this trick in `GenSymbols.reifyFreeTerm`
@@ -119,11 +124,11 @@ abstract class TreeInfo {
     typeOk(tree.tpe) && (allowVolatile || !hasVolatileType(tree)) && !definitions.isByNameParamType(tree.tpe)
   )
 
-  private def isStableIdent(tree: Ident): Boolean = (
+  private def isStableIdent(tree: Ident, allowVolatile: Boolean): Boolean = (
        symOk(tree.symbol)
     && tree.symbol.isStable
     && !definitions.isByNameParamType(tree.tpe)
-    && !tree.symbol.hasVolatileType // TODO SPEC: not required by spec
+    && (allowVolatile || !tree.symbol.hasVolatileType) // TODO SPEC: not required by spec
   )
 
   /** Is `tree`'s type volatile? (Ignored if its symbol has the @uncheckedStable annotation.)
@@ -281,20 +286,24 @@ abstract class TreeInfo {
     }
   }
 
+  def isDefaultGetter(tree: Tree) = {
+    tree.symbol != null && tree.symbol.isDefaultGetter
+  }
+
   /** Is tree a self constructor call this(...)? I.e. a call to a constructor of the
    *  same object?
    */
-  def isSelfConstrCall(tree: Tree): Boolean = tree match {
-    case Applied(Ident(nme.CONSTRUCTOR), _, _)           => true
-    case Applied(Select(This(_), nme.CONSTRUCTOR), _, _) => true
-    case _                                               => false
+  def isSelfConstrCall(tree: Tree): Boolean = dissectApplied(tree).core match {
+    case Ident(nme.CONSTRUCTOR)           => true
+    case Select(This(_), nme.CONSTRUCTOR) => true
+    case _                                => false
   }
 
   /** Is tree a super constructor call?
    */
-  def isSuperConstrCall(tree: Tree): Boolean = tree match {
-    case Applied(Select(Super(_, _), nme.CONSTRUCTOR), _, _) => true
-    case _                                                   => false
+  def isSuperConstrCall(tree: Tree): Boolean = dissectApplied(tree).core match {
+    case Select(Super(_, _), nme.CONSTRUCTOR) => true
+    case _                                    => false
   }
 
   /**
@@ -399,6 +408,67 @@ abstract class TreeInfo {
   def isVarPattern(pat: Tree): Boolean = pat match {
     case x: Ident           => !x.isBackquoted && nme.isVariableName(x.name)
     case _                  => false
+  }
+
+  /** Does the tree have a structure similar to typechecked trees? */
+  private[internal] def detectTypecheckedTree(tree: Tree) =
+    tree.hasExistingSymbol || tree.exists {
+      case dd: DefDef => dd.mods.hasAccessorFlag || dd.mods.isSynthetic // for untypechecked trees
+      case md: MemberDef => md.hasExistingSymbol
+      case _ => false
+    }
+
+  /** Recover template body to parsed state */
+  private[internal] def untypecheckedTemplBody(templ: Template) =
+    untypecheckedTreeBody(templ, templ.body)
+
+  /** Recover block body to parsed state */
+  private[internal] def untypecheckedBlockBody(block: Block) =
+    untypecheckedTreeBody(block, block.stats)
+
+  /** Recover tree body to parsed state */
+  private[internal] def untypecheckedTreeBody(tree: Tree, tbody: List[Tree]) = {
+    def filterBody(body: List[Tree]) = body filter {
+      case _: ValDef | _: TypeDef => true
+      // keep valdef or getter for val/var
+      case dd: DefDef if dd.mods.hasAccessorFlag => !nme.isSetterName(dd.name) && !tbody.exists {
+        case vd: ValDef => dd.name == vd.name.dropLocal
+        case _ => false
+      }
+      case md: MemberDef => !md.mods.isSynthetic
+      case tree => true
+    }
+
+    def lazyValDefRhs(body: Tree) =
+      body match {
+        case Block(List(Assign(_, rhs)), _) => rhs
+        case _ => body
+      }
+
+    def recoverBody(body: List[Tree]) = body map {
+      case vd @ ValDef(vmods, vname, _, vrhs) if nme.isLocalName(vname) =>
+        tbody find {
+          case dd: DefDef => dd.name == vname.dropLocal
+          case _ => false
+        } map { dd =>
+          val DefDef(dmods, dname, _, _, _, drhs) = dd
+          // get access flags from DefDef
+          val vdMods = (vmods &~ Flags.AccessFlags) | (dmods & Flags.AccessFlags).flags
+          // for most cases lazy body should be taken from accessor DefDef
+          val vdRhs = if (vmods.isLazy) lazyValDefRhs(drhs) else vrhs
+          copyValDef(vd)(mods = vdMods, name = dname, rhs = vdRhs)
+        } getOrElse (vd)
+      // for abstract and some lazy val/vars
+      case dd @ DefDef(mods, name, _, _, tpt, rhs) if mods.hasAccessorFlag =>
+        // transform getter mods to field
+        val vdMods = (if (!mods.hasStableFlag) mods | Flags.MUTABLE else mods &~ Flags.STABLE) &~ Flags.ACCESSOR
+        ValDef(vdMods, name, tpt, rhs)
+      case tr => tr
+    }
+
+    if (detectTypecheckedTree(tree)) {
+      recoverBody(filterBody(tbody))
+    } else tbody
   }
 
   /** The first constructor definitions in `stats` */
@@ -612,8 +682,8 @@ abstract class TreeInfo {
   def effectivePatternArity(args: List[Tree]): Int = flattenedPatternArgs(args).length
 
   def flattenedPatternArgs(args: List[Tree]): List[Tree] = args map unbind match {
-    case Apply(fun, xs) :: Nil if isTupleSymbol(fun.symbol) => xs
-    case xs                                                 => xs
+    case build.SyntacticTuple(xs) :: Nil => xs
+    case xs                              => xs
   }
 
   // used in the symbols for labeldefs and valdefs emitted by the pattern matcher
@@ -735,6 +805,17 @@ abstract class TreeInfo {
       unapply(dissectApplied(tree))
   }
 
+  /** Does list of trees start with a definition of
+   *  a class of module with given name (ignoring imports)
+   */
+  def firstDefinesClassOrObject(trees: List[Tree], name: Name): Boolean = trees match {
+    case Import(_, _) :: xs             => firstDefinesClassOrObject(xs, name)
+    case Annotated(_, tree1) :: _       => firstDefinesClassOrObject(List(tree1), name)
+    case ModuleDef(_, `name`, _) :: _   => true
+    case ClassDef(_, `name`, _, _) :: _ => true
+    case _                              => false
+  }
+
   /** Locates the synthetic Apply node corresponding to an extractor's call to
    *  unapply (unwrapping nested Applies) and returns the fun part of that Apply.
    */
@@ -750,8 +831,7 @@ abstract class TreeInfo {
   }
 
   /** Is this file the body of a compilation unit which should not
-   *  have Predef imported? This is the case iff the first import in the
-   *  unit explicitly refers to Predef.
+   *  have Predef imported?
    */
   def noPredefImportForUnit(body: Tree) = {
     // Top-level definition whose leading imports include Predef.
@@ -760,7 +840,13 @@ abstract class TreeInfo {
       case Import(expr, _)      => isReferenceToPredef(expr)
       case _                    => false
     }
-    isLeadingPredefImport(body)
+    // Compilation unit is class or object 'name' in package 'scala'
+    def isUnitInScala(tree: Tree, name: Name) = tree match {
+      case PackageDef(Ident(nme.scala_), defs) => firstDefinesClassOrObject(defs, name)
+      case _                                   => false
+    }
+
+    isUnitInScala(body, nme.Predef) || isLeadingPredefImport(body)
   }
 
   def isAbsTypeDef(tree: Tree) = tree match {
@@ -848,8 +934,10 @@ abstract class TreeInfo {
       case _ => false
     })
 
-  def isMacroApplication(tree: Tree): Boolean =
-    !tree.isDef && tree.symbol != null && tree.symbol.isTermMacro && !tree.symbol.isErroneous
+  def isMacroApplication(tree: Tree): Boolean = !tree.isDef && {
+    val sym = tree.symbol
+    sym != null && sym.isTermMacro && !sym.isErroneous
+  }
 
   def isMacroApplicationOrBlock(tree: Tree): Boolean = tree match {
     case Block(_, expr) => isMacroApplicationOrBlock(expr)

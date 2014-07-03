@@ -1,7 +1,7 @@
 import org.scalacheck._, Prop._, Gen._, Arbitrary._
 import scala.tools.reflect.{ToolBox, ToolBoxError}
 import scala.reflect.runtime.currentMirror
-import scala.reflect.runtime.universe._, Flag._
+import scala.reflect.runtime.universe._, Flag._, internal.reificationSupport.setSymbol
 
 class QuasiquoteProperties(name: String) extends Properties(name) with ArbitraryTreesAndNames with Helpers
 
@@ -28,7 +28,7 @@ trait Helpers {
 
     override def transform(tree: Tree): Tree = tree match {
       case Ident(SimplifiedName(name))                  => Ident(name)
-      case ValDef(mods, SimplifiedName(name), tpt, rhs) => ValDef(mods, name, tpt, rhs)
+      case ValDef(mods, SimplifiedName(name), tpt, rhs) => ValDef(mods, name, transform(tpt), transform(rhs))
       case Bind(SimplifiedName(name), rhs)              => Bind(name, rhs)
       case _ =>
         super.transform(tree)
@@ -81,7 +81,7 @@ trait Helpers {
   val compile = toolbox.compile(_)
   val eval = toolbox.eval(_)
 
-  def typecheck(tree: Tree) = toolbox.typeCheck(tree)
+  def typecheck(tree: Tree) = toolbox.typecheck(tree)
 
   def typecheckTyp(tree: Tree) = {
     val q"type $_ = $res" = typecheck(q"type T = $tree")
@@ -116,10 +116,5 @@ trait Helpers {
     }
   }
 
-  def annot(name: String): Tree = annot(TypeName(name), Nil)
-  def annot(name: TypeName): Tree = annot(name, Nil)
-  def annot(name: String, args: List[Tree]): Tree = annot(TypeName(name), args)
-  def annot(name: TypeName, args: List[Tree]): Tree = q"new $name(..$args)"
-
-  val scalapkg = build.setSymbol(Ident(TermName("scala")), definitions.ScalaPackage)
+  val scalapkg = setSymbol(Ident(TermName("scala")), definitions.ScalaPackage)
 }

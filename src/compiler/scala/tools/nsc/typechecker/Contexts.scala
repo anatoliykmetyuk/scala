@@ -90,6 +90,8 @@ trait Contexts { self: Analyzer =>
     if (settings.noimports) Nil
     else if (unit.isJava) RootImports.javaList
     else if (settings.nopredef || treeInfo.noPredefImportForUnit(unit.body)) {
+      // SI-8258 Needed for the presentation compiler using -sourcepath, otherwise cycles can occur. See the commit
+      //         message for this ticket for an example.
       debuglog("Omitted import of Predef._ for " + unit)
       RootImports.javaAndScalaList
     }
@@ -102,7 +104,7 @@ trait Contexts { self: Analyzer =>
 
     // there must be a scala.xml package when xml literals were parsed in this unit
     if (unit.hasXml && ScalaXmlPackage == NoSymbol)
-      unit.error(unit.firstXmlPos, "To compile XML syntax, the scala.xml package must be on the classpath.\nPlease see https://github.com/scala/scala/wiki/Scala-2.11#xml.")
+      unit.error(unit.firstXmlPos, "To compile XML syntax, the scala.xml package must be on the classpath.\nPlease see http://docs.scala-lang.org/overviews/core/scala-2.11.html#scala-xml.")
 
     // scala-xml needs `scala.xml.TopScope` to be in scope globally as `$scope`
     // We detect `scala-xml` by looking for `scala.xml.TopScope` and
@@ -432,8 +434,10 @@ trait Contexts { self: Analyzer =>
         case _         => false
       }
       val isImport = tree match {
-        case _: Import => true
-        case _         => false
+        // The guard is for SI-8403. It prevents adding imports again in the context created by
+        // `Namer#createInnerNamer`
+        case _: Import if tree != this.tree => true
+        case _                              => false
       }
       val sameOwner = owner == this.owner
       val prefixInChild =
@@ -458,7 +462,9 @@ trait Contexts { self: Analyzer =>
       c.prefix             = prefixInChild
       c.enclClass          = if (isTemplateOrPackage) c else enclClass
       c(ConstructorSuffix) = !isTemplateOrPackage && c(ConstructorSuffix)
-      c.enclMethod         = if (isDefDef) c else enclMethod
+
+      // SI-8245 `isLazy` need to skip lazy getters to ensure `return` binds to the right place
+      c.enclMethod         = if (isDefDef && !owner.isLazy) c else enclMethod
 
       registerContext(c.asInstanceOf[analyzer.Context])
       debuglog("[context] ++ " + c.unit + " / " + tree.summaryString)
@@ -513,7 +519,7 @@ trait Contexts { self: Analyzer =>
             argContext.scope enter e.sym
           }
         }
-        if (c.isLocal && !c.owner.isLocalDummy) {
+        if (c.owner.isTerm && !c.owner.isLocalDummy) {
           enterElems(c.outer)
           enterLocalElems(c.scope.elems)
         }
@@ -539,6 +545,8 @@ trait Contexts { self: Analyzer =>
       if (checking) onTreeCheckerError(pos, msg) else unit.error(pos, msg)
 
     @inline private def issueCommon(err: AbsTypeError)(pf: PartialFunction[AbsTypeError, Unit]) {
+      // TODO: are errors allowed to have pos == NoPosition??
+      // if not, Jason suggests doing: val pos = err.errPos.orElse( { devWarning("Que?"); context.tree.pos })
       if (settings.Yissuedebug) {
         log("issue error: " + err.errMsg)
         (new Exception).printStackTrace()
@@ -585,9 +593,6 @@ trait Contexts { self: Analyzer =>
       if (reportErrors || force) unit.warning(pos, msg)
       else if (bufferErrors) reportBuffer += (pos -> msg)
     }
-
-    /** Is the owning symbol of this context a term? */
-    final def isLocal: Boolean = owner.isTerm
 
     // nextOuter determines which context is searched next for implicits
     // (after `this`, which contributes `newImplicits` below.) In
@@ -652,6 +657,13 @@ trait Contexts { self: Analyzer =>
       c
     }
 
+    def enclosingNonImportContext: Context = {
+      var c = this
+      while (c != NoContext && c.tree.isInstanceOf[Import])
+        c = c.outer
+      c
+    }
+
     /** Is `sym` accessible as a member of `pre` in current context? */
     def isAccessible(sym: Symbol, pre: Type, superAccess: Boolean = false): Boolean = {
       lastAccessCheckDetails = ""
@@ -711,7 +723,7 @@ trait Contexts { self: Analyzer =>
 
         (  (ab.isTerm || ab == rootMirror.RootClass)
         || (accessWithin(ab) || accessWithinLinked(ab)) &&
-             (  !sym.hasLocalFlag
+             (  !sym.isLocalToThis
              || sym.owner.isImplClass // allow private local accesses to impl classes
              || sym.isProtected && isSubThisType(pre, sym.owner)
              || pre =:= sym.owner.thisType
@@ -977,7 +989,7 @@ trait Contexts { self: Analyzer =>
         //   2) sym.owner is inherited by the correct package object class
         // We try to establish 1) by inspecting the owners directly, and then we try
         // to rule out 2), and only if both those fail do we resort to looking in the info.
-        !sym.isPackage && sym.owner.exists && (
+        !sym.hasPackageFlag && sym.owner.exists && (
           if (sym.owner.isPackageObjectClass)
             sym.owner.owner == pkgClass
           else
@@ -1207,7 +1219,7 @@ trait Contexts { self: Analyzer =>
   trait ImportContext extends Context {
     private val impInfo: ImportInfo = {
       val info = new ImportInfo(tree.asInstanceOf[Import], outerDepth)
-      if (settings.lint && !isRootImport) // excludes java.lang/scala/Predef imports
+      if (settings.warnUnusedImport && !isRootImport) // excludes java.lang/scala/Predef imports
         allImportInfos(unit) ::= info
       info
     }
@@ -1304,7 +1316,7 @@ trait Contexts { self: Analyzer =>
       var renamed = false
       var selectors = tree.selectors
       def current = selectors.head
-      while (selectors.nonEmpty && result == NoSymbol) {
+      while ((selectors ne Nil) && result == NoSymbol) {
         if (current.rename == name.toTermName)
           result = qual.tpe.nonLocalMember( // new to address #2733: consider only non-local members for imports
             if (name.isTypeName) current.name.toTypeName else current.name)
@@ -1316,7 +1328,7 @@ trait Contexts { self: Analyzer =>
         if (result == NoSymbol)
           selectors = selectors.tail
       }
-      if (settings.lint && selectors.nonEmpty && result != NoSymbol && pos != NoPosition)
+      if (settings.warnUnusedImport && selectors.nonEmpty && result != NoSymbol && pos != NoPosition)
         recordUsage(current, result)
 
       // Harden against the fallout from bugs like SI-6745
@@ -1354,9 +1366,8 @@ trait Contexts { self: Analyzer =>
     override def toString = tree.toString
   }
 
-  case class ImportType(expr: Tree) extends Type {
-    override def safeToString = "ImportType("+expr+")"
-  }
+  type ImportType = global.ImportType
+  val ImportType = global.ImportType
 }
 
 object ContextMode {

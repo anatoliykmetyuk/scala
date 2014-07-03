@@ -15,6 +15,7 @@ import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
 import util.{ ClassPath, MergedClassPath, StatisticsInfo, returning, stackTraceString }
+import scala.reflect.ClassTag
 import scala.reflect.internal.util.{ OffsetPosition, SourceFile, NoSourceFile, BatchSourceFile, ScriptSourceFile }
 import scala.reflect.internal.pickling.{ PickleBuffer, PickleFormat }
 import scala.reflect.io.VirtualFile
@@ -33,6 +34,7 @@ import backend.jvm.GenASM
 import backend.opt.{ Inliners, InlineExceptionHandlers, ConstantOptimization, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
 import scala.language.postfixOps
+import scala.tools.nsc.ast.{TreeGen => AstTreeGen}
 
 class Global(var currentSettings: Settings, var reporter: Reporter)
     extends SymbolTable
@@ -49,11 +51,15 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   override def isCompilerUniverse = true
   override val useOffsetPositions = !currentSettings.Yrangepos
 
+  type RuntimeClass = java.lang.Class[_]
+  implicit val RuntimeClassTag: ClassTag[RuntimeClass] = ClassTag[RuntimeClass](classOf[RuntimeClass])
+
   class GlobalMirror extends Roots(NoSymbol) {
     val universe: self.type = self
     def rootLoader: LazyType = new loaders.PackageLoader(classPath)
     override def toString = "compiler mirror"
   }
+  implicit val MirrorTag: ClassTag[Mirror] = ClassTag[Mirror](classOf[GlobalMirror])
 
   lazy val rootMirror: Mirror = {
     val rm = new GlobalMirror
@@ -81,6 +87,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   def picklerPhase: Phase = if (currentRun.isDefined) currentRun.picklerPhase else NoPhase
 
+  def erasurePhase: Phase = if (currentRun.isDefined) currentRun.erasurePhase else NoPhase
+
   // platform specific elements
 
   protected class GlobalPlatform extends {
@@ -98,13 +106,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   // sub-components --------------------------------------------------
 
-  /** Generate ASTs */
-  type TreeGen = scala.tools.nsc.ast.TreeGen
-
   /** Tree generation, usually based on existing symbols. */
   override object gen extends {
     val global: Global.this.type = Global.this
-  } with TreeGen {
+  } with AstTreeGen {
     def mkAttributedCast(tree: Tree, pt: Type): Tree =
       typer.typed(mkCast(tree, pt))
   }
@@ -231,6 +236,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   override def inform(msg: String)      = inform(NoPosition, msg)
   override def globalError(msg: String) = globalError(NoPosition, msg)
   override def warning(msg: String)     = warning(NoPosition, msg)
+  override def deprecationWarning(pos: Position, msg: String) = currentUnit.deprecationWarning(pos, msg)
 
   def globalError(pos: Position, msg: String) = reporter.error(pos, msg)
   def warning(pos: Position, msg: String)     = if (settings.fatalWarnings) globalError(pos, msg) else reporter.warning(pos, msg)
@@ -527,7 +533,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   } with Erasure
 
   // phaseName = "posterasure"
-  object postErasure extends {
+  override object postErasure extends {
     val global: Global.this.type = Global.this
     val runsAfter = List("erasure")
     val runsRightAfter = Some("erasure")
@@ -1213,7 +1219,26 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     /** Have we already supplemented the error message of a compiler crash? */
     private[nsc] final var supplementedError = false
 
-    private val unitbuf = new mutable.ListBuffer[CompilationUnit]
+    private class SyncedCompilationBuffer { self =>
+      private val underlying = new mutable.ArrayBuffer[CompilationUnit]
+      def size = synchronized { underlying.size }
+      def +=(cu: CompilationUnit): this.type = { synchronized { underlying += cu }; this }
+      def head: CompilationUnit = synchronized{ underlying.head }
+      def apply(i: Int): CompilationUnit = synchronized { underlying(i) }
+      def iterator: Iterator[CompilationUnit] = new collection.AbstractIterator[CompilationUnit] {
+        private var used = 0
+        def hasNext = self.synchronized{ used < underlying.size }
+        def next = self.synchronized {
+          if (!hasNext) throw new NoSuchElementException("next on empty Iterator")
+          used += 1
+          underlying(used-1)
+        }
+      }
+      def toList: List[CompilationUnit] = synchronized{ underlying.toList }
+    }
+
+    private val unitbuf = new SyncedCompilationBuffer
+
     val compiledFiles   = new mutable.HashSet[String]
 
     /** A map from compiled top-level symbols to their source files */
@@ -1224,9 +1249,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     private var phasec: Int  = 0   // phases completed
     private var unitc: Int   = 0   // units completed this phase
-    private var _unitbufSize = 0
 
-    def size = _unitbufSize
+    def size = unitbuf.size
     override def toString = "scalac Run for:\n  " + compiledFiles.toList.sorted.mkString("\n  ")
 
     // Calculate where to stop based on settings -Ystop-before or -Ystop-after.
@@ -1329,7 +1353,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       val toReload = mutable.Set[String]()
       for (sym <- root.info.decls) {
         if (sym.isInitialized && clearOnNextRun(sym))
-          if (sym.isPackage) {
+          if (sym.hasPackageFlag) {
             resetProjectClasses(sym.moduleClass)
             openPackageModule(sym.moduleClass)
           } else {
@@ -1451,7 +1475,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     /** add unit to be compiled in this run */
     private def addUnit(unit: CompilationUnit) {
       unitbuf += unit
-      _unitbufSize += 1 // counting as they're added so size is cheap
       compiledFiles += unit.source.file.path
     }
     private def checkDeprecatedSettings(unit: CompilationUnit) {
@@ -1467,8 +1490,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     /* !!! Note: changing this to unitbuf.toList.iterator breaks a bunch
        of tests in tests/res.  This is bad, it means the resident compiler
        relies on an iterator of a mutable data structure reflecting changes
-       made to the underlying structure (in whatever accidental way it is
-       currently depending upon.)
+       made to the underlying structure.
      */
     def units: Iterator[CompilationUnit] = unitbuf.iterator
 
@@ -1711,25 +1733,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       }
     }
 
-    /** Create and compile a synthetic compilation unit from the provided tree.
-     *
-     *  This needs to create a virtual file underlying the compilation unit in order to appease SBT.
-     *  However this file cannot have a randomly generated name, because then SBT 0.13 goes into a vicious loop
-     *  as described on the mailing list: https://groups.google.com/forum/#!msg/scala-user/r1SgSoVfs0U/Wv4av0LOKukJ
-     *  Therefore I have introduced an additional parameter that makes everyone specify meaningful file names.
-     */
-    def compileLate(virtualFileName: String, code: PackageDef) {
-      // compatibility with SBT
-      // on the one hand, we need to specify some jfile here, otherwise sbt crashes with an NPE (SI-6870)
-      // on the other hand, we can't specify the obvious enclosingUnit, because then sbt somehow fails to run tests using type macros
-      val fakeJfile = new java.io.File(virtualFileName)
-      val virtualFile = new VirtualFile(virtualFileName) { override def file = fakeJfile }
-      val sourceFile = new BatchSourceFile(virtualFile, code.toString)
-      val unit = new CompilationUnit(sourceFile)
-      unit.body = code
-      compileLate(unit)
-    }
-
     /** Reset package class to state at typer (not sure what this
      *  is needed for?)
      */
@@ -1797,10 +1800,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   private def writeICode() {
     val printer = new icodes.TextPrinter(null, icodes.linearizer)
     icodes.classes.values.foreach((cls) => {
-      val suffix = if (cls.symbol.hasModuleFlag) "$.icode" else ".icode"
-      val file = getFile(cls.symbol, suffix)
-//      if (file.exists())
-//        file = new File(file.getParentFile(), file.getName() + "1")
+      val moduleSfx = if (cls.symbol.hasModuleFlag) "$" else ""
+      val phaseSfx  = if (settings.debug) phase else "" // only for debugging, appending the full phasename breaks windows build
+      val file      = getFile(cls.symbol, s"$moduleSfx$phaseSfx.icode")
+
       try {
         val stream = new FileOutputStream(file)
         printer.setWriter(new PrintWriter(stream, true))

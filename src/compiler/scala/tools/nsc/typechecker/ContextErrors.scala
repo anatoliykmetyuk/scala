@@ -359,6 +359,14 @@ trait ContextErrors {
         //setError(sel)
       }
 
+      def SelectWithUnderlyingError(sel: Tree, err: AbsTypeError) = {
+        // if there's no position, this is likely the result of a MissingRequirementError
+        // use the position of the selection we failed to type check to report the original message
+        if (err.errPos == NoPosition) issueNormalTypeError(sel, err.errMsg)
+        else issueTypeError(err)
+        setError(sel)
+      }
+
       //typedNew
       def IsAbstractError(tree: Tree, sym: Symbol) = {
         issueNormalTypeError(tree, sym + " is abstract; cannot be instantiated")
@@ -418,7 +426,7 @@ trait ContextErrors {
                 case TypeRef(_, _, arg :: _) if arg.typeSymbol == TupleClass(funArity) && funArity > 1 =>
                   sm"""|
                        |Note: The expected type requires a one-argument function accepting a $funArity-Tuple.
-                       |      Consider a pattern matching anoynmous function, `{ case $example =>  ... }`"""
+                       |      Consider a pattern matching anonymous function, `{ case $example =>  ... }`"""
                 case _ => ""
               }
             case _ => ""
@@ -625,8 +633,7 @@ trait ContextErrors {
         setError(tree)
       }
 
-      def CaseClassConstructorError(tree: Tree) = {
-        val baseMessage = tree.symbol + " is not a case class constructor, nor does it have an unapply/unapplySeq method"
+      def CaseClassConstructorError(tree: Tree, baseMessage: String) = {
         val addendum = directUnapplyMember(tree.symbol.info) match {
           case sym if hasMultipleNonImplicitParamLists(sym) => s"\nNote: ${sym.defString} exists in ${tree.symbol}, but it cannot be used as an extractor due to its second non-implicit parameter list"
           case _                                            => ""
@@ -726,9 +733,17 @@ trait ContextErrors {
         NormalTypeError(expandee, "too many argument lists for " + fun)
       }
 
-      def MacroInvalidExpansionError(expandee: Tree, role: String, allowedExpansions: String) = {
-        issueNormalTypeError(expandee, s"macro in $role role can only expand into $allowedExpansions")
+      private def MacroIncompatibleEngineError(friendlyMessage: String, internalMessage: String) = {
+        def debugDiagnostic = s"(internal diagnostic: $internalMessage)"
+        val message = if (macroDebugLite || macroDebugVerbose) s"$friendlyMessage $debugDiagnostic" else friendlyMessage
+        issueNormalTypeError(lastTreeToTyper, message)
       }
+
+      def MacroCantExpand210xMacrosError(internalMessage: String) =
+        MacroIncompatibleEngineError("can't expand macros compiled by previous versions of Scala", internalMessage)
+
+      def MacroCantExpandIncompatibleMacrosError(internalMessage: String) =
+        MacroIncompatibleEngineError("macro cannot be expanded, because it was compiled by an incompatible macro engine", internalMessage)
 
       case object MacroExpansionException extends Exception with scala.util.control.ControlThrowable
 

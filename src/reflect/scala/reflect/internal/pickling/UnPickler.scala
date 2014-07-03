@@ -229,6 +229,20 @@ abstract class UnPickler {
           NoSymbol
         }
 
+        def moduleAdvice(missing: String): String = {
+          val module =
+            if      (missing.startsWith("scala.xml"))                Some(("org.scala-lang.modules", "scala-xml"))
+            else if (missing.startsWith("scala.util.parsing"))       Some(("org.scala-lang.modules", "scala-parser-combinators"))
+            else if (missing.startsWith("scala.swing"))              Some(("org.scala-lang.modules", "scala-swing"))
+            else if (missing.startsWith("scala.util.continuations")) Some(("org.scala-lang.plugins", "scala-continuations-library"))
+            else None
+
+          (module map { case (group, art) =>
+            s"""\n(NOTE: It looks like the $art module is missing; try adding a dependency on "$group" : "$art".
+               |       See http://docs.scala-lang.org/overviews/core/scala-2.11.html for more information.)""".stripMargin
+           } getOrElse "")
+        }
+
         // (1) Try name.
         fromName(name) orElse {
           // (2) Try with expanded name.  Can happen if references to private
@@ -240,11 +254,12 @@ abstract class UnPickler {
               // (4) Call the mirror's "missing" hook.
               adjust(mirrorThatLoaded(owner).missingHook(owner, name)) orElse {
                 // (5) Create a stub symbol to defer hard failure a little longer.
+                val fullName = s"${owner.fullName}.$name"
                 val missingMessage =
-                  s"""|bad symbolic reference. A signature in $filename refers to ${name.longString}
-                      |in ${owner.kindString} ${owner.fullName} which is not available.
-                      |It may be completely missing from the current classpath, or the version on
-                      |the classpath might be incompatible with the version used when compiling $filename.""".stripMargin
+                  s"""|bad symbolic reference to $fullName encountered in class file '$filename'.
+                      |Cannot access ${name.longString} in ${owner.kindString} ${owner.fullName}. The current classpath may be
+                      |missing a definition for $fullName, or $filename may have been compiled against a version that's
+                      |incompatible with the one found on the current classpath.${moduleAdvice(fullName)}""".stripMargin
                 owner.newStubSymbol(name, missingMessage)
               }
             }
@@ -275,6 +290,7 @@ abstract class UnPickler {
       def pflags       = flags & PickledFlags
 
       def finishSym(sym: Symbol): Symbol = {
+        markFlagsCompleted(sym)(mask = AllFlags)
         sym.privateWithin = privateWithin
         sym.info = (
           if (atEnd) {
@@ -362,7 +378,7 @@ abstract class UnPickler {
         case METHODtpe                 => MethodTypeRef(readTypeRef(), readSymbols())
         case POLYtpe                   => PolyOrNullaryType(readTypeRef(), readSymbols())
         case EXISTENTIALtpe            => ExistentialType(underlying = readTypeRef(), quantified = readSymbols())
-        case ANNOTATEDtpe              => AnnotatedType(underlying = readTypeRef(), annotations = readAnnots(), selfsym = NoSymbol)
+        case ANNOTATEDtpe              => AnnotatedType(underlying = readTypeRef(), annotations = readAnnots())
       }
     }
 
@@ -487,6 +503,7 @@ abstract class UnPickler {
       def nameRef()     = readNameRef()
       def tparamRef()   = readTypeDefRef()
       def vparamRef()   = readValDefRef()
+      def memberRef()   = readMemberDefRef()
       def constRef()    = readConstantRef()
       def idRef()       = readIdentRef()
       def termNameRef() = readNameRef().toTermName
@@ -520,7 +537,7 @@ abstract class UnPickler {
         case CLASStree           => ClassDef(modsRef, typeNameRef, rep(tparamRef), implRef)
         case COMPOUNDTYPEtree    => CompoundTypeTree(implRef)
         case DEFDEFtree          => DefDef(modsRef, termNameRef, rep(tparamRef), rep(rep(vparamRef)), ref, ref)
-        case EXISTENTIALTYPEtree => ExistentialTypeTree(ref, all(ref))
+        case EXISTENTIALTYPEtree => ExistentialTypeTree(ref, all(memberRef))
         case FUNCTIONtree        => Function(rep(vparamRef), ref)
         case IMPORTtree          => Import(ref, selectorsRef)
         case LABELtree           => LabelDef(termNameRef, rep(idRef), ref)
@@ -634,6 +651,12 @@ abstract class UnPickler {
         case other =>
           errorBadSignature("expected an TypeDef (" + other + ")")
       }
+    protected def readMemberDefRef(): MemberDef =
+      readTreeRef() match {
+        case tree:MemberDef => tree
+        case other =>
+          errorBadSignature("expected an MemberDef (" + other + ")")
+      }
 
     protected def errorBadSignature(msg: String) =
       throw new RuntimeException("malformed Scala signature of " + classRoot.name + " at " + readIndex + "; " + msg)
@@ -656,7 +679,7 @@ abstract class UnPickler {
     private class LazyTypeRef(i: Int) extends LazyType with FlagAgnosticCompleter {
       private val definedAtRunId = currentRunId
       private val p = phase
-      override def complete(sym: Symbol) : Unit = try {
+      protected def completeInternal(sym: Symbol) : Unit = try {
         val tp = at(i, () => readType(sym.isTerm)) // after NMT_TRANSITION, revert `() => readType(sym.isTerm)` to `readType`
         if (p ne null)
           slowButSafeEnteringPhase(p) (sym setInfo tp)
@@ -666,6 +689,10 @@ abstract class UnPickler {
       catch {
         case e: MissingRequirementError => throw toTypeError(e)
       }
+      override def complete(sym: Symbol) : Unit = {
+        completeInternal(sym)
+        if (!isCompilerUniverse) markAllCompleted(sym)
+      }
       override def load(sym: Symbol) { complete(sym) }
     }
 
@@ -673,8 +700,9 @@ abstract class UnPickler {
      *  of completed symbol to symbol at index `j`.
      */
     private class LazyTypeRefAndAlias(i: Int, j: Int) extends LazyTypeRef(i) {
-      override def complete(sym: Symbol) = try {
-        super.complete(sym)
+      override def completeInternal(sym: Symbol) = try {
+        super.completeInternal(sym)
+
         var alias = at(j, readSymbol)
         if (alias.isOverloaded)
           alias = slowButSafeEnteringPhase(picklerPhase)((alias suchThat (alt => sym.tpe =:= sym.owner.thisType.memberType(alt))))

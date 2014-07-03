@@ -105,11 +105,10 @@ abstract class UnCurry extends InfoTransform
      */
     def isByNameRef(tree: Tree) = (
          tree.isTerm
-      && !byNameArgs(tree)
       && (tree.symbol ne null)
       && (isByName(tree.symbol))
+      && !byNameArgs(tree)
     )
-
 
 // ------- Handling non-local returns -------------------------------------------------
 
@@ -222,7 +221,9 @@ abstract class UnCurry extends InfoTransform
           def mkMethod(owner: Symbol, name: TermName, additionalFlags: FlagSet = NoFlags): DefDef =
             gen.mkMethodFromFunction(localTyper)(fun, owner, name, additionalFlags)
 
-          if (inlineFunctionExpansion) {
+          val canUseDelamdafyMethod = (inConstructorFlag == 0) // Avoiding synthesizing code prone to SI-6666, SI-8363 by using old-style lambda translation
+
+          if (inlineFunctionExpansion || !canUseDelamdafyMethod) {
             val parents = addSerializable(abstractFunctionForFunctionType(fun.tpe))
             val anonClass = fun.symbol.owner newAnonymousFunctionClass(fun.pos, inConstructorFlag) addAnnotation SerialVersionUIDAnnotation
             anonClass setInfo ClassInfoType(parents, newScope, anonClass)
@@ -413,7 +414,7 @@ abstract class UnCurry extends InfoTransform
       val sym = tree.symbol
 
       // true if the taget is a lambda body that's been lifted into a method
-      def isLiftedLambdaBody(target: Tree) = target.symbol.isLocal && target.symbol.isArtifact && target.symbol.name.containsName(nme.ANON_FUN_NAME)
+      def isLiftedLambdaBody(target: Tree) = target.symbol.isLocalToBlock && target.symbol.isArtifact && target.symbol.name.containsName(nme.ANON_FUN_NAME)
 
       val result = (
         // TODO - settings.noassertions.value temporarily retained to avoid
@@ -457,12 +458,11 @@ abstract class UnCurry extends InfoTransform
             else
               super.transform(tree)
           case UnApply(fn, args) =>
-            val fn1 = transform(fn)
-            val args1 = transformTrees(fn.symbol.name match {
-              case nme.unapply    => args
-              case nme.unapplySeq => transformArgs(tree.pos, fn.symbol, args, localTyper.expectedPatternTypes(fn, args))
-              case _              => sys.error("internal error: UnApply node has wrong symbol")
-            })
+            val fn1   = transform(fn)
+            val args1 = fn.symbol.name match {
+              case nme.unapplySeq => transformArgs(tree.pos, fn.symbol, args, patmat.alignPatterns(tree).expectedTypes)
+              case _              => args
+            }
             treeCopy.UnApply(tree, fn1, args1)
 
           case Apply(fn, args) =>
@@ -686,11 +686,13 @@ abstract class UnCurry extends InfoTransform
           case Packed(param, tempVal) => (param, tempVal)
         }.unzip
 
-        val rhs1 = localTyper.typedPos(rhs.pos) {
-          // Patch the method body to refer to the temp vals
-          val rhsSubstituted = rhs.substituteSymbols(packedParams map (_.symbol), tempVals map (_.symbol))
-          // The new method body: { val p$1 = p.asInstanceOf[<dependent type>]; ...; <rhsSubstituted> }
-          Block(tempVals, rhsSubstituted)
+        val rhs1 = if (tempVals.isEmpty) rhs else {
+          localTyper.typedPos(rhs.pos) {
+            // Patch the method body to refer to the temp vals
+            val rhsSubstituted = rhs.substituteSymbols(packedParams map (_.symbol), tempVals map (_.symbol))
+            // The new method body: { val p$1 = p.asInstanceOf[<dependent type>]; ...; <rhsSubstituted> }
+            Block(tempVals, rhsSubstituted)
+          }
         }
 
         (allParams :: Nil, rhs1)

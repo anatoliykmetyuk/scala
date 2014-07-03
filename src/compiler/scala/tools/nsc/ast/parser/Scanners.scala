@@ -226,8 +226,11 @@ trait Scanners extends ScannersCommon {
             if (allowIdent  != name 
             && nme.SCRIPTkw != name  // Note: only used in SubScript; do not warn
             && nme.BREAKkw  != name  // Note: only used in SubScript; do not warn
-            && emitIdentifierDeprecationWarnings)
-              deprecationWarning(name+" is now a reserved word; usage as an identifier is deprecated")
+            )
+              if (name == nme.MACROkw)
+                syntaxError(s"$name is now a reserved word; usage as an identifier is disallowed")
+              else if (emitIdentifierDeprecationWarnings)
+                deprecationWarning(s"$name is now a reserved word; usage as an identifier is deprecated")
           }
         }
         if (isInSubScript_script && name.toString=="then") {
@@ -543,14 +546,17 @@ trait Scanners extends ScannersCommon {
             if (token == INTERPOLATIONID) {
               nextRawChar()
               if (ch == '\"') {
-                nextRawChar()
-                if (ch == '\"') {
+                val lookahead = lookaheadReader
+                lookahead.nextChar()
+                if (lookahead.ch == '\"') {
+                  nextRawChar()                        // now eat it
                   offset += 3
                   nextRawChar()
                   getStringPart(multiLine = true)
                   sepRegions = STRINGPART :: sepRegions // indicate string part
                   sepRegions = STRINGLIT  :: sepRegions // once more to indicate multi line string part
                 } else {
+                  nextChar()
                   token = STRINGLIT
                   strVal = ""
                 }
@@ -704,8 +710,7 @@ trait Scanners extends ScannersCommon {
       if (ch == '`') {
         nextChar()
         finishNamed(BACKQUOTED_IDENT)
-        if      (name.length ==            0) syntaxError("empty quoted identifier")
-        else if (name        == nme.WILDCARD) syntaxError("wildcard invalid as backquoted identifier")
+        if (name.length == 0) syntaxError("empty quoted identifier")
       }
       else                                    syntaxError("unclosed quoted identifier")
     }

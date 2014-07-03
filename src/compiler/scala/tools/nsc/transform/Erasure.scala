@@ -61,7 +61,7 @@ abstract class Erasure extends AddInterfaces
             parents foreach traverse
           case ClassInfoType(parents, _, _) =>
             parents foreach traverse
-          case AnnotatedType(_, atp, _) =>
+          case AnnotatedType(_, atp) =>
             traverse(atp)
           case _ =>
             mapOver(tp)
@@ -92,11 +92,22 @@ abstract class Erasure extends AddInterfaces
   // more rigorous way up front rather than catching it after the fact,
   // but that will be more involved.
   private def dotCleanup(sig: String): String = {
+    // OPT 50% of time in generic signatures (~1% of compile time) was in this method, hence the imperative rewrite.
     var last: Char = '\u0000'
-    sig map {
-      case '.' if last != '>' => last = '.' ; '$'
-      case ch                 => last = ch ; ch
+    var i = 0
+    val len = sig.length
+    val copy: Array[Char] = sig.toCharArray
+    var changed = false
+    while (i < sig.length) {
+      val ch = copy(i)
+      if (ch == '.' && last != '>') {
+         copy(i) = '$'
+         changed = true
+      }
+      last = ch
+      i += 1
     }
+    if (changed) new String(copy) else sig
   }
 
   /** This object is only used for sanity testing when -check:genjvm is set.
@@ -227,8 +238,11 @@ abstract class Erasure extends AddInterfaces
               if (!(AnyRefTpe <:< bounds.hi)) "+" + boxedSig(bounds.hi)
               else if (!(bounds.lo <:< NullTpe)) "-" + boxedSig(bounds.lo)
               else "*"
-            } else {
-              boxedSig(tp)
+            } else tp match {
+              case PolyType(_, res) =>
+                "*" // SI-7932
+              case _ =>
+                boxedSig(tp)
             }
           def classSig = {
             val preRebound = pre.baseType(sym.owner) // #2585
@@ -302,7 +316,7 @@ abstract class Erasure extends AddInterfaces
           boxedSig(parent)
         case ClassInfoType(parents, _, _) =>
           superSig(parents)
-        case AnnotatedType(_, atp, _) =>
+        case AnnotatedType(_, atp) =>
           jsig(atp, existentiallyBound, toplevel, primitiveOK)
         case BoundedWildcardType(bounds) =>
           println("something's wrong: "+sym0+":"+sym0.tpe+" has a bounded wildcard type")
@@ -392,19 +406,19 @@ abstract class Erasure extends AddInterfaces
      *  @param  other    The overidden symbol for which the bridge was generated
      *  @param  bridge   The bridge
      */
-    def checkBridgeOverrides(member: Symbol, other: Symbol, bridge: Symbol): Boolean = {
+    def checkBridgeOverrides(member: Symbol, other: Symbol, bridge: Symbol): Seq[(Position, String)] = {
       def fulldef(sym: Symbol) =
         if (sym == NoSymbol) sym.toString
         else s"$sym: ${sym.tpe} in ${sym.owner}"
       var noclash = true
+      val clashErrors = mutable.Buffer[(Position, String)]()
       def clashError(what: String) = {
-        noclash = false
-        unit.error(
-          if (member.owner == root) member.pos else root.pos,
-          sm"""bridge generated for member ${fulldef(member)}
-              |which overrides ${fulldef(other)}
-              |clashes with definition of $what;
-              |both have erased type ${exitingPostErasure(bridge.tpe)}""")
+        val pos = if (member.owner == root) member.pos else root.pos
+        val msg = sm"""bridge generated for member ${fulldef(member)}
+                      |which overrides ${fulldef(other)}
+                      |clashes with definition of $what;
+                      |both have erased type ${exitingPostErasure(bridge.tpe)}"""
+        clashErrors += Tuple2(pos, msg)
       }
       for (bc <- root.baseClasses) {
         if (settings.debug)
@@ -429,7 +443,7 @@ abstract class Erasure extends AddInterfaces
           }
         }
       }
-      noclash
+      clashErrors
     }
 
     /** TODO - work through this logic with a fine-toothed comb, incorporating
@@ -467,8 +481,18 @@ abstract class Erasure extends AddInterfaces
       bridge setInfo (otpe cloneInfo bridge)
       bridgeTarget(bridge) = member
 
-      if (!(member.tpe exists (_.typeSymbol.isDerivedValueClass)) ||
-          checkBridgeOverrides(member, other, bridge)) {
+      def sigContainsValueClass = (member.tpe exists (_.typeSymbol.isDerivedValueClass))
+
+      val shouldAdd = (
+            !sigContainsValueClass
+        ||  (checkBridgeOverrides(member, other, bridge) match {
+              case Nil => true
+              case es if member.owner.isAnonymousClass => resolveAnonymousBridgeClash(member, bridge); true
+              case es => for ((pos, msg) <- es) unit.error(pos, msg); false
+            })
+      )
+
+      if (shouldAdd) {
         exitingErasure(root.info.decls enter bridge)
         if (other.owner == root) {
           exitingErasure(root.info.decls.unlink(other))
@@ -521,6 +545,8 @@ abstract class Erasure extends AddInterfaces
   /** The modifier typer which retypes with erased types. */
   class Eraser(_context: Context) extends Typer(_context) with TypeAdapter {
     val typer = this.asInstanceOf[analyzer.Typer]
+
+    override protected def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = tree
 
     /**  Replace member references as follows:
      *
@@ -714,7 +740,7 @@ abstract class Erasure extends AddInterfaces
     /** TODO - adapt SymbolPairs so it can be used here. */
     private def checkNoDeclaredDoubleDefs(base: Symbol) {
       val decls = base.info.decls
-      
+
       // SI-8010 force infos, otherwise makeNotPrivate in ExplicitOuter info transformer can trigger
       //         a scope rehash while were iterating and we can see the same entry twice!
       //         Inspection of SymbolPairs (the basis of OverridingPairs), suggests that it is immune
@@ -725,13 +751,13 @@ abstract class Erasure extends AddInterfaces
       //         we do these checks, so that we're comparing same-named methods based on the expanded names that actually
       //         end up in the bytecode.
       exitingPostErasure(decls.foreach(_.info))
-      
+
       var e = decls.elems
       while (e ne null) {
         if (e.sym.isTerm) {
           var e1 = decls lookupNextEntry e
           while (e1 ne null) {
-            assert(e.sym ne e1.sym, s"Internal error: encountered ${e.sym.debugLocationString} twice during scope traversal. This might be related to SI-8010.")            
+            assert(e.sym ne e1.sym, s"Internal error: encountered ${e.sym.debugLocationString} twice during scope traversal. This might be related to SI-8010.")
             if (sameTypeAfterErasure(e.sym, e1.sym))
               doubleDefError(new SymbolPair(base, e.sym, e1.sym))
 
@@ -760,7 +786,7 @@ abstract class Erasure extends AddInterfaces
           || super.exclude(sym)
           || !sym.hasTypeAt(currentRun.refchecksPhase.id)
         )
-        override def matches(sym1: Symbol, sym2: Symbol) = true
+        override def matches(lo: Symbol, high: Symbol) = true
       }
       def isErasureDoubleDef(pair: SymbolPair) = {
         import pair._
@@ -1112,6 +1138,14 @@ abstract class Erasure extends AddInterfaces
         newTyper(rootContext(unit, tree, erasedTypes = true)).typed(tree2)
       }
     }
+  }
+
+  final def resolveAnonymousBridgeClash(sym: Symbol, bridge: Symbol) {
+    // TODO reinstate this after Delambdafy generates anonymous classes that meet this requirement.
+    // require(sym.owner.isAnonymousClass, sym.owner)
+    log(s"Expanding name of ${sym.debugLocationString} as it clashes with bridge. Renaming deemed safe because the owner is anonymous.")
+    sym.expandName(sym.owner)
+    bridge.resetFlag(BRIDGE)
   }
 
   private class TypeRefAttachment(val tpe: TypeRef)

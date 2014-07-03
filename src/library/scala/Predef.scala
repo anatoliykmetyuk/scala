@@ -15,7 +15,7 @@ import generic.CanBuildFrom
 import scala.annotation.{ elidable, implicitNotFound }
 import scala.annotation.elidable.ASSERTION
 import scala.language.{implicitConversions, existentials}
-import scala.io.ReadStdin
+import scala.io.StdIn
 
 /** The `Predef` object provides definitions that are accessible in all Scala
  *  compilation units without explicit qualification.
@@ -95,8 +95,6 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   type Set[A]     = immutable.Set[A]
   val Map         = immutable.Map
   val Set         = immutable.Set
-  // @deprecated("Use scala.AnyRef instead", "2.10.0")
-  // def AnyRef = scala.AnyRef
 
   // Manifest types, companions, and incantations for summoning
   @annotation.implicitNotFound(msg = "No ClassManifest available for ${T}.")
@@ -266,8 +264,16 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
     @inline def formatted(fmtstr: String): String = fmtstr format self
   }
 
-  implicit final class StringAdd[A](private val self: A) extends AnyVal {
-    def +(other: String) = String.valueOf(self) + other
+  // TODO: remove, only needed for binary compatibility of 2.11.0-RC1 with 2.11.0-M8
+  // note that `private[scala]` becomes `public` in bytecode
+  private[scala] final class StringAdd[A](private val self: A) extends AnyVal {
+    def +(other: String): String = String.valueOf(self) + other
+  }
+  private[scala] def StringAdd(x: Any): Any = new StringAdd(x)
+
+  // SI-8229 retaining the pre 2.11 name for source compatibility in shadowing this implicit
+  implicit final class any2stringadd[A](private val self: A) extends AnyVal {
+    def +(other: String): String = String.valueOf(self) + other
   }
 
   implicit final class RichException(private val self: Throwable) extends AnyVal {
@@ -376,9 +382,13 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   @implicitNotFound(msg = "Cannot prove that ${From} <:< ${To}.")
   sealed abstract class <:<[-From, +To] extends (From => To) with Serializable
   private[this] final val singleton_<:< = new <:<[Any,Any] { def apply(x: Any): Any = x }
-  // not in the <:< companion object because it is also
-  // intended to subsume identity (which is no longer implicit)
-  implicit def conforms[A]: A <:< A = singleton_<:<.asInstanceOf[A <:< A]
+  // The dollar prefix is to dodge accidental shadowing of this method
+  // by a user-defined method of the same name (SI-7788).
+  // The collections rely on this method.
+  implicit def $conforms[A]: A <:< A = singleton_<:<.asInstanceOf[A <:< A]
+
+  @deprecated("Use `implicitly[T <:< U]` or `identity` instead.", "2.11.0")
+  def conforms[A]: A <:< A = $conforms[A]
 
   /** An instance of `A =:= B` witnesses that the types `A` and `B` are equal.
    *
@@ -412,25 +422,24 @@ private[scala] trait DeprecatedPredef {
   @deprecated("Use `ArrowAssoc`", "2.11.0") def any2ArrowAssoc[A](x: A): ArrowAssoc[A]                                      = new ArrowAssoc(x)
   @deprecated("Use `Ensuring`", "2.11.0") def any2Ensuring[A](x: A): Ensuring[A]                                            = new Ensuring(x)
   @deprecated("Use `StringFormat`", "2.11.0") def any2stringfmt(x: Any): StringFormat[Any]                                  = new StringFormat(x)
-  @deprecated("Use String interpolation", "2.11.0") def any2stringadd(x: Any): StringAdd[Any]                               = new StringAdd(x)
   @deprecated("Use `Throwable` directly", "2.11.0") def exceptionWrapper(exc: Throwable)                                    = new RichException(exc)
   @deprecated("Use `SeqCharSequence`", "2.11.0") def seqToCharSequence(xs: scala.collection.IndexedSeq[Char]): CharSequence = new SeqCharSequence(xs)
   @deprecated("Use `ArrayCharSequence`", "2.11.0") def arrayToCharSequence(xs: Array[Char]): CharSequence                   = new ArrayCharSequence(xs)
 
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readLine(): String                 = ReadStdin.readLine()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readLine(text: String, args: Any*) = ReadStdin.readLine(text, args: _*)
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readBoolean()                      = ReadStdin.readBoolean()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readByte()                         = ReadStdin.readByte()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readShort()                        = ReadStdin.readShort()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readChar()                         = ReadStdin.readChar()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readInt()                          = ReadStdin.readInt()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readLong()                         = ReadStdin.readLong()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readFloat()                        = ReadStdin.readFloat()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readDouble()                       = ReadStdin.readDouble()
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readf(format: String)              = ReadStdin.readf(format)
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readf1(format: String)             = ReadStdin.readf1(format)
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readf2(format: String)             = ReadStdin.readf2(format)
-  @deprecated("Use the method in `scala.io.ReadStdin`", "2.11.0") def readf3(format: String)             = ReadStdin.readf3(format)
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readLine(): String                 = StdIn.readLine()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readLine(text: String, args: Any*) = StdIn.readLine(text, args: _*)
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readBoolean()                      = StdIn.readBoolean()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readByte()                         = StdIn.readByte()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readShort()                        = StdIn.readShort()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readChar()                         = StdIn.readChar()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readInt()                          = StdIn.readInt()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readLong()                         = StdIn.readLong()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readFloat()                        = StdIn.readFloat()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readDouble()                       = StdIn.readDouble()
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf(format: String)              = StdIn.readf(format)
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf1(format: String)             = StdIn.readf1(format)
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf2(format: String)             = StdIn.readf2(format)
+  @deprecated("Use the method in `scala.io.StdIn`", "2.11.0") def readf3(format: String)             = StdIn.readf3(format)
 }
 
 /** The `LowPriorityImplicits` class provides implicit values that

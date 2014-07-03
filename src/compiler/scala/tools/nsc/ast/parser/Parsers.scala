@@ -33,7 +33,7 @@ trait ParsersCommon extends ScannersCommon { self =>
   import global.{currentUnit => _, _}
 
   def newLiteral(const: Any) = Literal(Constant(const))
-  def literalUnit            = newLiteral(())
+  def literalUnit            = gen.mkSyntheticUnit()
 
   /** This is now an abstract class, only to work around the optimizer:
    *  methods in traits are never inlined.
@@ -125,7 +125,7 @@ self =>
   val global: Global
   import global._
 
-  case class OpInfo(lhs: Tree, operator: TermName, offset: Offset) {
+  case class OpInfo(lhs: Tree, operator: TermName, targs: List[Tree], offset: Offset) {
     def precedence = Precedence(operator.toString)
   }
 
@@ -413,12 +413,10 @@ self =>
        *
        *  {{{
        *  object moduleName {
-       *    def main(argv: Array[String]): Unit = {
-       *      val args = argv
+       *    def main(args: Array[String]): Unit =
        *      new AnyRef {
        *        stmts
        *      }
-       *    }
        *  }
        *  }}}
        */
@@ -433,9 +431,8 @@ self =>
 
       // def main
       def mainParamType = AppliedTypeTree(Ident(tpnme.Array), List(Ident(tpnme.String)))
-      def mainParameter = List(ValDef(Modifiers(Flags.PARAM), nme.argv, mainParamType, EmptyTree))
-      def mainSetArgv   = List(ValDef(NoMods, nme.args, TypeTree(), Ident(nme.argv)))
-      def mainDef       =      DefDef(NoMods, nme.main, Nil, List(mainParameter), scalaDot(tpnme.Unit), Block(mainSetArgv, gen.mkAnonymousNew(stmts)))
+      def mainParameter = List(ValDef(Modifiers(Flags.PARAM), nme.args, mainParamType, EmptyTree))
+      def mainDef       = DefDef(NoMods, nme.main, Nil, List(mainParameter), scalaDot(tpnme.Unit), gen.mkAnonymousNew(stmts))
 
       // object Main
       def moduleName  = newTermName(ScriptRunner scriptMain settings)
@@ -645,15 +642,10 @@ self =>
 
     /** Check that type parameter is not by name or repeated. */
     def checkNotByNameOrVarargs(tpt: Tree) = {
-      if      (treeInfo   isByNameParamType tpt) syntaxError(tpt.pos, "no by-name parameter type allowed here", skipIt = false)
-      else if (treeInfo isRepeatedParamType tpt) syntaxError(tpt.pos,       "no * parameter type allowed here", skipIt = false)
-    }
-
-    /** Check that tree is a legal clause of a forSome. */
-    def checkLegalExistential(t: Tree) = t match {
-      case TypeDef(_, _, _, TypeBoundsTree(_, _)) |
-            ValDef(_, _, _,      EmptyTree) | EmptyTree => ;
-      case _ => syntaxError(t.pos, "not a legal existential clause", skipIt = false)
+      if (treeInfo isByNameParamType tpt)
+        syntaxError(tpt.pos, "no by-name parameter type allowed here", skipIt = false)
+      else if (treeInfo isRepeatedParamType tpt)
+        syntaxError(tpt.pos, "no * parameter type allowed here", skipIt = false)
     }
 
 /* -------------- TOKEN CLASSES ------------------------------------------- */
@@ -690,11 +682,13 @@ self =>
     def isIdentExcept(except: Name) = isIdent && in.name != except
     def isIdentOf(name: Name)       = isIdent && in.name == name
 
-    def isUnaryOp = isIdent && raw.isUnary(in.name)
-    def isRawStar = isIdent && in.name == raw.STAR
-    def isRawBar  = isIdent && in.name == raw.BAR
+    def isUnaryOp  = isIdent && raw.isUnary(in.name)
+    def isRawStar  = isRawIdent && in.name == raw.STAR
+    def isRawBar   = isRawIdent && in.name == raw.BAR
+    def isRawIdent = in.token == IDENTIFIER
 
-    def isIdent   = in.token == IDENTIFIER || in.token == BACKQUOTED_IDENT
+    def isIdent = in.token == IDENTIFIER || in.token == BACKQUOTED_IDENT
+    def isMacro = in.token == IDENTIFIER && in.name == nme.MACROkw
 
     def isLiteralToken(token: Token) = token match {
       case CHARLIT | INTLIT | LONGLIT | FLOATLIT | DOUBLELIT |
@@ -817,10 +811,13 @@ self =>
     private def opHead = opstack.head
     private def headPrecedence = opHead.precedence
     private def popOpInfo(): OpInfo = try opHead finally opstack = opstack.tail
-    private def pushOpInfo(top: Tree) {
-      val opinfo = OpInfo(top, in.name, in.offset)
-      opstack ::= opinfo
+    private def pushOpInfo(top: Tree): Unit = {
+      val name   = in.name
+      val offset = in.offset
       ident()
+      val targs = if (in.token == LBRACKET) exprTypeArgs() else Nil
+      val opinfo = OpInfo(top, name, targs, offset)
+      opstack ::= opinfo
     }
 
     def checkHeadAssoc(leftAssoc: Boolean) = checkAssoc(opHead.offset, opHead.operator, leftAssoc)
@@ -830,6 +827,9 @@ self =>
     )
 
     def finishPostfixOp(start: Int, base: List[OpInfo], opinfo: OpInfo): Tree = {
+      if (opinfo.targs.nonEmpty)
+        syntaxError(opinfo.offset, "type application is not allowed for postfix operators")
+
       val od = stripParens(reduceExprStack(base, opinfo.lhs))
       makePostfixSelect(start, opinfo.offset, od, opinfo.operator)
     }
@@ -839,7 +839,7 @@ self =>
       val operatorPos: Position = Position.range(rhs.pos.source, offset, offset, offset + operator.length)
       val pos                   = lhs.pos union rhs.pos union operatorPos withPoint offset
 
-      atPos(pos)(makeBinop(isExpr, lhs, operator, rhs, operatorPos))
+      atPos(pos)(makeBinop(isExpr, lhs, operator, rhs, operatorPos, opinfo.targs))
     }
 
     def reduceExprStack(base: List[OpInfo], top: Tree): Tree    = reduceStack(isExpr = true, base, top)
@@ -861,8 +861,14 @@ self =>
       if (samePrecedence)
         checkHeadAssoc(leftAssoc)
 
-      def loop(top: Tree): Tree =
-        if (canReduce) loop(finishBinaryOp(isExpr, popOpInfo(), top)) else top
+      def loop(top: Tree): Tree = if (canReduce) {
+        val info = popOpInfo()
+        if (!isExpr && info.targs.nonEmpty) {
+          syntaxError(info.offset, "type application is not allowed in pattern")
+          info.targs.foreach(_.setType(ErrorType))
+        }
+        loop(finishBinaryOp(isExpr, info, top))
+      } else top
 
       loop(top)
     }
@@ -906,9 +912,14 @@ self =>
         }
       }
       private def makeExistentialTypeTree(t: Tree) = {
-        val whereClauses = refinement()
-        whereClauses foreach checkLegalExistential
-        ExistentialTypeTree(t, whereClauses)
+        // EmptyTrees in the result of refinement() stand for parse errors
+        // so it's okay for us to filter them out here
+        ExistentialTypeTree(t, refinement() flatMap {
+          case t @ TypeDef(_, _, _, TypeBoundsTree(_, _)) => Some(t)
+          case t @ ValDef(_, _, _, EmptyTree) => Some(t)
+          case EmptyTree => None
+          case _ => syntaxError(t.pos, "not a legal existential clause", skipIt = false); None
+        })
       }
 
       /** {{{
@@ -1016,17 +1027,30 @@ self =>
       }
 
       def infixTypeRest(t: Tree, mode: InfixMode.Value): Tree = {
-        if (isIdent && in.name != nme.STAR) {
-          val opOffset       = in.offset
-          val leftAssoc      = treeInfo.isLeftAssoc(in.name)
-          if (mode          != InfixMode.FirstOp) checkAssoc(opOffset, in.name, leftAssoc = mode == InfixMode.LeftOp)
-          val op             = identForType()
-          val tycon          = atPos(opOffset) { Ident(op) }
+        // Detect postfix star for repeated args.
+        // Only RPAREN can follow, but accept COMMA and EQUALS for error's sake.
+        // Take RBRACE as a paren typo.
+        def checkRepeatedParam = if (isRawStar) {
+          lookingAhead (in.token match {
+            case RPAREN | COMMA | EQUALS | RBRACE => t
+            case _                                => EmptyTree
+          })
+        } else EmptyTree
+        def asInfix = {
+          val opOffset  = in.offset
+          val leftAssoc = treeInfo.isLeftAssoc(in.name)
+          if (mode != InfixMode.FirstOp)
+            checkAssoc(opOffset, in.name, leftAssoc = mode == InfixMode.LeftOp)
+          val tycon = atPos(opOffset) { Ident(identForType()) }
           newLineOptWhenFollowing(isTypeIntroToken)
           def mkOp(t1: Tree) = atPos(t.pos.start, opOffset) { AppliedTypeTree(tycon, List(t, t1)) }
-          if (leftAssoc) infixTypeRest(mkOp(compoundType()), InfixMode.LeftOp)
-          else      mkOp(infixType(InfixMode.RightOp))
-        } else t
+          if (leftAssoc)
+            infixTypeRest(mkOp(compoundType()), InfixMode.LeftOp)
+          else
+            mkOp(infixType(InfixMode.RightOp))
+        }
+        if (isIdent) checkRepeatedParam orElse asInfix
+        else t
       }
 
       /** {{{
@@ -1045,7 +1069,11 @@ self =>
 
     /** Assumed (provisionally) to be TermNames. */
     def ident(skipIt: Boolean): Name = (
-      if (isIdent) rawIdent().encode
+      if (isIdent) {
+        val name = in.name.encode
+        in.nextToken()
+        name
+      }
       else syntaxErrorOrIncompleteAnd(expectedMsg(IDENTIFIER), skipIt)(nme.ERROR)
     )
 
@@ -1055,6 +1083,8 @@ self =>
     /** For when it's known already to be a type name. */
     def identForType(               ): TypeName = ident(      ).toTypeName
     def identForType(skipIt: Boolean): TypeName = ident(skipIt).toTypeName
+
+    def identOrMacro(): Name = if (isMacro) rawIdent() else ident()
 
     def selector(t: Tree): Tree = {
       val point = in.offset
@@ -1220,7 +1250,7 @@ self =>
       // Like Swiss cheese, with holes
       def stringCheese: Tree = atPos(in.offset) {
         val start = in.offset
-        val interpolator = in.name
+        val interpolator = in.name.encoded // ident() for INTERPOLATIONID
 
         val partsBuf = new ListBuffer[Tree]
         val exprBuf = new ListBuffer[Tree]
@@ -2685,7 +2715,7 @@ self =>
         newLiteral(true)
       }
     }
-    
+
     /* hook for IDE, unlike expression can be stubbed
      * don't use for any tree that can be inspected in the parser!
      */
@@ -3246,9 +3276,9 @@ self =>
         def isDelimiter            = in.token == RPAREN || in.token == RBRACE
         def isCommaOrDelimiter     = isComma || isDelimiter
         val (isUnderscore, isStar) = opstack match {
-          case OpInfo(Ident(nme.WILDCARD), nme.STAR, _) :: _ => (true,   true)
-          case OpInfo(_, nme.STAR, _) :: _                   => (false,  true)
-          case _                                             => (false, false)
+          case OpInfo(Ident(nme.WILDCARD), nme.STAR, _, _) :: _ => (true,   true)
+          case OpInfo(_, nme.STAR, _, _) :: _                   => (false,  true)
+          case _                                                => (false, false)
         }
         def isSeqPatternClose = isUnderscore && isStar && isSequenceOK && isDelimiter
         val preamble = "bad simple pattern:"
@@ -3470,7 +3500,6 @@ self =>
 
 /* -------- PARAMETERS ------------------------------------------- */
 
-    def allowTypelessParams = false
 
     /** {{{
      *  ParamClauses      ::= {ParamClause} [[nl] `(' implicit Params `)']
@@ -3485,70 +3514,11 @@ self =>
      */
     def paramClauses(owner: Name, contextBounds: List[Tree], ofCaseClass: Boolean): List[List[ValDef]] = {
       var implicitmod = 0
-      var caseParam   = ofCaseClass
-      def param(): ValDef = {
-        val start  = in.offset
-        var annots = annotations(skipNewLines = false)
-        var mods   = Modifiers(Flags.PARAM)
-        if (owner.isTypeName) {
-          mods = modifiers() | Flags.PARAMACCESSOR
-          if (mods.isLazy) syntaxError("lazy modifier not allowed here. Use call-by-name parameters instead", skipIt = false)
-          in.token match {
-            case v @ (VAL | VAR) =>
-              mods = mods withPosition (in.token.toLong, tokenRange(in))
-              if (v == VAR) mods |= Flags.MUTABLE
-              in.nextToken()
-            case _ =>
-              if (mods.flags != Flags.PARAMACCESSOR) accept(VAL)
-              if (!caseParam) mods |= Flags.PrivateLocal
-          }
-          if (caseParam) mods |= Flags.CASEACCESSOR
-        }
-        var isSubScriptFormalOutputParameter      = false
-        var isSubScriptFormalConstrainedParameter = false
-        if (in.isInSubScript_header) { // TBD: clean up
-          if (in.token==IDENTIFIER)
-            in.name match {
-              case nme.QMARKkw  => isSubScriptFormalOutputParameter      = true; in.nextToken()
-              case nme.QMARK2kw => isSubScriptFormalConstrainedParameter = true; in.nextToken()
-              case _            =>
-            }
-        }
-        val nameOffset = in.offset
-        val name       = ident()
-        var bynamemod = 0
-        val tpt =
-          if (((settings.YmethodInfer && !owner.isTypeName) || allowTypelessParams) && in.token != COLON) {
-            TypeTree()
-          } else { // XX-METHOD-INFER
-            accept(COLON)
-            if (in.token == ARROW) {
-              if (owner.isTypeName && !mods.hasLocalFlag)
-                                         syntaxError(in.offset, (if (mods.isMutable) "`var'" else "`val'") + " parameters may not be call-by-name", skipIt = false)
-              else if (implicitmod != 0) syntaxError(in.offset,                                      "implicit parameters may not be call-by-name", skipIt = false)
-              else                       bynamemod = Flags.BYNAMEPARAM
-            }
-            paramType()
-          }
-        val default =
-          if (in.token == EQUALS) {
-            in.nextToken()
-            mods |= Flags.DEFAULTPARAM
-            expr()
-          } else EmptyTree
-        val termName = name.toTermName
-        
-        if (isSubScriptFormalOutputParameter     ) storeScriptFormalOutputParameter     (termName,tpt)
-        if (isSubScriptFormalConstrainedParameter) storeScriptFormalConstrainedParameter(termName,tpt)
-        
-        atPos(start, if (name == nme.ERROR) start else nameOffset) {
-          ValDef((mods | implicitmod.toLong | bynamemod) withAnnotations annots, name.toTermName, tpt, default)
-        }
-      }
+      var caseParam = ofCaseClass
       def paramClause(): List[ValDef] = {
         if (in.token == RPAREN  ) return Nil
         if (in.token == IMPLICIT) {in.nextToken(); implicitmod = Flags.IMPLICIT}
-        commaSeparated(param())
+        commaSeparated(param(owner, implicitmod, caseParam  ))
       }
       val vds   = new ListBuffer[List[ValDef]]
       val start = in.offset
@@ -3593,6 +3563,66 @@ self =>
             else atPos(t.pos.start, t.pos.point)(repeatedApplication(t))
           }
           else t
+      }
+    }
+
+    def param(owner: Name, implicitmod: Int, caseParam: Boolean): ValDef = {
+      val start  = in.offset
+      var annots = annotations(skipNewLines = false)
+      var mods   = Modifiers(Flags.PARAM)
+      if (owner.isTypeName) {
+        mods = modifiers() | Flags.PARAMACCESSOR
+        if (mods.isLazy) syntaxError("lazy modifier not allowed here. Use call-by-name parameters instead", skipIt = false)
+        in.token match {
+          case v @ (VAL | VAR) =>
+            mods = mods withPosition (in.token.toLong, tokenRange(in))
+            if (v == VAR) mods |= Flags.MUTABLE
+            in.nextToken()
+          case _ =>
+            if (mods.flags != Flags.PARAMACCESSOR) accept(VAL)
+            if (!caseParam) mods |= Flags.PrivateLocal
+        }
+        if (caseParam) mods |= Flags.CASEACCESSOR
+      }
+      var isSubScriptFormalOutputParameter      = false
+      var isSubScriptFormalConstrainedParameter = false
+      if (in.isInSubScript_header) { // TBD: clean up
+        if (in.token==IDENTIFIER)
+          in.name match {
+            case nme.QMARKkw  => isSubScriptFormalOutputParameter      = true; in.nextToken()
+            case nme.QMARK2kw => isSubScriptFormalConstrainedParameter = true; in.nextToken()
+            case _            =>
+          }
+      }
+      val nameOffset = in.offset
+      val name       = ident()
+      var bynamemod = 0
+      val tpt =
+        if ((settings.YmethodInfer && !owner.isTypeName) && in.token != COLON) {
+          TypeTree()
+        } else { // XX-METHOD-INFER
+          accept(COLON)
+          if (in.token == ARROW) {
+            if (owner.isTypeName && !mods.isLocalToThis)
+                                       syntaxError(in.offset, (if (mods.isMutable) "`var'" else "`val'") + " parameters may not be call-by-name", skipIt = false)
+            else if (implicitmod != 0) syntaxError(in.offset,                                      "implicit parameters may not be call-by-name", skipIt = false)
+            else                       bynamemod = Flags.BYNAMEPARAM
+          }
+          paramType()
+        }
+      val default =
+        if (in.token == EQUALS) {
+          in.nextToken()
+          mods |= Flags.DEFAULTPARAM
+          expr()
+        } else EmptyTree
+      val termName = name.toTermName
+      
+      if (isSubScriptFormalOutputParameter     ) storeScriptFormalOutputParameter     (termName,tpt)
+      if (isSubScriptFormalConstrainedParameter) storeScriptFormalConstrainedParameter(termName,tpt)
+      
+      atPos(start, if (name == nme.ERROR) start else nameOffset) {
+        ValDef((mods | implicitmod.toLong | bynamemod) withAnnotations annots, name.toTermName, tpt, default)
       }
     }
 
@@ -3883,7 +3913,7 @@ self =>
       }
       else {
         val nameOffset = in.offset
-        val name       = ident()
+        val name       = identOrMacro()
         funDefRest(start, nameOffset, mods, name)
       }
     }
@@ -3916,7 +3946,7 @@ self =>
           } else {
             if (in.token == EQUALS) {
               in.nextTokenAllow(nme.MACROkw)
-              if (in.token == IDENTIFIER && in.name == nme.MACROkw) {
+              if (isMacro) {
                 in.nextToken()
                 newmods |= Flags.MACRO
               }
@@ -4411,11 +4441,6 @@ self =>
           stats ++= importClause()
           acceptStatSepOpt()
         }
-        else if (isExprIntro) {
-          stats += statement(InBlock)
-          if (!isTokenAClosingBrace(in.token) 
-          &&  !isCaseDefEnd                  ) acceptStatSep()
-        }
         else if (isDefIntro || isLocalModifier || isAnnotation) {
           if (in.token == IMPLICIT) {
             val start = in.skipToken()
@@ -4425,6 +4450,11 @@ self =>
             stats ++= localDef(0)
           }
           acceptStatSepOpt()
+        }
+        else if (isExprIntro) {
+          stats += statement(InBlock)
+          if (!isTokenAClosingBrace(in.token) 
+          &&  !isCaseDefEnd                  ) acceptStatSep()
         }
         else if (isStatSep) {
           in.nextToken()

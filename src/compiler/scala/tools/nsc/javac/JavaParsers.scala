@@ -190,7 +190,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         case GTGTGT   => GTGT
         case GTGTEQ   => GTEQ
         case GTGT     => GT
-        case GTEQ     => ASSIGN
+        case GTEQ     => EQUALS
       }
       if (closers isDefinedAt in.token) in.token = closers(in.token)
       else accept(GT)
@@ -538,7 +538,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
         in.nextToken()
         if (in.token == IDENTIFIER) { // if there's an ident after the comma ...
           val name = ident()
-          if (in.token == ASSIGN || in.token == SEMI) { // ... followed by a `=` or `;`, we know it's a real variable definition
+          if (in.token == EQUALS || in.token == SEMI) { // ... followed by a `=` or `;`, we know it's a real variable definition
             buf ++= maybe
             buf += varDecl(in.currentPos, mods, tpt.duplicate, name.toTermName)
             maybe.clear()
@@ -563,7 +563,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
 
     def varDecl(pos: Position, mods: Modifiers, tpt: Tree, name: TermName): ValDef = {
       val tpt1 = optArrayBrackets(tpt)
-      if (in.token == ASSIGN && !mods.isParameter) skipTo(COMMA, SEMI)
+      if (in.token == EQUALS && !mods.isParameter) skipTo(COMMA, SEMI)
       val mods1 = if (mods.isFinal) mods &~ Flags.FINAL else mods | Flags.MUTABLE
       atPos(pos) {
         ValDef(mods1, name, tpt1, blankExpr)
@@ -792,7 +792,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
       val superclazz =
         AppliedTypeTree(javaLangDot(tpnme.Enum), List(enumType))
       addCompanionObject(consts ::: statics ::: predefs, atPos(pos) {
-        ClassDef(mods, name, List(),
+        ClassDef(mods | Flags.ENUM, name, List(),
                  makeTemplate(superclazz :: interfaces, body))
       })
     }
@@ -811,10 +811,7 @@ trait JavaParsers extends ast.parser.ParsersCommon with JavaScanners {
           skipAhead()
           accept(RBRACE)
         }
-        // The STABLE flag is to signal to namer that this was read from a
-        // java enum, and so should be given a Constant type (thereby making
-        // it usable in annotations.)
-        ValDef(Modifiers(Flags.STABLE | Flags.JAVA | Flags.STATIC), name.toTermName, enumType, blankExpr)
+        ValDef(Modifiers(Flags.ENUM | Flags.STABLE | Flags.JAVA | Flags.STATIC), name.toTermName, enumType, blankExpr)
       }
     }
 
