@@ -5,11 +5,11 @@ import language._
 object Test extends ScaladocModelTest {
 
   override def code = """
-    import scala.reflect.macros.BlackboxContext
+    import scala.reflect.macros.blackbox.Context
     import language.experimental.macros
 
     object Macros {
-      def impl(c: BlackboxContext) = c.literalUnit
+      def impl(c: Context) = c.literalUnit
       def foo: Unit = macro impl
     }
 
@@ -19,6 +19,6 @@ object Test extends ScaladocModelTest {
   """
 
   def scaladocSettings = ""
-  override def extraSettings = super.extraSettings + " -Ymacro-no-expand"
+  override def extraSettings = super.extraSettings + " -Ymacro-no-expand -deprecation"
   def testModel(root: Package) = ()
 }

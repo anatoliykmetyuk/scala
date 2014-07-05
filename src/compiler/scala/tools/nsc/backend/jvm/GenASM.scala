@@ -20,7 +20,7 @@ import scala.annotation.tailrec
  *
  * Documentation at http://lamp.epfl.ch/~magarcia/ScalaCompilerCornerReloaded/2012Q2/GenASM.pdf
  */
-abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
+abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM { self =>
   import global._
   import icodes._
   import icodes.opcodes._
@@ -171,10 +171,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
   var pickledBytes = 0 // statistics
 
-  val javaNameCache = perRunCaches.newMap[Symbol, Name]()
+  val javaNameCache = perRunCaches.newAnyRefMap[Symbol, Name]()
 
   // unlike javaNameCache, reverseJavaName contains entries only for class symbols and their internal names.
-  val reverseJavaName = perRunCaches.newMap[String, Symbol]()
+  val reverseJavaName = perRunCaches.newAnyRefMap[String, Symbol]()
 
   private def mkFlags(args: Int*)         = args.foldLeft(0)(_ | _)
   private def hasPublicBitSet(flags: Int) = (flags & asm.Opcodes.ACC_PUBLIC) != 0
@@ -244,6 +244,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       if (sym.isBridge) ACC_BRIDGE | ACC_SYNTHETIC else 0,
       if (sym.isArtifact) ACC_SYNTHETIC else 0,
       if (sym.isClass && !sym.isInterface) ACC_SUPER else 0,
+      if (sym.hasEnumFlag) ACC_ENUM else 0,
       if (sym.isVarargsMethod) ACC_VARARGS else 0,
       if (sym.hasFlag(Flags.SYNCHRONIZED)) ACC_SYNCHRONIZED else 0
     )
@@ -468,9 +469,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
         }
         bytecodeWriter.writeClass(label, jclassName, arr, outF)
       } catch {
-        case e: java.lang.RuntimeException if(e.getMessage() == "Class file too large!") =>
-          // TODO check where ASM throws the equivalent of CodeSizeTooBigException
-          log("Skipped class "+jclassName+" because it exceeds JVM limits (it's too big or has methods that are too long).")
+        case e: java.lang.RuntimeException if e != null && (e.getMessage contains "too large!") =>
+          reporter.error(sym.pos,
+            s"Could not write class $jclassName because it exceeds JVM code size limits. ${e.getMessage}")
       }
     }
 
@@ -802,134 +803,9 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       annot.args.isEmpty &&
       !annot.matches(DeprecatedAttr)
 
-    // @M don't generate java generics sigs for (members of) implementation
-    // classes, as they are monomorphic (TODO: ok?)
-    private def needsGenericSignature(sym: Symbol) = !(
-      // PP: This condition used to include sym.hasExpandedName, but this leads
-      // to the total loss of generic information if a private member is
-      // accessed from a closure: both the field and the accessor were generated
-      // without it.  This is particularly bad because the availability of
-      // generic information could disappear as a consequence of a seemingly
-      // unrelated change.
-         settings.Ynogenericsig
-      || sym.isArtifact
-      || sym.isLiftedMethod
-      || sym.isBridge
-      || (sym.ownerChain exists (_.isImplClass))
-    )
-
     def getCurrentCUnit(): CompilationUnit
 
-    /** @return
-     *   - `null` if no Java signature is to be added (`null` is what ASM expects in these cases).
-     *   - otherwise the signature in question
-     */
-    def getGenericSignature(sym: Symbol, owner: Symbol): String = {
-
-      if (!needsGenericSignature(sym)) { return null }
-
-      val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
-
-      val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
-      if (jsOpt.isEmpty) { return null }
-
-      val sig = jsOpt.get
-      log(sig) // This seems useful enough in the general case.
-
-          def wrap(op: => Unit) = {
-            try   { op; true }
-            catch { case _: Throwable => false }
-          }
-
-      if (settings.Xverify) {
-        // Run the signature parser to catch bogus signatures.
-        val isValidSignature = wrap {
-          // Alternative: scala.tools.reflect.SigParser (frontend to sun.reflect.generics.parser.SignatureParser)
-          import scala.tools.asm.util.CheckClassAdapter
-          if (sym.isMethod)    { CheckClassAdapter checkMethodSignature sig } // requires asm-util.jar
-          else if (sym.isTerm) { CheckClassAdapter checkFieldSignature  sig }
-          else                 { CheckClassAdapter checkClassSignature  sig }
-        }
-
-        if(!isValidSignature) {
-          getCurrentCUnit().warning(sym.pos,
-              """|compiler bug: created invalid generic signature for %s in %s
-                 |signature: %s
-                 |if this is reproducible, please report bug at https://issues.scala-lang.org/
-              """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig))
-          return null
-        }
-      }
-
-      if ((settings.check containsName phaseName)) {
-        val normalizedTpe = enteringErasure(erasure.prepareSigMap(memberTpe))
-        val bytecodeTpe = owner.thisType.memberInfo(sym)
-        if (!sym.isType && !sym.isConstructor && !(erasure.erasure(sym)(normalizedTpe) =:= bytecodeTpe)) {
-          getCurrentCUnit().warning(sym.pos,
-              """|compiler bug: created generic signature for %s in %s that does not conform to its erasure
-                 |signature: %s
-                 |original type: %s
-                 |normalized type: %s
-                 |erasure type: %s
-                 |if this is reproducible, please report bug at http://issues.scala-lang.org/
-              """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig, memberTpe, normalizedTpe, bytecodeTpe))
-           return null
-        }
-      }
-
-      sig
-    }
-
-    def ubytesToCharArray(bytes: Array[Byte]): Array[Char] = {
-      val ca = new Array[Char](bytes.length)
-      var idx = 0
-      while(idx < bytes.length) {
-        val b: Byte = bytes(idx)
-        assert((b & ~0x7f) == 0)
-        ca(idx) = b.asInstanceOf[Char]
-        idx += 1
-      }
-
-      ca
-    }
-
-    private def arrEncode(sb: ScalaSigBytes): Array[String] = {
-      var strs: List[String]  = Nil
-      val bSeven: Array[Byte] = sb.sevenBitsMayBeZero
-      // chop into slices of at most 65535 bytes, counting 0x00 as taking two bytes (as per JVMS 4.4.7 The CONSTANT_Utf8_info Structure)
-      var prevOffset = 0
-      var offset     = 0
-      var encLength  = 0
-      while(offset < bSeven.length) {
-        val deltaEncLength = (if(bSeven(offset) == 0) 2 else 1)
-        val newEncLength = encLength.toLong + deltaEncLength
-        if(newEncLength >= 65535) {
-          val ba     = bSeven.slice(prevOffset, offset)
-          strs     ::= new java.lang.String(ubytesToCharArray(ba))
-          encLength  = 0
-          prevOffset = offset
-        } else {
-          encLength += deltaEncLength
-          offset    += 1
-        }
-      }
-      if(prevOffset < offset) {
-        assert(offset == bSeven.length)
-        val ba = bSeven.slice(prevOffset, offset)
-        strs ::= new java.lang.String(ubytesToCharArray(ba))
-      }
-      assert(strs.size > 1, "encode instead as one String via strEncode()") // TODO too strict?
-      strs.reverse.toArray
-    }
-
-    private def strEncode(sb: ScalaSigBytes): String = {
-      val ca = ubytesToCharArray(sb.sevenBitsMayBeZero)
-      new java.lang.String(ca)
-      // debug val bvA = new asm.ByteVector; bvA.putUTF8(s)
-      // debug val enc: Array[Byte] = scala.reflect.internal.pickling.ByteCodecs.encode(bytes)
-      // debug assert(enc(idx) == bvA.getByte(idx + 2))
-      // debug assert(bvA.getLength == enc.size + 2)
-    }
+    def getGenericSignature(sym: Symbol, owner: Symbol) = self.getGenericSignature(sym, owner, getCurrentCUnit())
 
     def emitArgument(av:   asm.AnnotationVisitor,
                      name: String,
@@ -1063,7 +939,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
       )
 
       // TODO needed? for(ann <- m.annotations) { ann.symbol.initialize }
-      val jgensig = if (m.isDeferred) null else getGenericSignature(m, module); // only add generic signature if method concrete; bug #1745
+      val jgensig = staticForwarderGenericSignature(m, module, getCurrentCUnit())
       addRemoteExceptionAnnot(isRemoteClass, hasPublicBitSet(flags), m)
       val (throws, others) = m.annotations partition (_.symbol == ThrowsClass)
       val thrownExceptions: List[String] = getExceptions(throws)
@@ -1266,9 +1142,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
     def isParcelableClass = isAndroidParcelableClass(clasz.symbol)
 
-    def serialVUID: Option[Long] = clasz.symbol getAnnotation SerialVersionUIDAttr collect {
-      case AnnotationInfo(_, Literal(const) :: _, _) => const.longValue
-    }
+    def serialVUID: Option[Long] = genBCode.serialVUID(clasz.symbol)
 
     private def getSuperInterfaces(c: IClass): Array[String] = {
 
@@ -3302,4 +3176,147 @@ abstract class GenASM extends SubComponent with BytecodeWriters with GenJVMASM {
 
   }
 
+  // @M don't generate java generics sigs for (members of) implementation
+  // classes, as they are monomorphic (TODO: ok?)
+  private def needsGenericSignature(sym: Symbol) = !(
+    // PP: This condition used to include sym.hasExpandedName, but this leads
+    // to the total loss of generic information if a private member is
+    // accessed from a closure: both the field and the accessor were generated
+    // without it.  This is particularly bad because the availability of
+    // generic information could disappear as a consequence of a seemingly
+    // unrelated change.
+       settings.Ynogenericsig
+    || sym.isArtifact
+    || sym.isLiftedMethod
+    || sym.isBridge
+    || (sym.ownerChain exists (_.isImplClass))
+  )
+
+  final def staticForwarderGenericSignature(sym: Symbol, moduleClass: Symbol, unit: CompilationUnit): String = {
+    if (sym.isDeferred) null // only add generic signature if method concrete; bug #1745
+    else {
+      // SI-3452 Static forwarder generation uses the same erased signature as the method if forwards to.
+      // By rights, it should use the signature as-seen-from the module class, and add suitable
+      // primitive and value-class boxing/unboxing.
+      // But for now, just like we did in mixin, we just avoid writing a wrong generic signature
+      // (one that doesn't erase to the actual signature). See run/t3452b for a test case.
+      val memberTpe = enteringErasure(moduleClass.thisType.memberInfo(sym))
+      val erasedMemberType = erasure.erasure(sym)(memberTpe)
+      if (erasedMemberType =:= sym.info)
+        getGenericSignature(sym, moduleClass, memberTpe, unit)
+      else null
+    }
+  }
+
+  /** @return
+   *   - `null` if no Java signature is to be added (`null` is what ASM expects in these cases).
+   *   - otherwise the signature in question
+   */
+  def getGenericSignature(sym: Symbol, owner: Symbol, unit: CompilationUnit): String = {
+    val memberTpe = enteringErasure(owner.thisType.memberInfo(sym))
+    getGenericSignature(sym, owner, memberTpe, unit)
+  }
+  def getGenericSignature(sym: Symbol, owner: Symbol, memberTpe: Type, unit: CompilationUnit): String = {
+    if (!needsGenericSignature(sym)) { return null }
+
+    val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
+    if (jsOpt.isEmpty) { return null }
+
+    val sig = jsOpt.get
+    log(sig) // This seems useful enough in the general case.
+
+        def wrap(op: => Unit) = {
+          try   { op; true }
+          catch { case _: Throwable => false }
+        }
+
+    if (settings.Xverify) {
+      // Run the signature parser to catch bogus signatures.
+      val isValidSignature = wrap {
+        // Alternative: scala.tools.reflect.SigParser (frontend to sun.reflect.generics.parser.SignatureParser)
+        import scala.tools.asm.util.CheckClassAdapter
+        if (sym.isMethod)    { CheckClassAdapter checkMethodSignature sig } // requires asm-util.jar
+        else if (sym.isTerm) { CheckClassAdapter checkFieldSignature  sig }
+        else                 { CheckClassAdapter checkClassSignature  sig }
+      }
+
+      if(!isValidSignature) {
+        unit.warning(sym.pos,
+            """|compiler bug: created invalid generic signature for %s in %s
+               |signature: %s
+               |if this is reproducible, please report bug at https://issues.scala-lang.org/
+            """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig))
+        return null
+      }
+    }
+
+    if ((settings.check containsName phaseName)) {
+      val normalizedTpe = enteringErasure(erasure.prepareSigMap(memberTpe))
+      val bytecodeTpe = owner.thisType.memberInfo(sym)
+      if (!sym.isType && !sym.isConstructor && !(erasure.erasure(sym)(normalizedTpe) =:= bytecodeTpe)) {
+        unit.warning(sym.pos,
+            """|compiler bug: created generic signature for %s in %s that does not conform to its erasure
+               |signature: %s
+               |original type: %s
+               |normalized type: %s
+               |erasure type: %s
+               |if this is reproducible, please report bug at http://issues.scala-lang.org/
+            """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig, memberTpe, normalizedTpe, bytecodeTpe))
+         return null
+      }
+    }
+
+    sig
+  }
+
+  def ubytesToCharArray(bytes: Array[Byte]): Array[Char] = {
+    val ca = new Array[Char](bytes.length)
+    var idx = 0
+    while(idx < bytes.length) {
+      val b: Byte = bytes(idx)
+      assert((b & ~0x7f) == 0)
+      ca(idx) = b.asInstanceOf[Char]
+      idx += 1
+    }
+
+    ca
+  }
+
+  final def arrEncode(sb: ScalaSigBytes): Array[String] = {
+    var strs: List[String]  = Nil
+    val bSeven: Array[Byte] = sb.sevenBitsMayBeZero
+    // chop into slices of at most 65535 bytes, counting 0x00 as taking two bytes (as per JVMS 4.4.7 The CONSTANT_Utf8_info Structure)
+    var prevOffset = 0
+    var offset     = 0
+    var encLength  = 0
+    while(offset < bSeven.length) {
+      val deltaEncLength = (if(bSeven(offset) == 0) 2 else 1)
+      val newEncLength = encLength.toLong + deltaEncLength
+      if(newEncLength >= 65535) {
+        val ba     = bSeven.slice(prevOffset, offset)
+        strs     ::= new java.lang.String(ubytesToCharArray(ba))
+        encLength  = 0
+        prevOffset = offset
+      } else {
+        encLength += deltaEncLength
+        offset    += 1
+      }
+    }
+    if(prevOffset < offset) {
+      assert(offset == bSeven.length)
+      val ba = bSeven.slice(prevOffset, offset)
+      strs ::= new java.lang.String(ubytesToCharArray(ba))
+    }
+    assert(strs.size > 1, "encode instead as one String via strEncode()") // TODO too strict?
+    strs.reverse.toArray
+  }
+
+  private def strEncode(sb: ScalaSigBytes): String = {
+    val ca = ubytesToCharArray(sb.sevenBitsMayBeZero)
+    new java.lang.String(ca)
+    // debug val bvA = new asm.ByteVector; bvA.putUTF8(s)
+    // debug val enc: Array[Byte] = scala.reflect.internal.pickling.ByteCodecs.encode(bytes)
+    // debug assert(enc(idx) == bvA.getByte(idx + 2))
+    // debug assert(bvA.getLength == enc.size + 2)
+  }
 }

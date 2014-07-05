@@ -452,10 +452,10 @@ trait TypeDiagnostics {
         val treeTypes = mutable.Set[Type]()
 
         def defnSymbols = defnTrees.toList map (_.symbol)
-        def localVars   = defnSymbols filter (t => t.isLocal && t.isVar)
+        def localVars   = defnSymbols filter (t => t.isLocalToBlock && t.isVar)
 
         def qualifiesTerm(sym: Symbol) = (
-             (sym.isModule || sym.isMethod || sym.isPrivateLocal || sym.isLocal)
+             (sym.isModule || sym.isMethod || sym.isPrivateLocal || sym.isLocalToBlock)
           && !nme.isLocalName(sym.name)
           && !sym.isParameter
           && !sym.isParamAccessor       // could improve this, but it's a pain
@@ -499,12 +499,12 @@ trait TypeDiagnostics {
         def isUnusedType(m: Symbol): Boolean = (
               m.isType
           && !m.isTypeParameterOrSkolem // would be nice to improve this
-          && (m.isPrivate || m.isLocal)
+          && (m.isPrivate || m.isLocalToBlock)
           && !(treeTypes.exists(tp => tp exists (t => t.typeSymbolDirect == m)))
         )
         def isUnusedTerm(m: Symbol): Boolean = (
              (m.isTerm)
-          && (m.isPrivate || m.isLocal)
+          && (m.isPrivate || m.isLocalToBlock)
           && !targets(m)
           && !(m.name == nme.WILDCARD)              // e.g. val _ = foo
           && !ignoreNames(m.name.toTermName)        // serialization methods
@@ -518,14 +518,11 @@ trait TypeDiagnostics {
       }
 
       def apply(unit: CompilationUnit) = {
-        warnUnusedImports(unit)
-
         val p = new UnusedPrivates
         p traverse unit.body
         val unused = p.unusedTerms
         unused foreach { defn: DefTree =>
           val sym             = defn.symbol
-          val isDefaultGetter = sym.name containsName nme.DEFAULT_GETTER_STRING
           val pos = (
             if (defn.pos.isDefined) defn.pos
             else if (sym.pos.isDefined) sym.pos
@@ -536,7 +533,7 @@ trait TypeDiagnostics {
           )
           val why = if (sym.isPrivate) "private" else "local"
           val what = (
-            if (isDefaultGetter) "default argument"
+            if (sym.isDefaultGetter) "default argument"
             else if (sym.isConstructor) "constructor"
             else if (sym.isVar || sym.isGetter && sym.accessed.isVar) "var"
             else if (sym.isVal || sym.isGetter && sym.accessed.isVal) "val"

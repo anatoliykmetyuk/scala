@@ -14,6 +14,7 @@ import scala.util.Try
  */
 trait Parsers { self: Quasiquotes =>
   import global.{Try => _, _}
+  import build.implodePatDefs
 
   abstract class Parser extends {
     val global: self.global.type = self.global
@@ -21,7 +22,8 @@ trait Parsers { self: Quasiquotes =>
     def parse(code: String): Tree = {
       try {
         val file = new BatchSourceFile(nme.QUASIQUOTE_FILE, code)
-        new QuasiquoteParser(file).parseRule(entryPoint)
+        val parser = new QuasiquoteParser(file)
+        parser.checkNoEscapingPlaceholders { parser.parseRule(entryPoint) }
       } catch {
         case mi: MalformedInput => c.abort(correspondingPosition(mi.offset), mi.msg)
       }
@@ -29,15 +31,15 @@ trait Parsers { self: Quasiquotes =>
 
     def correspondingPosition(offset: Int): Position = {
       val posMapList = posMap.toList
-      def containsOffset(start: Int, end: Int) = start <= offset && offset <= end
+      def containsOffset(start: Int, end: Int) = start <= offset && offset < end
       def fallbackPosition = posMapList match {
         case (pos1, (start1, end1)) :: _   if start1 > offset => pos1
-        case _ :+ ((pos2, (start2, end2))) if offset > end2   => pos2.withPoint(pos2.point + (end2 - start2))
+        case _ :+ ((pos2, (start2, end2))) if end2 <= offset  => pos2.withPoint(pos2.point + (end2 - start2))
       }
       posMapList.sliding(2).collect {
-        case (pos1, (start1, end1)) :: _                if containsOffset(start1, end1) => (pos1, offset - start1)
-        case (pos1, (_, end1)) :: (_, (start2, _)) :: _ if containsOffset(end1, start2) => (pos1, end1)
-        case _ :: (pos2, (start2, end2)) :: _           if containsOffset(start2, end2) => (pos2, offset - start2)
+        case (pos1, (start1, end1)) :: _                        if containsOffset(start1, end1) => (pos1, offset - start1)
+        case (pos1, (start1, end1)) :: (pos2, (start2, _)) :: _ if containsOffset(end1, start2) => (pos1, end1 - start1)
+        case _ :: (pos2, (start2, end2)) :: _                   if containsOffset(start2, end2) => (pos2, offset - start2)
       }.map { case (pos, offset) =>
         pos.withPoint(pos.point + offset)
       }.toList.headOption.getOrElse(fallbackPosition)
@@ -55,18 +57,16 @@ trait Parsers { self: Quasiquotes =>
 
       def isHole(name: Name): Boolean = holeMap.contains(name)
 
-      override implicit def fresh: FreshNameCreator = new FreshNameCreator(nme.QUASIQUOTE_PREFIX)
+      override implicit lazy val fresh: FreshNameCreator = new FreshNameCreator(nme.QUASIQUOTE_PREFIX)
 
       override val treeBuilder = new ParserTreeBuilder {
         override implicit def fresh: FreshNameCreator = parser.fresh
 
         // q"(..$xs)"
-        override def makeTupleTerm(trees: List[Tree]): Tree =
-          Apply(Ident(nme.QUASIQUOTE_TUPLE), trees)
+        override def makeTupleTerm(trees: List[Tree]): Tree = TuplePlaceholder(trees)
 
         // tq"(..$xs)"
-        override def makeTupleType(trees: List[Tree]): Tree =
-          AppliedTypeTree(Ident(tpnme.QUASIQUOTE_TUPLE), trees)
+        override def makeTupleType(trees: List[Tree]): Tree = TupleTypePlaceholder(trees)
 
         // q"{ $x }"
         override def makeBlock(stats: List[Tree]): Tree = stats match {
@@ -75,18 +75,32 @@ trait Parsers { self: Quasiquotes =>
         }
 
         // tq"$a => $b"
-        override def makeFunctionTypeTree(argtpes: List[Tree], restpe: Tree): Tree =
-          AppliedTypeTree(Ident(tpnme.QUASIQUOTE_FUNCTION), argtpes :+ restpe)
+        override def makeFunctionTypeTree(argtpes: List[Tree], restpe: Tree): Tree = FunctionTypePlaceholder(argtpes, restpe)
+
+        // make q"val (x: T) = rhs" be equivalent to q"val x: T = rhs" for sake of bug compatibility (SI-8211)
+        override def makePatDef(mods: Modifiers, pat: Tree, rhs: Tree) = pat match {
+          case TuplePlaceholder(inParensPat :: Nil) => super.makePatDef(mods, inParensPat, rhs)
+          case _ => super.makePatDef(mods, pat, rhs)
+        }
       }
       import treeBuilder.{global => _, unit => _, _}
 
       // q"def foo($x)"
-      override def allowTypelessParams = true
+      override def param(owner: Name, implicitmod: Int, caseParam: Boolean): ValDef =
+        if (isHole && lookingAhead { in.token == COMMA || in.token == RPAREN }) {
+          ParamPlaceholder(implicitmod, ident())
+        } else super.param(owner, implicitmod, caseParam)
+
+      // q"($x) => ..." && q"class X { selfie => }
+      override def convertToParam(tree: Tree): ValDef = tree match {
+        case Ident(name) if isHole(name) => ParamPlaceholder(NoFlags, name)
+        case _ => super.convertToParam(tree)
+      }
 
       // q"foo match { case $x }"
       override def caseClause(): CaseDef =
         if (isHole && lookingAhead { in.token == CASE || in.token == RBRACE || in.token == SEMI }) {
-          val c = makeCaseDef(Apply(Ident(nme.QUASIQUOTE_CASE), List(Ident(ident()))), EmptyTree, EmptyTree)
+          val c = CasePlaceholder(ident())
           while (in.token == SEMI) in.nextToken()
           c
         } else
@@ -105,12 +119,14 @@ trait Parsers { self: Quasiquotes =>
 
       override def isTemplateIntro: Boolean = super.isTemplateIntro || (isHole && lookingAhead { isTemplateIntro })
 
+      override def isDefIntro: Boolean = super.isDefIntro || (isHole && lookingAhead { isDefIntro })
+
       override def isDclIntro: Boolean = super.isDclIntro || (isHole && lookingAhead { isDclIntro })
 
       override def isStatSep(token: Int) = token == EOF || super.isStatSep(token)
 
       override def expectedMsg(token: Int): String =
-        if (isHole) expectedMsgTemplate(token2string(token), "splicee")
+        if (isHole) expectedMsgTemplate(token2string(token), "unquotee")
         else super.expectedMsg(token)
 
       // $mods def foo
@@ -120,7 +136,7 @@ trait Parsers { self: Quasiquotes =>
           in.nextToken()
           annot :: readAnnots(annot)
         case _ if isHole && lookingAhead { isAnnotation || isModifier || isDefIntro || isIdent || isStatSep || in.token == LPAREN } =>
-          val ann = Apply(Select(New(Ident(tpnme.QUASIQUOTE_MODS)), nme.CONSTRUCTOR), List(Literal(Constant(in.name.toString))))
+          val ann = ModsPlaceholder(in.name)
           in.nextToken()
           ann :: readAnnots(annot)
         case _ =>
@@ -129,13 +145,13 @@ trait Parsers { self: Quasiquotes =>
 
       override def refineStat(): List[Tree] =
         if (isHole && !isDclIntro) {
-          val result = ValDef(NoMods, in.name, Ident(tpnme.QUASIQUOTE_REFINE_STAT), EmptyTree) :: Nil
+          val result = RefineStatPlaceholder(in.name) :: Nil
           in.nextToken()
           result
         } else super.refineStat()
 
       override def ensureEarlyDef(tree: Tree) = tree match {
-        case Ident(name: TermName) if isHole(name) => ValDef(NoMods | Flag.PRESUPER, name, Ident(tpnme.QUASIQUOTE_EARLY_DEF), EmptyTree)
+        case Ident(name: TermName) if isHole(name) => EarlyDefPlaceholder(name)
         case _ => super.ensureEarlyDef(tree)
       }
 
@@ -146,40 +162,49 @@ trait Parsers { self: Quasiquotes =>
 
       override def topStat = super.topStat.orElse {
         case _ if isHole =>
-          val stats = ValDef(NoMods, in.name, Ident(tpnme.QUASIQUOTE_PACKAGE_STAT), EmptyTree) :: Nil
+          val stats = PackageStatPlaceholder(in.name) :: Nil
           in.nextToken()
           stats
       }
 
       override def enumerator(isFirst: Boolean, allowNestedIf: Boolean = true) =
         if (isHole && lookingAhead { in.token == EOF || in.token == RPAREN || isStatSep }) {
-          val res = build.SyntacticValFrom(Bind(in.name, Ident(nme.WILDCARD)), Ident(nme.QUASIQUOTE_FOR_ENUM)) :: Nil
+          val res = ForEnumPlaceholder(in.name) :: Nil
           in.nextToken()
           res
         } else super.enumerator(isFirst, allowNestedIf)
     }
   }
 
-  object TermParser extends Parser {
-    def entryPoint = { parser =>
-      parser.templateOrTopStatSeq() match {
-        case head :: Nil => Block(Nil, head)
-        case lst => gen.mkTreeOrBlock(lst)
-      }
+  /** Wrapper around tree parsed in q"..." quote. Needed to support ..$ splicing on top-level. */
+  object Q {
+    def apply(tree: Tree): Block = Block(Nil, tree).updateAttachment(Q)
+    def unapply(tree: Tree): Option[Tree] = tree match {
+      case Block(Nil, contents) if tree.hasAttachment[Q.type] => Some(contents)
+      case _ => None
     }
   }
 
+  object TermParser extends Parser {
+    def entryPoint = parser => Q(implodePatDefs(gen.mkTreeOrBlock(parser.templateOrTopStatSeq())))
+  }
+
   object TypeParser extends Parser {
-    def entryPoint = _.typ()
+    def entryPoint = { parser =>
+      if (parser.in.token == EOF)
+        TypeTree()
+      else
+        parser.typ()
+    }
   }
 
   object CaseParser extends Parser {
-    def entryPoint = _.caseClause()
+    def entryPoint = parser => implodePatDefs(parser.caseClause())
   }
 
   object PatternParser extends Parser {
     def entryPoint = { parser =>
-      val pat = parser.noSeq.pattern1()
+      val pat = parser.noSeq.pattern()
       gen.patvarTransformer.transform(pat)
     }
   }
@@ -188,7 +213,7 @@ trait Parsers { self: Quasiquotes =>
     def entryPoint = { parser =>
       val enums = parser.enumerator(isFirst = false, allowNestedIf = false)
       assert(enums.length == 1)
-      enums.head
+      implodePatDefs(enums.head)
     }
   }
 

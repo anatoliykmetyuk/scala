@@ -74,7 +74,7 @@ trait Erasure {
   //
   // This requires that cls.isClass.
   protected def rebindInnerClass(pre: Type, cls: Symbol): Type =
-    if (cls.isTopLevel || cls.isLocal) pre else cls.owner.tpe_*
+    if (cls.isTopLevel || cls.isLocalToBlock) pre else cls.owner.tpe_*
 
   /** The type of the argument of a value class reference after erasure
    *  This method needs to be called at a phase no later than erasurephase
@@ -144,7 +144,7 @@ trait Erasure {
           else apply(mt.resultType(mt.paramTypes)))
       case RefinedType(parents, decls) =>
         apply(mergeParents(parents))
-      case AnnotatedType(_, atp, _) =>
+      case AnnotatedType(_, atp) =>
         apply(atp)
       case ClassInfoType(parents, decls, clazz) =>
         ClassInfoType(

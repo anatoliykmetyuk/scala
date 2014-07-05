@@ -99,20 +99,18 @@ object UnliftableProps extends QuasiquoteProperties("unliftable") {
     assert(l5 == orig2)
   }
 
-  property("don't unlift non-tree splicee (1)") = test {
+  property("don't unlift non-tree unquotee (1)") = test {
     val q"${a: TermName}.${b: TermName}" = q"a.b"
     assert(a == TermName("a"))
     assert(b == TermName("b"))
   }
 
-  property("don't unlift non-tree splicee (2)") = test {
+  property("don't unlift non-tree unquotee (2)") = test {
     val q"${mods: Modifiers} def foo" = q"def foo"
     assert(mods == Modifiers(DEFERRED))
   }
 
   property("unlift tuple") = test {
-    // fails due to SI-8045
-    // val q"${t1: Tuple1[Int]}" = q"_root_.scala.Tuple1(1)"
     val q"${t2: (Int, Int)}" = q"(1, 2)"
     val q"${t3: (Int, Int, Int)}" = q"(1, 2, 3)"
     val q"${t4: (Int, Int, Int, Int)}" = q"(1, 2, 3, 4)"
@@ -156,5 +154,13 @@ object UnliftableProps extends QuasiquoteProperties("unliftable") {
     assert(t20 == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
     assert(t21 == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21))
     assert(t22 == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22))
+  }
+
+  property("unlift xml comment") = test {
+    implicit val unliftXmlComment = Unliftable[xml.Comment] {
+      case q"new _root_.scala.xml.Comment(${value: String})" => xml.Comment(value)
+    }
+    val q"${comment: xml.Comment}" = q"<!--foo-->"
+    assert(comment.commentText == "foo")
   }
 }

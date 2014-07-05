@@ -1,4 +1,4 @@
-import scala.reflect.macros.BlackboxContext
+import scala.reflect.macros.blackbox.Context
 import scala.language.experimental.macros
 
 trait Foo[T]
@@ -15,10 +15,10 @@ object Foo extends LowPriority {
 }
 
 object Macros {
-  def impl[T: c.WeakTypeTag](c: BlackboxContext) = {
+  def impl[T: c.WeakTypeTag](c: Context) = {
     import c.universe._
     val tpe = weakTypeOf[T]
-    if (tpe.members.exists(_.typeSignature =:= typeOf[Int]))
+    if (tpe.members.exists(_.info =:= typeOf[Int]))
       c.abort(c.enclosingPosition, "I don't like classes that contain integers")
     q"new Foo[$tpe]{ override def toString = ${tpe.toString} }"
   }

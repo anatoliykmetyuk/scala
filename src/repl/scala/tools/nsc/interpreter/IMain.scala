@@ -18,7 +18,7 @@ import scala.reflect.internal.util.{ BatchSourceFile, SourceFile }
 import scala.tools.util.PathResolver
 import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.typechecker.{ TypeStrings, StructuredTypeStrings }
-import scala.tools.nsc.util.{ ScalaClassLoader, stringFromWriter, StackTraceOps }
+import scala.tools.nsc.util.{ ScalaClassLoader, stringFromReader, stringFromWriter, StackTraceOps }
 import scala.tools.nsc.util.Exceptional.unwrap
 import javax.script.{AbstractScriptEngine, Bindings, ScriptContext, ScriptEngine, ScriptEngineFactory, ScriptException, CompiledScript, Compilable}
 
@@ -117,8 +117,10 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   private def _initSources = List(new BatchSourceFile("<init>", "class $repl_$init { }"))
   private def _initialize() = {
     try {
-      // todo. if this crashes, REPL will hang
-      new _compiler.Run() compileSources _initSources
+      // if this crashes, REPL will hang its head in shame
+      val run = new _compiler.Run()
+      assert(run.typerPhase != NoPhase, "REPL requires a typer phase.")
+      run compileSources _initSources
       _initializeComplete = true
       true
     }
@@ -306,7 +308,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
      */
     override protected def findAbstractFile(name: String): AbstractFile =
       super.findAbstractFile(name) match {
-        case null => translatePath(name) map (super.findAbstractFile(_)) orNull
+        case null if _initializeComplete => translatePath(name) map (super.findAbstractFile(_)) orNull
         case file => file
       }
   }
@@ -384,6 +386,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
 
   def compileSourcesKeepingRun(sources: SourceFile*) = {
     val run = new Run()
+    assert(run.typerPhase != NoPhase, "REPL requires a typer phase.")
     reporter.reset()
     run compileSources sources.toList
     (!reporter.hasErrors, run)
@@ -534,8 +537,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
 
   var code = ""
   var bound = false
-  @throws[ScriptException]
-  def compile(script: String): CompiledScript = {
+  def compiled(script: String): CompiledScript = {
     if (!bound) {
       quietBind("engine" -> this.asInstanceOf[ScriptEngine])
       bound = true
@@ -560,18 +562,6 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
         new WrappedRequest(req)
       }
     }
-  }
-
-  @throws[ScriptException]
-  def compile(reader: java.io.Reader): CompiledScript = {
-    val writer = new java.io.StringWriter()
-    var c = reader.read()
-    while(c != -1) {
-      writer.write(c)
-      c = reader.read()
-    }
-    reader.close()
-    compile(writer.toString())
   }
 
   private class WrappedRequest(val req: Request) extends CompiledScript {
@@ -1014,10 +1004,16 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   }
 
   @throws[ScriptException]
-  def eval(script: String, context: ScriptContext): Object = compile(script).eval(context)
+  def compile(script: String): CompiledScript = eval("new javax.script.CompiledScript { def eval(context: javax.script.ScriptContext): Object = { " + script + " }.asInstanceOf[Object]; def getEngine: javax.script.ScriptEngine = engine }").asInstanceOf[CompiledScript]
 
   @throws[ScriptException]
-  def eval(reader: java.io.Reader, context: ScriptContext): Object = compile(reader).eval(context)
+  def compile(reader: java.io.Reader): CompiledScript = compile(stringFromReader(reader))
+
+  @throws[ScriptException]
+  def eval(script: String, context: ScriptContext): Object = compiled(script).eval(context)
+
+  @throws[ScriptException]
+  def eval(reader: java.io.Reader, context: ScriptContext): Object = eval(stringFromReader(reader), context)
 
   override def finalize = close
 
@@ -1038,7 +1034,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   def lastWarnings = mostRecentWarnings
 
   private lazy val importToGlobal  = global mkImporter ru
-  private lazy val importToRuntime = ru mkImporter global
+  private lazy val importToRuntime = ru.internal createImporter global
   private lazy val javaMirror = ru.rootMirror match {
     case x: ru.JavaMirror => x
     case _                => null

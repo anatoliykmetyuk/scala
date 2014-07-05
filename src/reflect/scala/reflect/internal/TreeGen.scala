@@ -6,7 +6,7 @@ import Flags._
 import util._
 import scala.collection.mutable.ListBuffer
 
-abstract class TreeGen extends macros.TreeBuilder {
+abstract class TreeGen {
   val global: SymbolTable
 
   import global._
@@ -49,10 +49,10 @@ abstract class TreeGen extends macros.TreeBuilder {
     mkMethodCall(Select(receiver, method), targs, args)
 
   def mkMethodCall(target: Tree, targs: List[Type], args: List[Tree]): Tree =
-    Apply(mkTypeApply(target, targs map TypeTree), args)
+    Apply(mkTypeApply(target, mapList(targs)(TypeTree)), args)
 
   def mkNullaryCall(method: Symbol, targs: List[Type]): Tree =
-    mkTypeApply(mkAttributedRef(method), targs map TypeTree)
+    mkTypeApply(mkAttributedRef(method), mapList(targs)(TypeTree))
 
   /** Builds a reference to value whose type is given stable prefix.
    *  The type must be suitable for this.  For example, it
@@ -95,7 +95,7 @@ abstract class TreeGen extends macros.TreeBuilder {
       case ConstantType(value) =>
         Literal(value) setType tpe
 
-      case AnnotatedType(_, atp, _) =>
+      case AnnotatedType(_, atp) =>
         mkAttributedQualifier(atp)
 
       case RefinedType(parents, _) =>
@@ -186,16 +186,12 @@ abstract class TreeGen extends macros.TreeBuilder {
       )
       val needsPackageQualifier = (
            (sym ne null)
-        && qualsym.isPackage
+        && qualsym.hasPackageFlag
         && !(sym.isDefinedInPackage || sym.moduleClass.isDefinedInPackage) // SI-7817 work around strangeness in post-flatten `Symbol#owner`
       )
       val pkgQualifier =
         if (needsPackageQualifier) {
-          // The owner of a symbol which requires package qualification may be the
-          // package object iself, but it also could be any superclass of the package
-          // object.  In the latter case, we must go through the qualifier's info
-          // to obtain the right symbol.
-          val packageObject = if (sym.owner.isModuleClass) sym.owner.sourceModule else qual.tpe member nme.PACKAGE
+          val packageObject = rootMirror.getPackageObjectWithMember(qual.tpe, sym)
           Select(qual, nme.PACKAGE) setSymbol packageObject setType singleType(qual.tpe, packageObject)
         }
         else qual
@@ -285,7 +281,7 @@ abstract class TreeGen extends macros.TreeBuilder {
     case tree :: Nil if flattenUnary =>
       tree
     case _ =>
-      Apply(scalaDot(TupleClass(elems.length).companionModule.name), elems)
+      Apply(scalaDot(TupleClass(elems.length).name.toTermName), elems)
   }
 
   def mkTupleType(elems: List[Tree], flattenUnary: Boolean = true): Tree = elems match {
@@ -340,11 +336,13 @@ abstract class TreeGen extends macros.TreeBuilder {
 
     // create parameters for <init> as synthetic trees.
     var vparamss1 = mmap(vparamss) { vd =>
-      atPos(vd.pos.focus) {
+      val param = atPos(vd.pos.makeTransparent) {
         val mods = Modifiers(vd.mods.flags & (IMPLICIT | DEFAULTPARAM | BYNAMEPARAM) | PARAM | PARAMACCESSOR)
-        ValDef(mods withAnnotations vd.mods.annotations, vd.name, vd.tpt.duplicate, vd.rhs.duplicate)
+        ValDef(mods withAnnotations vd.mods.annotations, vd.name, vd.tpt.duplicate, duplicateAndKeepPositions(vd.rhs))
       }
+      param
     }
+
     val (edefs, rest) = body span treeInfo.isEarlyDef
     val (evdefs, etdefs) = edefs partition treeInfo.isEarlyValDef
     val gvdefs = evdefs map {
@@ -377,15 +375,21 @@ abstract class TreeGen extends macros.TreeBuilder {
                                          // this means that we don't know what will be the arguments of the super call
                                          // therefore here we emit a dummy which gets populated when the template is named and typechecked
         Some(
-          // TODO: previously this was `wrappingPos(superPos, lvdefs ::: argss.flatten)`
-          // is it going to be a problem that we can no longer include the `argss`?
-          atPos(wrappingPos(superPos, lvdefs)) (
+          atPos(wrappingPos(superPos, lvdefs ::: vparamss1.flatten).makeTransparent) (
             DefDef(constrMods, nme.CONSTRUCTOR, List(), vparamss1, TypeTree(), Block(lvdefs ::: List(superCall), Literal(Constant())))))
       }
     }
     constr foreach (ensureNonOverlapping(_, parents ::: gvdefs, focus = false))
     // Field definitions for the class - remove defaults.
-    val fieldDefs = vparamss.flatten map (vd => copyValDef(vd)(mods = vd.mods &~ DEFAULTPARAM, rhs = EmptyTree))
+
+    val fieldDefs = vparamss.flatten map (vd => {
+      val field = copyValDef(vd)(mods = vd.mods &~ DEFAULTPARAM, rhs = EmptyTree)
+      // Prevent overlapping of `field` end's position with default argument's start position.
+      // This is needed for `Positions.Locator(pos).traverse` to return the correct tree when
+      // the `pos` is a point position with all its values equal to `vd.rhs.pos.start`.
+      if(field.pos.isRange && vd.rhs.pos.isRange) field.pos = field.pos.withEnd(vd.rhs.pos.start - 1)
+      field
+    })
 
     global.Template(parents, self, gvdefs ::: fieldDefs ::: constr ++: etdefs ::: rest)
   }
@@ -440,13 +444,23 @@ abstract class TreeGen extends macros.TreeBuilder {
   def mkFunctionTypeTree(argtpes: List[Tree], restpe: Tree): Tree =
     AppliedTypeTree(rootScalaDot(newTypeName("Function" + argtpes.length)), argtpes ::: List(restpe))
 
+  /** Create a literal unit tree that is inserted by the compiler but not
+   *  written by end user. It's important to distinguish the two so that
+   *  quasiquotes can strip synthetic ones away.
+   */
+  def mkSyntheticUnit() = Literal(Constant(())).updateAttachment(SyntheticUnitAttachment)
+
   /** Create block of statements `stats`  */
   def mkBlock(stats: List[Tree]): Tree =
-    if (stats.isEmpty) Literal(Constant(()))
-    else if (!stats.last.isTerm) Block(stats, Literal(Constant(())))
+    if (stats.isEmpty) mkSyntheticUnit()
+    else if (!stats.last.isTerm) Block(stats, mkSyntheticUnit())
     else if (stats.length == 1) stats.head
     else Block(stats.init, stats.last)
 
+  /** Create a block that wraps multiple statements but don't
+   *  do any wrapping if there is just one statement. Used by
+   *  quasiquotes, macro c.parse api and toolbox.
+   */
   def mkTreeOrBlock(stats: List[Tree]) = stats match {
     case Nil         => EmptyTree
     case head :: Nil => head
@@ -677,11 +691,11 @@ abstract class TreeGen extends macros.TreeBuilder {
   }
 
   /** Create tree for pattern definition <val pat0 = rhs> */
-  def mkPatDef(pat: Tree, rhs: Tree)(implicit fresh: FreshNameCreator): List[Tree] =
+  def mkPatDef(pat: Tree, rhs: Tree)(implicit fresh: FreshNameCreator): List[ValDef] =
     mkPatDef(Modifiers(0), pat, rhs)
 
   /** Create tree for pattern definition <mods val pat0 = rhs> */
-  def mkPatDef(mods: Modifiers, pat: Tree, rhs: Tree)(implicit fresh: FreshNameCreator): List[Tree] = matchVarPattern(pat) match {
+  def mkPatDef(mods: Modifiers, pat: Tree, rhs: Tree)(implicit fresh: FreshNameCreator): List[ValDef] = matchVarPattern(pat) match {
     case Some((name, tpt)) =>
       List(atPos(pat.pos union rhs.pos) {
         ValDef(mods, name.toTermName, tpt, rhs)
@@ -879,4 +893,7 @@ abstract class TreeGen extends macros.TreeBuilder {
 
   def mkSyntheticParam(pname: TermName) =
     ValDef(Modifiers(PARAM | SYNTHETIC), pname, TypeTree(), EmptyTree)
+
+  def mkCast(tree: Tree, pt: Type): Tree =
+    atPos(tree.pos)(mkAsInstanceOf(tree, pt, any = true, wrapInApply = false))
 }

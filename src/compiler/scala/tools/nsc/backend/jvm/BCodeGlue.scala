@@ -22,6 +22,8 @@ abstract class BCodeGlue extends SubComponent {
 
   import global._
 
+  protected val bCodeICodeCommon: BCodeICodeCommon[global.type] = new BCodeICodeCommon(global)
+
   object BType {
 
     import global.chrs
@@ -660,6 +662,14 @@ abstract class BCodeGlue extends SubComponent {
   val RT_NULL    = brefType("scala/runtime/Null$")
   val CT_NOTHING = brefType("scala/Nothing") // TODO needed?
   val CT_NULL    = brefType("scala/Null")    // TODO needed?
+
+  val srBooleanRef = brefType("scala/runtime/BooleanRef")
+  val srByteRef    = brefType("scala/runtime/ByteRef")
+  val srCharRef    = brefType("scala/runtime/CharRef")
+  val srIntRef     = brefType("scala/runtime/IntRef")
+  val srLongRef    = brefType("scala/runtime/LongRef")
+  val srFloatRef   = brefType("scala/runtime/FloatRef")
+  val srDoubleRef  = brefType("scala/runtime/DoubleRef")
 
   /*  Map from type kinds to the Java reference types.
    *  Useful when pushing class literals onto the operand stack (ldc instruction taking a class literal).

@@ -23,6 +23,7 @@ import scala.tools.asm
 abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
   import global._
   import definitions._
+  import bCodeICodeCommon._
 
   /*
    * Functionality to build the body of ASM MethodNode, except for `synchronized` and `try` expressions.
@@ -88,7 +89,9 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
 
     def genThrow(expr: Tree): BType = {
       val thrownKind = tpeTK(expr)
-      assert(exemplars.get(thrownKind).isSubtypeOf(ThrowableReference))
+      // `throw null` is valid although scala.Null (as defined in src/libray-aux) isn't a subtype of Throwable.
+      // Similarly for scala.Nothing (again, as defined in src/libray-aux).
+      assert(thrownKind.isNullType || thrownKind.isNothingType || exemplars.get(thrownKind).isSubtypeOf(ThrowableReference))
       genLoad(expr, thrownKind)
       lineNumber(expr)
       emit(asm.Opcodes.ATHROW) // ICode enters here into enterIgnoreMode, we'll rely instead on DCE at ClassNode level.
@@ -348,7 +351,7 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
 
         case Ident(name) =>
           val sym = tree.symbol
-          if (!sym.isPackage) {
+          if (!sym.hasPackageFlag) {
             val tk = symInfoTK(sym)
             if (sym.isModule) { genLoadModule(tree) }
             else { locals.load(sym) }
@@ -805,7 +808,7 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
         emit(asm.Opcodes.ATHROW) // ICode enters here into enterIgnoreMode, we'll rely instead on DCE at ClassNode level.
       } else if (from.isNullType) {
         bc drop from
-        mnode.visitInsn(asm.Opcodes.ACONST_NULL)
+        emit(asm.Opcodes.ACONST_NULL)
       }
       else (from, to) match  {
         case (BYTE, LONG) | (SHORT, LONG) | (CHAR, LONG) | (INT, LONG) => bc.emitT2T(INT, LONG)
@@ -824,7 +827,6 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
 
     /* Generate code that loads args into label parameters. */
     def genLoadLabelArguments(args: List[Tree], lblDef: LabelDef, gotoPos: Position) {
-      assert(args forall { a => !a.hasSymbolField || a.hasSymbolWhich( s => !s.isLabel) }, s"SI-6089 at: $gotoPos") // SI-6089
 
       val aps = {
         val params: List[Symbol] = lblDef.params.map(_.symbol)
@@ -857,12 +859,11 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
     }
 
     def genLoadModule(tree: Tree): BType = {
-      // Working around SI-5604.  Rather than failing the compile when we see a package here, check if there's a package object.
       val module = (
         if (!tree.symbol.isPackageClass) tree.symbol
         else tree.symbol.info.member(nme.PACKAGE) match {
-          case NoSymbol => abort(s"Cannot use package as value: $tree") ; NoSymbol
-          case s        => devWarning("Bug: found package class where package object expected.  Converting.") ; s.moduleClass
+          case NoSymbol => abort(s"SI-5604: Cannot use package as value: $tree")
+          case s        => abort(s"SI-5604: found package class where package object expected: $tree")
         }
       )
       lineNumber(tree)
@@ -871,7 +872,8 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
     }
 
     def genLoadModule(module: Symbol) {
-      if (claszSymbol == module.moduleClass && jMethodName != "readResolve") {
+      def inStaticMethod = methSymbol != null && methSymbol.isStaticMember
+      if (claszSymbol == module.moduleClass && jMethodName != "readResolve" && !inStaticMethod) {
         mnode.visitVarInsn(asm.Opcodes.ALOAD, 0)
       } else {
         val mbt  = symInfoTK(module)
@@ -1018,17 +1020,6 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
       case _ =>
         tree :: Nil
     }
-
-    /* Some useful equality helpers. */
-    def isNull(t: Tree) = {
-      t match {
-        case Literal(Constant(null)) => true
-        case _ => false
-      }
-    }
-
-    /* If l or r is constant null, returns the other ; otherwise null */
-    def ifOneIsNull(l: Tree, r: Tree) = if (isNull(l)) r else if (isNull(r)) l else null
 
     /* Emit code to compare the two top-most stack values using the 'op' operator. */
     private def genCJUMP(success: asm.Label, failure: asm.Label, op: TestOp, tk: BType) {
@@ -1199,6 +1190,12 @@ abstract class BCodeBodyBuilder extends BCodeSkelBuilder {
           // expr == null -> expr eq null
           genLoad(l, ObjectReference)
           genCZJUMP(success, failure, icodes.EQ, ObjectReference)
+        } else if (isNonNullExpr(l)) {
+          // SI-7852 Avoid null check if L is statically non-null.
+          genLoad(l, ObjectReference)
+          genLoad(r, ObjectReference)
+          genCallMethod(Object_equals, icodes.opcodes.Dynamic)
+          genCZJUMP(success, failure, icodes.NE, BOOL)
         } else {
           // l == r -> if (l eq null) r eq null else l.equals(r)
           val eqEqTempLocal = locals.makeLocal(AnyRefReference, nme.EQEQ_LOCAL_VAR.toString)

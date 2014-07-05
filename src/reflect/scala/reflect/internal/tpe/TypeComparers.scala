@@ -17,20 +17,15 @@ trait TypeComparers {
   private val _pendingSubTypes = new mutable.HashSet[SubTypePair]
   def pendingSubTypes = _pendingSubTypes
 
-  class SubTypePair(val tp1: Type, val tp2: Type) {
-    override def hashCode = tp1.hashCode * 41 + tp2.hashCode
-    override def equals(other: Any) = (this eq other.asInstanceOf[AnyRef]) || (other match {
-      // suspend TypeVars in types compared by =:=,
-      // since we don't want to mutate them simply to check whether a subtype test is pending
-      // in addition to making subtyping "more correct" for type vars,
-      // it should avoid the stackoverflow that's been plaguing us (https://groups.google.com/d/topic/scala-internals/2gHzNjtB4xA/discussion)
-      // this method is only called when subtyping hits a recursion threshold (subsametypeRecursions >= LogPendingSubTypesThreshold)
-      case stp: SubTypePair =>
-        val tvars = List(tp1, stp.tp1, tp2, stp.tp2) flatMap (t => if (t.isGround) Nil else typeVarsInType(t))
-        suspendingTypeVars(tvars)(tp1 =:= stp.tp1 && tp2 =:= stp.tp2)
-      case _ =>
-        false
-    })
+  final case class SubTypePair(tp1: Type, tp2: Type) {
+    // SI-8146 we used to implement equality here in terms of pairwise =:=.
+    //         But, this was inconsistent with hashCode, which was based on the
+    //         Type#hashCode, based on the structure of types, not the meaning.
+    //         Now, we use `Type#{equals,hashCode}` as the (consistent) basis for
+    //         detecting cycles (aka keeping subtyping decidable.)
+    //
+    //         I added a tests to show that we detect the cycle: neg/t8146-no-finitary*
+
     override def toString = tp1+" <:<? "+tp2
   }
 
@@ -170,10 +165,19 @@ trait TypeComparers {
     // corresponds does not check length of two sequences before checking the predicate,
     // but SubstMap assumes it has been checked (SI-2956)
     (     sameLength(tparams1, tparams2)
-      && (tparams1 corresponds tparams2)((p1, p2) => p1.info =:= subst(p2.info))
+      && (tparams1 corresponds tparams2)((p1, p2) => methodHigherOrderTypeParamsSameVariance(p1, p2) && p1.info =:= subst(p2.info))
       && (res1 =:= subst(res2))
     )
   }
+
+  // SI-2066 This prevents overrides with incompatible variance in higher order type parameters.
+  private def methodHigherOrderTypeParamsSameVariance(sym1: Symbol, sym2: Symbol) = {
+    def ignoreVariance(sym: Symbol) = !(sym.isHigherOrderTypeParameter && sym.logicallyEnclosingMember.isMethod)
+    !settings.isScala211 || ignoreVariance(sym1) || ignoreVariance(sym2) || sym1.variance == sym2.variance
+  }
+
+  private def methodHigherOrderTypeParamsSubVariance(low: Symbol, high: Symbol) =
+    !settings.isScala211 || methodHigherOrderTypeParamsSameVariance(low, high) || low.variance.isInvariant
 
   def isSameType2(tp1: Type, tp2: Type): Boolean = {
     def retry(lhs: Type, rhs: Type) = ((lhs ne tp1) || (rhs ne tp2)) && isSameType(lhs, rhs)
@@ -262,7 +266,7 @@ trait TypeComparers {
       if (subsametypeRecursions >= LogPendingSubTypesThreshold) {
         val p = new SubTypePair(tp1, tp2)
         if (pendingSubTypes(p))
-          false
+          false // see neg/t8146-no-finitary*
         else
           try {
             pendingSubTypes += p
@@ -327,7 +331,10 @@ trait TypeComparers {
       val substitutes = if (isMethod) tparams1 else cloneSymbols(tparams1)
       def sub1(tp: Type) = if (isMethod) tp else tp.substSym(tparams1, substitutes)
       def sub2(tp: Type) = tp.substSym(tparams2, substitutes)
-      def cmp(p1: Symbol, p2: Symbol) = sub2(p2.info) <:< sub1(p1.info)
+      def cmp(p1: Symbol, p2: Symbol) = (
+            methodHigherOrderTypeParamsSubVariance(p2, p1)
+         && sub2(p2.info) <:< sub1(p1.info)
+      )
 
       (tparams1 corresponds tparams2)(cmp) && (sub1(res1) <:< sub2(res2))
     }
@@ -403,14 +410,14 @@ trait TypeComparers {
           case _ =>
             secondTry
         }
-      case AnnotatedType(_, _, _) =>
+      case AnnotatedType(_, _) =>
         isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
           annotationsConform(tp1, tp2)
       case BoundedWildcardType(bounds) =>
         isSubType(tp1, bounds.hi, depth)
       case tv2 @ TypeVar(_, constr2) =>
         tp1 match {
-          case AnnotatedType(_, _, _) | BoundedWildcardType(_) =>
+          case AnnotatedType(_, _) | BoundedWildcardType(_) =>
             secondTry
           case _ =>
             tv2.registerBound(tp1, isLowerBound = true)
@@ -425,7 +432,7 @@ trait TypeComparers {
      *   - handle existential types by skolemization.
      */
     def secondTry = tp1 match {
-      case AnnotatedType(_, _, _) =>
+      case AnnotatedType(_, _) =>
         isSubType(tp1.withoutAnnotations, tp2.withoutAnnotations, depth) &&
           annotationsConform(tp1, tp2)
       case BoundedWildcardType(bounds) =>

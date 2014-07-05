@@ -12,13 +12,12 @@ import scala.collection.{immutable, mutable}
  */
 trait Placeholders { self: Quasiquotes =>
   import global._
-  import Cardinality._
+  import Rank._
   import universeTypes._
 
   // Step 1: Transform Scala source with holes into vanilla Scala source
 
-  lazy val holeMap = new HoleMap()
-  lazy val posMap = mutable.ListMap[Position, (Int, Int)]()
+  lazy val posMap = mutable.LinkedHashMap[Position, (Int, Int)]()
   lazy val code = {
     val sb = new StringBuilder()
     val sessionSuffix = randomUUID().toString.replace("-", "").substring(0, 8) + "$"
@@ -30,27 +29,25 @@ trait Placeholders { self: Quasiquotes =>
       posMap += pos -> ((start, end))
     }
 
-    def appendHole(tree: Tree, cardinality: Cardinality) = {
+    def appendHole(tree: Tree, rank: Rank) = {
       val placeholderName = c.freshName(TermName(nme.QUASIQUOTE_PREFIX + sessionSuffix))
       sb.append(placeholderName)
       val holeTree =
         if (method != nme.unapply) tree
         else Bind(placeholderName, tree)
-      holeMap(placeholderName) = Hole(cardinality, holeTree)
+      holeMap(placeholderName) = Hole(rank, holeTree)
     }
 
     val iargs = method match {
       case nme.apply   => args
-      case nme.unapply =>
-        val (dummy @ Ident(nme.SELECTOR_DUMMY)) :: Nil = args
-        dummy.attachments.get[SubpatternsAttachment].get.patterns
+      case nme.unapply => internal.subpatterns(args.head).get
       case _           => global.abort("unreachable")
     }
 
     foreach2(iargs, parts.init) { case (tree, (p, pos)) =>
-      val (part, cardinality) = parseDots(p)
+      val (part, rank) = parseDots(p)
       appendPart(part, pos)
-      appendHole(tree, cardinality)
+      appendHole(tree, rank)
     }
     val (p, pos) = parts.last
     appendPart(p, pos)
@@ -58,25 +55,27 @@ trait Placeholders { self: Quasiquotes =>
     sb.toString
   }
 
-  class HoleMap {
-    private var underlying = immutable.SortedMap[String, Hole]()
-    private val accessed = mutable.Set[String]()
+  object holeMap {
+    private val underlying = mutable.LinkedHashMap.empty[String, Hole]
+    private val accessed   = mutable.Set.empty[String]
     def unused: Set[Name] = (underlying.keys.toSet -- accessed).map(TermName(_))
-    def contains(key: Name) = underlying.contains(key.toString)
-    def apply(key: Name) = {
-      val s = key.toString
-      accessed += s
-      underlying(s)
+    def contains(key: Name): Boolean = underlying.contains(key.toString)
+    def apply(key: Name): Hole = {
+      val skey = key.toString
+      val value = underlying(skey)
+      accessed += skey
+      value
     }
-    def update(key: Name, hole: Hole) = {
+    def update(key: Name, hole: Hole) =
       underlying += key.toString -> hole
+    def get(key: Name): Option[Hole] = {
+      val skey = key.toString
+      underlying.get(skey).map { v =>
+        accessed += skey
+        v
+      }
     }
-    def get(key: Name) = {
-      val s = key.toString
-      accessed += s
-      underlying.get(s)
-    }
-    def toList = underlying.toList
+    def keysIterator: Iterator[TermName] = underlying.keysIterator.map(TermName(_))
   }
 
   // Step 2: Transform vanilla Scala AST into an AST with holes
@@ -95,11 +94,12 @@ trait Placeholders { self: Quasiquotes =>
       case Ident(name) => name
       case Bind(name, Ident(nme.WILDCARD)) => name
       case TypeDef(_, name, List(), TypeBoundsTree(EmptyTree, EmptyTree)) => name
-      case ValDef(_, name, TypeTree(), EmptyTree) => name
     }
   }
 
   object ModsPlaceholder extends HolePlaceholder {
+    def apply(name: Name) =
+      Apply(Select(New(Ident(tpnme.QUASIQUOTE_MODS)), nme.CONSTRUCTOR), List(Literal(Constant(name.toString))))
     def matching = {
       case Apply(Select(New(Ident(tpnme.QUASIQUOTE_MODS)), nme.CONSTRUCTOR), List(Literal(Constant(s: String)))) => TermName(s)
     }
@@ -111,7 +111,17 @@ trait Placeholders { self: Quasiquotes =>
     }
   }
 
+  object ParamPlaceholder extends HolePlaceholder {
+    def apply(flags: FlagSet, name: Name) =
+      ValDef(Modifiers(flags), nme.QUASIQUOTE_PARAM, Ident(name), EmptyTree)
+    def matching = {
+      case ValDef(_, nme.QUASIQUOTE_PARAM, Ident(name), EmptyTree) => name
+    }
+  }
+
   object TuplePlaceholder {
+    def apply(args: List[Tree]) =
+      Apply(Ident(nme.QUASIQUOTE_TUPLE), args)
     def unapply(tree: Tree): Option[List[Tree]] = tree match {
       case Apply(Ident(nme.QUASIQUOTE_TUPLE), args) => Some(args)
       case _ => None
@@ -119,6 +129,8 @@ trait Placeholders { self: Quasiquotes =>
   }
 
   object TupleTypePlaceholder {
+    def apply(args: List[Tree]) =
+      AppliedTypeTree(Ident(tpnme.QUASIQUOTE_TUPLE), args)
     def unapply(tree: Tree): Option[List[Tree]] = tree match {
       case AppliedTypeTree(Ident(tpnme.QUASIQUOTE_TUPLE), args) => Some(args)
       case _ => None
@@ -126,6 +138,8 @@ trait Placeholders { self: Quasiquotes =>
   }
 
   object FunctionTypePlaceholder {
+    def apply(args: List[Tree], res: Tree) =
+      AppliedTypeTree(Ident(tpnme.QUASIQUOTE_FUNCTION), args :+ res)
     def unapply(tree: Tree): Option[(List[Tree], Tree)] = tree match {
       case AppliedTypeTree(Ident(tpnme.QUASIQUOTE_FUNCTION), args :+ res) => Some((args, res))
       case _ => None
@@ -140,6 +154,8 @@ trait Placeholders { self: Quasiquotes =>
   }
 
   object CasePlaceholder {
+    def apply(name: Name) =
+      CaseDef(Apply(Ident(nme.QUASIQUOTE_CASE), Ident(name) :: Nil), EmptyTree, EmptyTree)
     def unapply(tree: Tree): Option[Hole] = tree match {
       case CaseDef(Apply(Ident(nme.QUASIQUOTE_CASE), List(Placeholder(hole))), EmptyTree, EmptyTree) => Some(hole)
       case _ => None
@@ -147,27 +163,35 @@ trait Placeholders { self: Quasiquotes =>
   }
 
   object RefineStatPlaceholder {
+    def apply(name: Name) =
+      ValDef(NoMods, nme.QUASIQUOTE_REFINE_STAT, Ident(name), EmptyTree)
     def unapply(tree: Tree): Option[Hole] = tree match {
-      case ValDef(_, Placeholder(hole), Ident(tpnme.QUASIQUOTE_REFINE_STAT), _) => Some(hole)
+      case ValDef(_, nme.QUASIQUOTE_REFINE_STAT, Ident(Placeholder(hole)), _) => Some(hole)
       case _ => None
     }
   }
 
   object EarlyDefPlaceholder {
+    def apply(name: Name) =
+      ValDef(Modifiers(Flag.PRESUPER), nme.QUASIQUOTE_EARLY_DEF, Ident(name), EmptyTree)
     def unapply(tree: Tree): Option[Hole] = tree match {
-      case ValDef(_, Placeholder(hole), Ident(tpnme.QUASIQUOTE_EARLY_DEF), _) => Some(hole)
+      case ValDef(_, nme.QUASIQUOTE_EARLY_DEF, Ident(Placeholder(hole)), _) => Some(hole)
       case _ => None
     }
   }
 
   object PackageStatPlaceholder {
+    def apply(name: Name) =
+      ValDef(NoMods, nme.QUASIQUOTE_PACKAGE_STAT, Ident(name), EmptyTree)
     def unapply(tree: Tree): Option[Hole] = tree match {
-      case ValDef(NoMods, Placeholder(hole), Ident(tpnme.QUASIQUOTE_PACKAGE_STAT), EmptyTree) => Some(hole)
+      case ValDef(NoMods, nme.QUASIQUOTE_PACKAGE_STAT, Ident(Placeholder(hole)), EmptyTree) => Some(hole)
       case _ => None
     }
   }
 
   object ForEnumPlaceholder {
+    def apply(name: Name) =
+      build.SyntacticValFrom(Bind(name, Ident(nme.WILDCARD)), Ident(nme.QUASIQUOTE_FOR_ENUM))
     def unapply(tree: Tree): Option[Hole] = tree match {
       case build.SyntacticValFrom(Bind(Placeholder(hole), Ident(nme.WILDCARD)), Ident(nme.QUASIQUOTE_FOR_ENUM)) =>
         Some(hole)

@@ -53,7 +53,13 @@ abstract class TreeBuilder {
   def makeSelfDef(name: TermName, tpt: Tree): ValDef = ValDef(Modifiers(PRIVATE), name, tpt, EmptyTree)
 
   /** Create tree representing (unencoded) binary operation expression or pattern. */
-  def makeBinop(isExpr: Boolean, left: Tree, op: TermName, right: Tree, opPos: Position): Tree = {
+  def makeBinop(isExpr: Boolean, left: Tree, op: TermName, right: Tree, opPos: Position, targs: List[Tree] = Nil): Tree = {
+    require(isExpr || targs.isEmpty || targs.exists(_.isErroneous), s"Incompatible args to makeBinop: !isExpr but targs=$targs")
+
+    def mkSelection(t: Tree) = {
+      def sel = atPos(opPos union t.pos)(Select(stripParens(t), op.encode))
+      if (targs.isEmpty) sel else atPos(left.pos)(TypeApply(sel, targs))
+    }
     def mkNamed(args: List[Tree]) = if (isExpr) args map treeInfo.assignmentToMaybeNamedArg else args
     val arguments = right match {
       case Parens(args) => mkNamed(args)
@@ -61,12 +67,12 @@ abstract class TreeBuilder {
     }
     if (isExpr) {
       if (treeInfo.isLeftAssoc(op)) {
-        Apply(atPos(opPos union left.pos) { Select(stripParens(left), op.encode) }, arguments)
+        Apply(mkSelection(left), arguments)
       } else {
         val x = freshTermName()
         Block(
           List(ValDef(Modifiers(SYNTHETIC | ARTIFACT), x, TypeTree(), stripParens(left))),
-          Apply(atPos(opPos union right.pos) { Select(stripParens(right), op.encode) }, List(Ident(x))))
+          Apply(mkSelection(right), List(Ident(x))))
       }
     } else {
       Apply(Ident(op.encode), stripParens(left) :: arguments)
@@ -159,4 +165,6 @@ abstract class TreeBuilder {
       else vparamss      ::: List(evidenceParams)
     }
   }
+
+  def makePatDef(mods: Modifiers, pat: Tree, rhs: Tree) = gen.mkPatDef(mods, pat, rhs)
 }

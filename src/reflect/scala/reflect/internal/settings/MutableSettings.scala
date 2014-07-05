@@ -37,8 +37,10 @@ abstract class MutableSettings extends AbsSettings {
   def XfullLubs: BooleanSetting
   def XnoPatmatAnalysis: BooleanSetting
   def Xprintpos: BooleanSetting
+  def strictInference: BooleanSetting
   def Yposdebug: BooleanSetting
   def Yrangepos: BooleanSetting
+  def Yshowsymowners: BooleanSetting
   def Yshowsymkinds: BooleanSetting
   def breakCycles: BooleanSetting
   def debug: BooleanSetting
@@ -51,6 +53,8 @@ abstract class MutableSettings extends AbsSettings {
 
   def Yrecursion: IntSetting
   def maxClassfileName: IntSetting
+
+  def isScala211: Boolean
 }
 
 object MutableSettings {

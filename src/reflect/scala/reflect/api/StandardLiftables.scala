@@ -2,54 +2,59 @@ package scala.reflect
 package api
 
 trait StandardLiftables { self: Universe =>
-  import build.{SyntacticTuple, ScalaDot}
+  import internal._
+  import reificationSupport.{SyntacticTuple, ScalaDot}
 
   trait StandardLiftableInstances {
     private def lift[T: Liftable](value: T): Tree            = implicitly[Liftable[T]].apply(value)
     private def selectScala(names: Name*)                    = names.tail.foldLeft(ScalaDot(names.head)) { Select(_, _) }
     private def callScala(names: Name*)(args: List[Tree])    = Apply(selectScala(names: _*), args)
-    private def callCollection(name: Name)(args: List[Tree]) = callScala(nme.collection, nme.immutable, name)(args)
+    private def callCollection(name: Name)(args: List[Tree]) = callScala(stdnme.collection, stdnme.immutable, name)(args)
     private def liftAsLiteral[T]: Liftable[T]                = Liftable { v => Literal(Constant(v)) }
 
-    implicit def liftByte[T <: Byte]: Liftable[T]     = liftAsLiteral[T]
-    implicit def liftShort[T <: Short]: Liftable[T]   = liftAsLiteral[T]
-    implicit def liftChar[T <: Char]: Liftable[T]     = liftAsLiteral[T]
-    implicit def liftInt[T <: Int]: Liftable[T]       = liftAsLiteral[T]
-    implicit def liftLong[T <: Long]: Liftable[T]     = liftAsLiteral[T]
-    implicit def liftFloat[T <: Float]: Liftable[T]   = liftAsLiteral[T]
-    implicit def liftDouble[T <: Double]: Liftable[T] = liftAsLiteral[T]
-    implicit def liftBoolean: Liftable[Boolean]       = liftAsLiteral[Boolean]
-    implicit def liftUnit: Liftable[Unit]             = liftAsLiteral[Unit]
-    implicit def liftString: Liftable[String]         = liftAsLiteral[String]
+    implicit def liftByte[T <: Byte]: Liftable[T]       = liftAsLiteral[T]
+    implicit def liftShort[T <: Short]: Liftable[T]     = liftAsLiteral[T]
+    implicit def liftChar[T <: Char]: Liftable[T]       = liftAsLiteral[T]
+    implicit def liftInt[T <: Int]: Liftable[T]         = liftAsLiteral[T]
+    implicit def liftLong[T <: Long]: Liftable[T]       = liftAsLiteral[T]
+    implicit def liftFloat[T <: Float]: Liftable[T]     = liftAsLiteral[T]
+    implicit def liftDouble[T <: Double]: Liftable[T]   = liftAsLiteral[T]
+    implicit def liftBoolean[T <: Boolean]: Liftable[T] = liftAsLiteral[T]
+    implicit def liftUnit: Liftable[Unit]               = liftAsLiteral[Unit]
+    implicit def liftString[T <: String]: Liftable[T]   = liftAsLiteral[T]
 
     implicit def liftScalaSymbol: Liftable[scala.Symbol] = Liftable { v =>
-      callScala(nme.Symbol)(Literal(Constant(v.name)) :: Nil)
+      callScala(stdnme.Symbol)(Literal(Constant(v.name)) :: Nil)
     }
 
+    implicit def liftTree[T <: Tree]: Liftable[T]              = Liftable { identity }
     implicit def liftName[T <: Name]: Liftable[T]              = Liftable { name => Ident(name) }
     implicit def liftExpr[T <: Expr[_]]: Liftable[T]           = Liftable { expr => expr.tree }
     implicit def liftType[T <: Type]: Liftable[T]              = Liftable { tpe => TypeTree(tpe) }
     implicit def liftTypeTag[T <: WeakTypeTag[_]]: Liftable[T] = Liftable { ttag => TypeTree(ttag.tpe) }
     implicit def liftConstant[T <: Constant]: Liftable[T]      = Liftable { const => Literal(const) }
 
-    implicit def liftArray[T: Liftable]: Liftable[Array[T]]             = Liftable { arr => callScala(nme.Array)(arr.map(lift(_)).toList) }
-    implicit def liftVector[T: Liftable]: Liftable[Vector[T]]           = Liftable { vect => callCollection(nme.Vector)(vect.map(lift(_)).toList) }
-    implicit def liftList[T: Liftable]: Liftable[List[T]]               = Liftable { lst => callCollection(nme.List)(lst.map(lift(_))) }
-    implicit def liftMap[K: Liftable, V: Liftable]: Liftable[Map[K, V]] = Liftable { m => callCollection(nme.Map)(m.toList.map(lift(_))) }
-    implicit def liftSet[T: Liftable]: Liftable[Set[T]]                 = Liftable { s => callCollection(nme.Set)(s.toList.map(lift(_))) }
+    implicit def liftArray[T: Liftable]: Liftable[Array[T]]             = Liftable { arr => callScala(stdnme.Array)(arr.map(lift(_)).toList) }
+    implicit def liftVector[T: Liftable]: Liftable[Vector[T]]           = Liftable { vect => callCollection(stdnme.Vector)(vect.map(lift(_)).toList) }
+    implicit def liftList[T: Liftable]: Liftable[List[T]]               = Liftable { lst => callCollection(stdnme.List)(lst.map(lift(_))) }
+    implicit def liftNil: Liftable[Nil.type]                            = Liftable { _ => selectScala(stdnme.collection, stdnme.immutable, stdnme.Nil) }
+    implicit def liftMap[K: Liftable, V: Liftable]: Liftable[Map[K, V]] = Liftable { m => callCollection(stdnme.Map)(m.toList.map(lift(_))) }
+    implicit def liftSet[T: Liftable]: Liftable[Set[T]]                 = Liftable { s => callCollection(stdnme.Set)(s.toList.map(lift(_))) }
 
+    implicit def liftSome[T: Liftable]: Liftable[Some[T]]     = Liftable { case Some(v) => callScala(stdnme.Some)(lift(v) :: Nil) }
+    implicit def liftNone: Liftable[None.type]                = Liftable { _ => selectScala(stdnme.None) }
     implicit def liftOption[T: Liftable]: Liftable[Option[T]] = Liftable {
-      case Some(v) => callScala(nme.Some)(lift(v) :: Nil)
-      case None    => selectScala(nme.None)
-    }
-    implicit def liftEither[L: Liftable, R: Liftable]: Liftable[Either[L, R]] = Liftable {
-      case Left(l)  => callScala(nme.util, nme.Left)(lift(l) :: Nil)
-      case Right(r) => callScala(nme.util, nme.Right)(lift(r) :: Nil)
+      case some: Some[T]   => lift(some)
+      case none: None.type => lift(none)
     }
 
-    implicit def liftTuple1[T1](implicit liftT1: Liftable[T1]): Liftable[Tuple1[T1]] = Liftable { t =>
-      SyntacticTuple(liftT1(t._1) :: Nil)
+    implicit def liftLeft[L: Liftable, R]: Liftable[Left[L, R]]               = Liftable { case Left(v)  => callScala(stdnme.util, stdnme.Left)(lift(v) :: Nil) }
+    implicit def liftRight[L, R: Liftable]: Liftable[Right[L, R]]             = Liftable { case Right(v) => callScala(stdnme.util, stdnme.Right)(lift(v) :: Nil) }
+    implicit def liftEither[L: Liftable, R: Liftable]: Liftable[Either[L, R]] = Liftable {
+      case left: Left[L, R]   => lift(left)
+      case right: Right[L, R] => lift(right)
     }
+
     implicit def liftTuple2[T1, T2](implicit liftT1: Liftable[T1], liftT2: Liftable[T2]): Liftable[Tuple2[T1, T2]] = Liftable { t =>
       SyntacticTuple(liftT1(t._1) :: liftT2(t._2) :: Nil)
     }
@@ -134,16 +139,13 @@ trait StandardLiftables { self: Universe =>
     implicit def unliftString: Unliftable[String]   = Unliftable { case Literal(Constant(s: String)) => s }
 
     implicit def unliftScalaSymbol: Unliftable[scala.Symbol] = Unliftable {
-      case Apply(ScalaDot(symbol), List(Literal(Constant(name: String)))) if symbol == nme.Symbol => scala.Symbol(name)
+      case Apply(ScalaDot(stdnme.Symbol), List(Literal(Constant(name: String)))) => scala.Symbol(name)
     }
 
-    implicit def unliftName[T <: Name : ClassTag]: Unliftable[T] = Unliftable[T] { case Ident(name: T) => name; case Bind(name: T, Ident(nme.WILDCARD)) => name}
+    implicit def unliftName[T <: Name : ClassTag]: Unliftable[T] = Unliftable[T] { case Ident(name: T) => name; case Bind(name: T, Ident(stdnme.WILDCARD)) => name }
     implicit def unliftType: Unliftable[Type]                    = Unliftable[Type] { case tt: TypeTree if tt.tpe != null => tt.tpe }
     implicit def unliftConstant: Unliftable[Constant]            = Unliftable[Constant] { case Literal(const) => const }
 
-    implicit def unliftTuple1[T1](implicit UnliftT1: Unliftable[T1]): Unliftable[Tuple1[T1]] = Unliftable {
-      case SyntacticTuple(UnliftT1(v1) :: Nil) => Tuple1(v1)
-    }
     implicit def unliftTuple2[T1, T2](implicit UnliftT1: Unliftable[T1], UnliftT2: Unliftable[T2]): Unliftable[Tuple2[T1, T2]] = Unliftable {
       case SyntacticTuple(UnliftT1(v1) :: UnliftT2(v2) :: Nil) => Tuple2(v1, v2)
     }
@@ -210,9 +212,10 @@ trait StandardLiftables { self: Universe =>
   }
 
   // names used internally by implementations of standard liftables and unliftables
-  import scala.language.implicitConversions
-  private implicit def cachedNames(nme: self.nme.type): CachedNames.type = CachedNames
-  private object CachedNames {
+  // can't be `private object nme` because of https://groups.google.com/forum/#!topic/scala-internals/b-Full9WZeE
+  // can't be `private[this] object nme` because then STARR has problems prioritizing this.nme over self.nme
+  // therefore I'm essentially forced to give this object a non-standard name
+  private object stdnme {
     val Array      = TermName("Array")
     val collection = TermName("collection")
     val immutable  = TermName("immutable")
@@ -220,11 +223,13 @@ trait StandardLiftables { self: Universe =>
     val List       = TermName("List")
     val Map        = TermName("Map")
     val None       = TermName("None")
+    val Nil        = TermName("Nil")
     val Right      = TermName("Right")
     val Set        = TermName("Set")
     val Some       = TermName("Some")
     val Symbol     = TermName("Symbol")
-    val Vector     = TermName("Vector")
     val util       = TermName("util")
+    val Vector     = TermName("Vector")
+    val WILDCARD   = self.nme.WILDCARD
   }
 }

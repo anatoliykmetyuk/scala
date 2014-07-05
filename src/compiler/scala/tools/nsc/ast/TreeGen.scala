@@ -37,7 +37,7 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
       NoSymbol
         newImport NoPosition
           setFlag SYNTHETIC
-          setInfo analyzer.ImportType(qual)
+          setInfo ImportType(qual)
     )
     val importTree = (
       Import(qual, selector)
@@ -142,7 +142,7 @@ abstract class TreeGen extends scala.reflect.internal.TreeGen with TreeDSL {
    *    x.asInstanceOf[`pt`]()   if after uncurry but before erasure
    *    x.$asInstanceOf[`pt`]()  if at or after erasure
    */
-  def mkCast(tree: Tree, pt: Type): Tree = {
+  override def mkCast(tree: Tree, pt: Type): Tree = {
     debuglog("casting " + tree + ":" + tree.tpe + " to " + pt + " at phase: " + phase)
     assert(!tree.tpe.isInstanceOf[MethodType], tree)
     assert(pt eq pt.normalize, tree +" : "+ debugString(pt) +" ~>"+ debugString(pt.normalize))

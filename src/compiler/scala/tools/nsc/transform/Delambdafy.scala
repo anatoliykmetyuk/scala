@@ -130,9 +130,9 @@ abstract class Delambdafy extends Transform with TypingTransformers with ast.Tre
         if (!thisProxy.exists) {
           target setFlag STATIC
         }
-        val params = ((optionSymbol(thisProxy) map {proxy:Symbol => ValDef(proxy)}) ++ (target.paramss.flatten map ValDef)).toList
+        val params = ((optionSymbol(thisProxy) map {proxy:Symbol => ValDef(proxy)}) ++ (target.paramss.flatten map ValDef.apply)).toList
 
-        val methSym = oldClass.newMethod(unit.freshTermName(nme.accessor.toString()), target.pos, FINAL | BRIDGE | SYNTHETIC | PROTECTED | STATIC)
+        val methSym = oldClass.newMethod(unit.freshTermName(nme.accessor.toString() + "$"), target.pos, FINAL | BRIDGE | SYNTHETIC | PROTECTED | STATIC)
 
         val paramSyms = params map {param => methSym.newSyntheticValueParam(param.symbol.tpe, param.name) }
 
@@ -232,9 +232,13 @@ abstract class Delambdafy extends Transform with TypingTransformers with ast.Tre
         val parents = addSerializable(abstractFunctionErasedType)
         val funOwner = originalFunction.symbol.owner
 
+        // TODO harmonize the naming of delamdafy anon-fun classes with those spun up by Uncurry
+        //      - make `anonClass.isAnonymousClass` true.
+        //      - use `newAnonymousClassSymbol` or push the required variations into a similar factory method
+        //      - reinstate the assertion in `Erasure.resolveAnonymousBridgeClash`
         val suffix = "$lambda$" + (
           if (funOwner.isPrimaryConstructor) ""
-          else "$" + funOwner.name
+          else "$" + funOwner.name + "$"
         )
         val name = unit.freshTypeName(s"${oldClass.name.decode}$suffix")
 
@@ -282,18 +286,11 @@ abstract class Delambdafy extends Transform with TypingTransformers with ast.Tre
         if (sym == NoSymbol) sym.toString
         else s"$sym: ${sym.tpe} in ${sym.owner}"
 
-      def clashError(bm: Symbol) = {
-        unit.error(
-          applyMethodDef.symbol.pos,
-            sm"""bridge generated for member ${fulldef(applyMethodDef.symbol)}
-                |which overrides ${fulldef(getMember(abstractFunctionErasedType.typeSymbol, nme.apply))}
-                |clashes with definition of the member itself;
-                |both have erased type ${exitingPostErasure(bm.tpe)}""")
-        }
-
         bridgeMethod foreach (bm =>
+          // TODO SI-6260 maybe just create the apply method with the signature (Object => Object) in all cases
+          //      rather than the method+bridge pair.
           if (bm.symbol.tpe =:= applyMethodDef.symbol.tpe)
-            clashError(bm.symbol)
+            erasure.resolveAnonymousBridgeClash(applyMethodDef.symbol, bm.symbol)
         )
 
         val body = members ++ List(constr, applyMethodDef) ++ bridgeMethod
@@ -396,7 +393,7 @@ abstract class Delambdafy extends Transform with TypingTransformers with ast.Tre
           declared += tree.symbol
         case Ident(_) =>
           val sym = tree.symbol
-          if ((sym != NoSymbol) && sym.isLocal && sym.isTerm && !sym.isMethod && !declared.contains(sym)) freeVars += sym
+          if ((sym != NoSymbol) && sym.isLocalToBlock && sym.isTerm && !sym.isMethod && !declared.contains(sym)) freeVars += sym
         case _ =>
       }
       super.traverse(tree)

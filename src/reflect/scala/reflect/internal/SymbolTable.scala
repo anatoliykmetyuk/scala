@@ -11,6 +11,7 @@ import scala.annotation.elidable
 import scala.collection.{ mutable, immutable }
 import util._
 import java.util.concurrent.TimeUnit
+import scala.reflect.internal.{TreeGen => InternalTreeGen}
 
 abstract class SymbolTable extends macros.Universe
                               with Collections
@@ -40,16 +41,17 @@ abstract class SymbolTable extends macros.Universe
                               with CapturedVariables
                               with StdAttachments
                               with StdCreators
-                              with BuildUtils
+                              with ReificationSupport
                               with PrivateWithin
                               with pickling.Translations
                               with FreshNames
+                              with Internals
 {
 
-  val gen = new TreeGen { val global: SymbolTable.this.type = SymbolTable.this }
-  lazy val treeBuild = gen
+  val gen = new InternalTreeGen { val global: SymbolTable.this.type = SymbolTable.this }
 
   def log(msg: => AnyRef): Unit
+  def deprecationWarning(pos: Position, msg: String): Unit = warning(msg)
   def warning(msg: String): Unit     = Console.err.println(msg)
   def inform(msg: String): Unit      = Console.err.println(msg)
   def globalError(msg: String): Unit = abort(msg)
@@ -64,9 +66,6 @@ abstract class SymbolTable extends macros.Universe
   def shouldLogAtThisPhase = false
   def isPastTyper = false
   protected def isDeveloper: Boolean = settings.debug
-
-  @deprecated("Give us a reason", "2.10.0")
-  def abort(): Nothing = abort("unknown error")
 
   @deprecated("Use devWarning if this is really a warning; otherwise use log", "2.11.0")
   def debugwarn(msg: => String): Unit = devWarning(msg)
@@ -244,6 +243,18 @@ abstract class SymbolTable extends macros.Universe
     finally popPhase(saved)
   }
 
+  final def findPhaseWithName(phaseName: String): Phase = {
+    var ph = phase
+    while (ph != NoPhase && ph.name != phaseName) {
+      ph = ph.prev
+    }
+    if (ph eq NoPhase) phase else ph
+  }
+  final def enteringPhaseWithName[T](phaseName: String)(body: => T): T = {
+    val phase = findPhaseWithName(phaseName)
+    enteringPhase(phase)(body)
+  }
+
   def slowButSafeEnteringPhase[T](ph: Phase)(op: => T): T = {
     if (isCompilerUniverse) enteringPhase(ph)(op)
     else op
@@ -344,29 +355,33 @@ abstract class SymbolTable extends macros.Universe
 
     // Weak references so the garbage collector will take care of
     // letting us know when a cache is really out of commission.
-    private val caches = WeakHashSet[Clearable]()
+    import java.lang.ref.WeakReference
+    private var caches = List[WeakReference[Clearable]]()
 
     def recordCache[T <: Clearable](cache: T): T = {
-      caches += cache
+      caches ::= new WeakReference(cache)
       cache
     }
 
     def clearAll() = {
       debuglog("Clearing " + caches.size + " caches.")
-      caches foreach (_.clear)
+      caches foreach (ref => Option(ref.get).foreach(_.clear))
+      caches = caches.filterNot(_.get == null)
     }
 
     def newWeakMap[K, V]()        = recordCache(mutable.WeakHashMap[K, V]())
     def newMap[K, V]()            = recordCache(mutable.HashMap[K, V]())
     def newSet[K]()               = recordCache(mutable.HashSet[K]())
     def newWeakSet[K <: AnyRef]() = recordCache(new WeakHashSet[K]())
+
+    def newAnyRefMap[K <: AnyRef, V]() = recordCache(mutable.AnyRefMap[K, V]())
     def newGeneric[T](f: => T): () => T = {
       val NoCached: T = null.asInstanceOf[T]
       var cached: T = NoCached
       var cachedRunId = NoRunId
-      caches += new Clearable {
+      recordCache(new Clearable {
         def clear(): Unit = cached = NoCached
-      }
+      })
       () => {
         if (currentRunId != cachedRunId || cached == NoCached) {
           cached = f
@@ -391,10 +406,9 @@ abstract class SymbolTable extends macros.Universe
    */
   def isCompilerUniverse = false
 
-  @deprecated("Use enteringPhase", "2.10.0")
+  @deprecated("Use enteringPhase", "2.10.0") // Used in SBT 0.12.4
   @inline final def atPhase[T](ph: Phase)(op: => T): T = enteringPhase(ph)(op)
-  @deprecated("Use enteringPhaseNotLaterThan", "2.10.0")
-  @inline final def atPhaseNotLaterThan[T](target: Phase)(op: => T): T = enteringPhaseNotLaterThan(target)(op)
+
 
   /**
    * Adds the `sm` String interpolator to a [[scala.StringContext]].

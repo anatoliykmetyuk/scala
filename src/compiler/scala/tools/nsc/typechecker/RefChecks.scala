@@ -136,7 +136,12 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           case MethodType(params, restpe) => (params exists (_.hasDefault)) || hasDefaultParam(restpe)
           case _                          => false
         }
-        val haveDefaults = methods filter (sym => hasDefaultParam(sym.info) && !nme.isProtectedAccessorName(sym.name))
+        val haveDefaults = methods filter (
+          if (settings.isScala211)
+             (sym => mexists(sym.info.paramss)(_.hasDefault) && !nme.isProtectedAccessorName(sym.name))
+          else
+            (sym => hasDefaultParam(sym.info) && !nme.isProtectedAccessorName(sym.name))
+        )
 
         if (haveDefaults.lengthCompare(1) > 0) {
           val owners = haveDefaults map (_.owner)
@@ -471,6 +476,11 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         //  overrideError("may not override parameterized type");
         // @M: substSym
         def checkOverrideAlias() {
+          // Important: first check the pair has the same kind, since the substitution
+          // carries high's type parameter's bounds over to low, so that
+          // type equality doesn't consider potentially different bounds on low/high's type params.
+          // In b781e25afe this went from using memberInfo to memberType (now lowType/highType), tested by neg/override.scala.
+          // TODO: was that the right fix? it seems type alias's RHS should be checked by looking at the symbol's info
           if (pair.sameKind && lowType.substSym(low.typeParams, high.typeParams) =:= highType) ()
           else overrideTypeError() // (1.6)
         }
@@ -857,7 +867,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         val baseClass = clazz.info.baseTypeSeq(i).typeSymbol
         seenTypes(i) match {
           case Nil =>
-            println("??? base "+baseClass+" not found in basetypes of "+clazz)
+            devWarning(s"base $baseClass not found in basetypes of $clazz. This might indicate incorrect caching of TypeRef#parents.")
           case _ :: Nil =>
             ;// OK
           case tp1 :: tp2 :: _ =>
@@ -907,7 +917,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
       var index = -1
       for (stat <- stats) {
         index = index + 1
-        def enterSym(sym: Symbol) = if (sym.isLocal) {
+        def enterSym(sym: Symbol) = if (sym.isLocalToBlock) {
           currentLevel.scope.enter(sym)
           symIndex(sym) = index
         }
@@ -924,7 +934,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
     }
 
     private def enterReference(pos: Position, sym: Symbol) {
-      if (sym.isLocal) {
+      if (sym.isLocalToBlock) {
         val e = currentLevel.scope.lookupEntry(sym.name)
         if ((e ne null) && sym == e.sym) {
           var l = currentLevel
@@ -1229,7 +1239,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         if (tree1.symbol.isLazy) tree1 :: Nil
         else {
           val lazySym = tree.symbol.lazyAccessorOrSelf
-          if (lazySym.isLocal && index <= currentLevel.maxindex) {
+          if (lazySym.isLocalToBlock && index <= currentLevel.maxindex) {
             debuglog("refsym = " + currentLevel.refsym)
             unit.error(currentLevel.refpos, "forward reference extends over definition of " + lazySym)
           }
@@ -1418,7 +1428,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
       case TypeRef(pre, sym, args) =>
         tree match {
           case tt: TypeTree if tt.original == null => // SI-7783 don't warn about inferred types
-                                                      // FIXME: reconcile this check with one in resetAllAttrs
+                                                      // FIXME: reconcile this check with one in resetAttrs
           case _ => checkUndesiredProperties(sym, tree.pos)
         }
         if(sym.isJavaDefined)
@@ -1431,7 +1441,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
     private def checkTypeRefBounds(tp: Type, tree: Tree) = {
       var skipBounds = false
       tp match {
-        case AnnotatedType(ann :: Nil, underlying, selfSym) if ann.symbol == UncheckedBoundsClass =>
+        case AnnotatedType(ann :: Nil, underlying) if ann.symbol == UncheckedBoundsClass =>
           skipBounds = true
           underlying
         case TypeRef(pre, sym, args) =>
@@ -1474,7 +1484,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           }
 
           doTypeTraversal(tree) {
-            case tp @ AnnotatedType(annots, _, _)  =>
+            case tp @ AnnotatedType(annots, _)  =>
               applyChecks(annots)
             case tp =>
           }
@@ -1548,7 +1558,7 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
 
       if (!sym.exists)
         devWarning("Select node has NoSymbol! " + tree + " / " + tree.tpe)
-      else if (sym.hasLocalFlag)
+      else if (sym.isLocalToThis)
         varianceValidator.checkForEscape(sym, currentClass)
 
       def checkSuper(mix: Name) =
@@ -1599,6 +1609,10 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
           unit.error(clazz.pos, "`abstract' modifier cannot be used with value classes")
       }
     }
+
+    private def checkUnexpandedMacro(t: Tree) =
+      if (!t.isDef && t.hasSymbolField && t.symbol.isTermMacro)
+        unit.error(t.pos, "macro has not been expanded")
 
     override def transform(tree: Tree): Tree = {
       val savedLocalTyper = localTyper
@@ -1753,12 +1767,15 @@ abstract class RefChecks extends InfoTransform with scala.reflect.internal.trans
         result match {
           case ClassDef(_, _, _, _)
              | TypeDef(_, _, _, _) =>
-            if (result.symbol.isLocal || result.symbol.isTopLevel)
+            if (result.symbol.isLocalToBlock || result.symbol.isTopLevel)
               varianceValidator.traverse(result)
           case tt @ TypeTree() if tt.original != null =>
             varianceValidator.traverse(tt.original) // See SI-7872
           case _ =>
         }
+
+        checkUnexpandedMacro(result)
+
         result
       } catch {
         case ex: TypeError =>
