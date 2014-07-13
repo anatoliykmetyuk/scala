@@ -312,19 +312,37 @@ trait Trees extends api.Trees {
   }
 
   case class ValDef(mods: Modifiers, name: TermName, tpt: Tree, rhs: Tree) extends ValOrDefDef with ValDefApi
-  object ValDef extends ValDefExtractor
+  object ValDef extends ValDefExtractor {
+    def apply(sym: Symbol): ValDef            = newValDef(sym, EmptyTree)()
+    def apply(sym: Symbol, rhs: Tree): ValDef = newValDef(sym, rhs)()
+  }
 
   case class DefDef(mods: Modifiers, name: TermName, tparams: List[TypeDef],
                     vparamss: List[List[ValDef]], tpt: Tree, rhs: Tree) extends ValOrDefDef with DefDefApi
-  object DefDef extends DefDefExtractor
+  object DefDef extends DefDefExtractor {
+    def apply(sym: Symbol, rhs: Tree): DefDef                                                = newDefDef(sym, rhs)()
+    def apply(sym: Symbol, vparamss: List[List[ValDef]], rhs: Tree): DefDef                  = newDefDef(sym, rhs)(vparamss = vparamss)
+    def apply(sym: Symbol, mods: Modifiers, rhs: Tree): DefDef                               = newDefDef(sym, rhs)(mods = mods)
+    def apply(sym: Symbol, mods: Modifiers, vparamss: List[List[ValDef]], rhs: Tree): DefDef = newDefDef(sym, rhs)(mods = mods, vparamss = vparamss)
+    def apply(sym: Symbol, rhs: List[List[Symbol]] => Tree): DefDef                          = newDefDef(sym, rhs(sym.info.paramss))()
+  }
 
   case class TypeDef(mods: Modifiers, name: TypeName, tparams: List[TypeDef], rhs: Tree)
        extends MemberDef with TypeDefApi
-  object TypeDef extends TypeDefExtractor
+  object TypeDef extends TypeDefExtractor {
+    /** A TypeDef node which defines abstract type or type parameter for given `sym` */
+    def apply(sym: Symbol): TypeDef            = newTypeDef(sym, TypeBoundsTree(sym))()
+    def apply(sym: Symbol, rhs: Tree): TypeDef = newTypeDef(sym, rhs)()
+  }
 
   case class LabelDef(name: TermName, params: List[Ident], rhs: Tree)
        extends DefTree with TermTree with LabelDefApi
-  object LabelDef extends LabelDefExtractor
+  object LabelDef extends LabelDefExtractor {
+    def apply(sym: Symbol, params: List[Symbol], rhs: Tree): LabelDef =
+      atPos(sym.pos) {
+        LabelDef(sym.name.toTermName, params map Ident, rhs) setSymbol sym
+      }
+  }
 
   case class ImportSelector(name: Name, namePos: Int, rename: Name, renamePos: Int) extends ImportSelectorApi
   object ImportSelector extends ImportSelectorExtractor {
@@ -1044,25 +1062,6 @@ trait Trees extends api.Trees {
     atPos(sym.pos)(TypeDef(mods, name, tparams, rhs)) setSymbol sym
   )
 
-/* Remove if everything is OK.
-  def DefDef(sym: Symbol, rhs: Tree): DefDef                                                = newDefDef(sym, rhs)()
-  def DefDef(sym: Symbol, vparamss: List[List[ValDef]], rhs: Tree): DefDef                  = newDefDef(sym, rhs)(vparamss = vparamss)
-  def DefDef(sym: Symbol, mods: Modifiers, rhs: Tree): DefDef                               = newDefDef(sym, rhs)(mods = mods)
-  def DefDef(sym: Symbol, mods: Modifiers, vparamss: List[List[ValDef]], rhs: Tree): DefDef = newDefDef(sym, rhs)(mods = mods, vparamss = vparamss)
-  def DefDef(sym: Symbol, rhs: List[List[Symbol]] => Tree): DefDef                          = newDefDef(sym, rhs(sym.info.paramss))()
-
-  def ValDef(sym: Symbol): ValDef            = newValDef(sym, EmptyTree)()
-  def ValDef(sym: Symbol, rhs: Tree): ValDef = newValDef(sym, rhs)()
-
-  /** A TypeDef node which defines abstract type or type parameter for given `sym` */
-  def TypeDef(sym: Symbol): TypeDef            = newTypeDef(sym, TypeBoundsTree(sym))()
-  def TypeDef(sym: Symbol, rhs: Tree): TypeDef = newTypeDef(sym, rhs)()
-
-  def LabelDef(sym: Symbol, params: List[Symbol], rhs: Tree): LabelDef =
-    atPos(sym.pos) {
-      LabelDef(sym.name.toTermName, params map Ident, rhs) setSymbol sym
-    }
-*/
 
   /** casedef shorthand */
   def CaseDef( pat: Tree  , body:   Tree        ): CaseDef = CaseDef(pat, EmptyTree, body)

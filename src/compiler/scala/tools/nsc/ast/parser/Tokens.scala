@@ -60,43 +60,44 @@ object Tokens extends CommonTokens {
   final val IGNORE = 202
   final val ESCAPE = 203
   
-  final val SCRIPT                   = 130
-  final val IF_QMARK                 = 131
-  final val DOT2                     = 132
-  final val DOT3                     = 133
-  final val LESS2                    = 134
-  final val GREATER2                 = 135
-  final val ARROW2                   = 136
-  final val CURLYARROW2              = 137
-  final val CURLYBROKENARROW2        = 138
+  /** SubScript */
+  final val SCRIPT                   = 330
+  final val IF_QMARK                 = 331
+  final val DOT2                     = 332
+  final val DOT3                     = 333
+  final val LESS2                    = 334
+  final val GREATER2                 = 335
+  final val ARROW2                   = 336
+  final val CURLYARROW2              = 337
+  final val CURLYBROKENARROW2        = 338
   
-  final val LBRACE_DOT               = 140
-  final val LBRACE_DOT3              = 141
-  final val LBRACE_QMARK             = 142
-  final val LBRACE_EMARK             = 143
-  final val LBRACE_ASTERISK          = 144
-  final val LBRACE_CARET             = 145
+  final val LBRACE_DOT               = 340
+  final val LBRACE_DOT3              = 341
+  final val LBRACE_QMARK             = 342
+  final val LBRACE_EMARK             = 343
+  final val LBRACE_ASTERISK          = 344
+  final val LBRACE_CARET             = 345
                                      
-  final val RBRACE_DOT               = 151
-  final val RBRACE_DOT3              = 152
-  final val RBRACE_QMARK             = 153
-  final val RBRACE_EMARK             = 154
-  final val RBRACE_ASTERISK          = 155
-  final val RBRACE_CARET             = 156
+  final val RBRACE_DOT               = 351
+  final val RBRACE_DOT3              = 352
+  final val RBRACE_QMARK             = 353
+  final val RBRACE_EMARK             = 354
+  final val RBRACE_ASTERISK          = 355
+  final val RBRACE_CARET             = 356
                                      
-  final val LPAREN_PLUS_RPAREN       = 160
-  final val LPAREN_MINUS_RPAREN      = 161
-  final val LPAREN_PLUS_MINUS_RPAREN = 162
-  final val LPAREN_SEMI_RPAREN       = 163
+  final val LPAREN_PLUS_RPAREN       = 360
+  final val LPAREN_MINUS_RPAREN      = 361
+  final val LPAREN_PLUS_MINUS_RPAREN = 362
+  final val LPAREN_SEMI_RPAREN       = 363
 
-  final val LPAREN_ASTERISK          = 164
-  final val LPAREN_ASTERISK2         = 165
-  final val RPAREN_ASTERISK          = 166
-  final val RPAREN_ASTERISK2         = 167
+  final val LPAREN_ASTERISK          = 364
+  final val LPAREN_ASTERISK2         = 365
+  final val RPAREN_ASTERISK          = 366
+  final val RPAREN_ASTERISK2         = 367
 
-  final val DO_THEN                  = 170 // only for generating code
-  final val DO_ELSE                  = 171 // only for generating code
-  final val DO_THEN_ELSE             = 172 // only for generating code
+  final val DO_THEN                  = 370 // only for generating code
+  final val DO_ELSE                  = 371 // only for generating code
+  final val DO_THEN_ELSE             = 372 // only for generating code
   
   final val scriptBracePairs = Map (
     LBRACE          -> RBRACE         ,
