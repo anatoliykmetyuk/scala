@@ -1127,110 +1127,48 @@ trait Trees extends api.Trees {
                                                              traverseTypeAscription(tpt) ; traverse(rhs)
       }
     }
+    
+    // TODO proper identation in the match. After the merge with 2.11.1, the identation went wrong.
     def traverseComponents(): Unit = tree match {
-      case LabelDef(name, params, rhs) =>
-        traverseName(name)
-        traverseParams(params)
-        traverse(rhs)
-      case Import(expr, selectors) =>
-        traverse(expr)
-        selectors foreach traverseImportSelector
-      case Annotated(annot, arg) =>
-        traverse(annot)
-        traverse(arg)
-      case Template(parents, self, body) =>
-        traverseParents(parents)
-        traverseSelfType(self)
-        traverseStats(body, tree.symbol)
-      case Block(stats, expr) =>
-        traverseTrees(stats)
-        traverse(expr)
-      case CaseDef(pat, guard, body) =>
-        traversePattern(pat)
-        traverseGuard(guard)
-        traverse(body)
-      case Alternative(trees) =>
-        traverseTrees(trees)
-      case Star(elem) =>
-        traverse(elem)
-      case Bind(name, body) =>
-        traverseName(name)
-        traverse(body)
-      case UnApply(fun, args) =>
-        traverse(fun)
-        traverseTrees(args)
-      case ArrayValue(elemtpt, trees) =>
-        traverse(elemtpt)
-        traverseTrees(trees)
-      case Assign(lhs, rhs) =>
-        traverse(lhs)
-        traverse(rhs)
-      case AssignOrNamedArg(lhs, rhs) =>
-        traverse(lhs)
-        traverse(rhs)
-      case If(cond, thenp, elsep) =>
-        traverse(cond)
-        traverse(thenp)
-        traverse(elsep)
-      case Match(selector, cases) =>
-        traverse(selector)
-        traverseCases(cases)
-      case Return(expr) =>
-        traverse(expr)
-      case Try(block, catches, finalizer) =>
-        traverse(block)
-        traverseCases(catches)
-        traverse(finalizer)
-      case Throw(expr) =>
-        traverse(expr)
-      case New(tpt) =>
-        traverse(tpt)
-      case Typed(expr, tpt) =>
-        traverse(expr)
-        traverseTypeAscription(tpt)
-      case TypeApply(fun, args) =>
-        traverse(fun)
-        traverseTypeArgs(args)
-      case Apply(fun, args) =>
-        traverse(fun)
-        traverseTrees(args)
-      case ApplyDynamic(qual, args) =>
-        traverse(qual)
-        traverseTrees(args)
-      case Super(qual, mix) =>
-        traverse(qual)
-        traverseName(mix)
-      case This(qual) =>
-        traverseName(qual)
-      case Select(qualifier, selector) =>
-        traverse(qualifier)
-        traverseName(selector)
-      case Ident(name) =>
-        traverseName(name)
-      case ReferenceToBoxed(idt) =>
-        traverse(idt)
-      case Literal(const) =>
-        traverseConstant(const)
-      case TypeTree() =>
-        ;
-      case SingletonTypeTree(ref) =>
-        traverse(ref)
-      case SelectFromTypeTree(qualifier, selector) =>
-        traverse(qualifier)
-        traverseName(selector)
-      case CompoundTypeTree(templ) =>
-        traverse(templ)
-      case AppliedTypeTree(tpt, args) =>
-        traverse(tpt)
-        traverseTypeArgs(args)
-      case TypeBoundsTree(lo, hi) =>
-        traverse(lo)
-        traverse(hi)
-      case ExistentialTypeTree(tpt, whereClauses) =>
-        traverse(tpt)
-        traverseTrees(whereClauses)
-      case _ =>
-        xtraverse(traverser, tree)
+      case LabelDef (name, params, rhs ) => traverseName(name); traverseParams(params); traverse(rhs)
+      case Import (expr, selectors ) => traverse(expr ); selectors foreach traverseImportSelector
+      case Annotated (annot, arg ) => traverse(annot); traverse(arg)
+      case Template (parents, self, body ) => traverseParents(parents); traverseSelfType(self); traverseStats(body, tree.symbol)
+      case Block (stats, expr ) => traverseTrees(stats); traverse(expr)
+      case CaseDef (pat, guard, body ) => traversePattern(pat); traverseGuard(guard); traverse(body)
+      case Alternative (trees ) => traverseTrees(trees)
+      case Star (elem ) => traverse(elem )
+      case Bind (name, body ) => traverseName(name); traverse(body)
+      case UnApply (fun, args ) => traverse(fun ); traverseTrees(args)
+      case ArrayValue (elemtpt, trees ) => traverse(elemtpt ); traverseTrees(trees)
+      case Assign (lhs, rhs ) => traverse(lhs ); traverse(rhs)
+      case AssignOrNamedArg (lhs, rhs ) => traverse(lhs ); traverse(rhs)
+      case If (cond, thenp, elsep ) => traverse(cond ); traverse(thenp); traverse(elsep)
+      case Match (selector, cases ) => traverse(selector ); traverseCases(cases)
+      case Return (expr ) => traverse(expr )
+      case Try (block, catches, finalizer) => traverse(block ); traverseCases(catches); traverse(finalizer)
+      case Throw (expr ) => traverse(expr )
+      case New (tpt ) => traverse(tpt )
+      case Typed (expr, tpt ) => traverse(expr ); traverseTypeAscription(tpt)
+      case TypeApply (fun, args ) => traverse(fun ); traverseTypeArgs(args)
+      case Apply (fun, args ) => traverse(fun ); traverseTrees(args)
+      case ScriptApply (fun, args ) => traverse(fun ); traverseTrees(args)
+      case ApplyDynamic (qual, args ) => traverse(qual ); traverseTrees(args)
+      case Super (qual, mix ) => traverse(qual ); traverseName(mix)
+      case This (qual ) => traverseName(qual)
+      case Select (qualifier, selector ) => traverse(qualifier); traverseName(selector)
+      case Ident (name ) => traverseName(name)
+      case ScriptVal (name ) => traverseName(name)
+      case ReferenceToBoxed (idt ) => traverse(idt )
+      case Literal (const ) => traverseConstant(const)
+      case TypeTree ( ) =>
+      case SingletonTypeTree (ref ) => traverse(ref )
+      case SelectFromTypeTree (qualifier, selector ) => traverse(qualifier); traverseName(selector)
+      case CompoundTypeTree (templ ) => traverse(templ )
+      case AppliedTypeTree (tpt, args ) => traverse(tpt ); traverseTypeArgs(args)
+      case TypeBoundsTree (lo, hi ) => traverse(lo ); traverse(hi)
+      case ExistentialTypeTree(tpt, whereClauses ) => traverse(tpt ); traverseTrees(whereClauses)
+      case _ => xtraverse(traverser, tree)
     }
 
     if (tree.canHaveAttrs) {

@@ -274,10 +274,21 @@ TODO:
       </artifact:dependencies>
 
       <!-- Akka -->
-      <artifact:dependencies pathId="subscript-extras.deps.classpath" filesetId="subscript-extras.fileset">
+      <artifact:dependencies pathId="akka.classpath" filesetId="akka.fileset">
         <dependency groupId="com.typesafe.akka" artifactId="akka-actor_2.11" version="${akka-actor.version.number}"/>
       </artifact:dependencies>
-      <copy-deps project="subscript-extras"/>
+
+      <!-- Akka, excluding the core -->
+      <path id="akka-nocore">
+        <restrict>
+          <path refid="akka.classpath"/>
+          <rsel:not><rsel:or>
+            <rsel:name name="scala-library*.jar"/>
+            <rsel:name name="scala-reflect*.jar"/>
+            <rsel:name name="scala-compiler*.jar"/>
+          </rsel:or></rsel:not>
+        </restrict>
+      </path>
 
       <!-- JUnit -->
       <property name="junit.version" value="4.10"/>
@@ -657,7 +668,7 @@ TODO:
     <property name="partest-javaagent.description" value="Scala Compiler Testing Tool (compiler-specific java agent)"/>
 
     <!-- projects without project-specific options: asm, forkjoin, manual, bin, repl -->
-    <for list="actors,subscript,subscript-extras,compiler,interactive,scaladoc,library,parser-combinators,partest,partest-extras,partest-javaagent,reflect,scalap,swing,xml,continuations-plugin,continuations-library" param="project">
+    <for list="actors,subscript,subscript-akka,subscript-swing,subscript-supplements,compiler,interactive,scaladoc,library,parser-combinators,partest,partest-extras,partest-javaagent,reflect,scalap,swing,xml,continuations-plugin,continuations-library" param="project">
       <sequential>
         <!-- description is mandatory -->
         <init-project-prop project="@{project}" name="package"     default=""/> <!-- used by mvn-package, copy-bundle, make-bundle -->
@@ -749,11 +760,23 @@ TODO:
       <pathelement location="${build-quick.dir}/classes/subscript"/>
     </path>
 
-    <path id="quick.subscript-extras.build.path">
+    <path id="quick.subscript-akka.build.path">
+      <pathelement location="${build-quick.dir}/classes/subscript-akka"/>
       <path refid="quick.subscript.build.path"/>
+      <path refid="akka-nocore"/>
+    </path>
+
+    <path id="quick.subscript-swing.build.path">
+      <pathelement location="${build-quick.dir}/classes/subscript-swing"/>
       <pathelement location="${swing.jar}"/>
+      <path refid="quick.subscript.build.path"/>
+    </path>
+
+    <path id="quick.subscript-supplements.build.path">
+      <path refid="quick.subscript.build.path"/>
+      <path refid="quick.subscript-swing.build.path"/>
+      <path refid="quick.subscript-akka.build.path"/>
       <path refid="test.junit.compiler.build.path"/>
-      <path refid="subscript-extras.deps.classpath"/>
     </path>
 
     <path id="quick.reflect.build.path">
@@ -866,7 +889,9 @@ TODO:
     <path id="pack.partest-javaagent.files"> <fileset dir="${build-quick.dir}/classes/partest-javaagent"/> </path>
 
     <path id="pack.subscript.files"><fileset dir="${build-quick.dir}/classes/subscript"/></path>
-    <path id="pack.subscript-extras.files"><fileset dir="${build-quick.dir}/classes/subscript-extras"/></path>
+    <path id="pack.subscript-akka.files"><fileset dir="${build-quick.dir}/classes/subscript-akka"/></path>
+    <path id="pack.subscript-swing.files"><fileset dir="${build-quick.dir}/classes/subscript-swing"/></path>
+    <path id="pack.subscript-supplements.files"><fileset dir="${build-quick.dir}/classes/subscript-supplements"/></path>
 
     <!-- STRAP -->
     <path id="strap.library.build.path">
@@ -1136,15 +1161,21 @@ TODO:
   <target name="quick.actors"     depends="quick.lib">
     <staged-build with="locker"   stage="quick" project="actors"/> </target>
 
+
   <target name="quick.subscript"  depends="quick.comp">
     <staged-build with="locker"   stage="quick" project="subscript"/> </target>
 
-  <target name="quick.subscript-extras" depends="quick.subscript">
-    <staged-build with="locker"   stage="quick" project="subscript-extras"/> </target>
+  <target name="quick.subscript-akka" depends="quick.subscript">
+    <staged-build with="locker"   stage="quick" project="subscript-akka"/> </target>
+
+  <target name="quick.subscript-swing" depends="quick.subscript">
+    <staged-build with="locker"   stage="quick" project="subscript-swing"/> </target>
+
+  <target name="quick.subscript-supplements" depends="quick.subscript, quick.subscript-swing, quick.subscript-akka">
+    <staged-build with="locker"   stage="quick" project="subscript-supplements"/> </target>
 
 
-
-  <target name="quick.modules" depends="quick.repl, quick.scaladoc, quick.interactive, quick.scalap, quick.subscript, quick.subscript-extras"/>
+  <target name="quick.modules" depends="quick.repl, quick.scaladoc, quick.interactive, quick.scalap, quick.subscript, quick.subscript-swing, quick.subscript-akka, quick.subscript-supplements"/>
 
   <target name="quick.bin" depends="quick.lib, quick.reflect, quick.comp, quick.modules">
     <staged-bin stage="quick" classpathref="quick.bin.tool.path"/>
@@ -1201,12 +1232,21 @@ TODO:
 
   <target name="pack.subscript" depends="quick.subscript"><staged-pack project="subscript"/></target>
 
-  <target name="pack.subscript-extras" depends="quick.subscript-extras"><staged-pack project="subscript-extras"/></target>
+  <target name="pack.subscript-akka" depends="quick.subscript-akka"><staged-pack project="subscript-akka"/></target>
+
+  <target name="pack.subscript-swing" depends="quick.subscript-swing"><staged-pack project="subscript-swing"/></target>
+
+  <target name="pack.subscript-supplements" depends="quick.subscript-supplements"><staged-pack project="subscript-supplements"/></target>
 
   <!-- TODO modularize compiler: pack.scaladoc, pack.interactive, -->
-  <target name="pack.modules" depends="pack.actors, pack.scalap, pack.subscript, pack.subscript-extras">
+  <!-- Note: we don't pack subscript-supplements, since it doesn't make any sence -->
+  <target name="pack.modules" depends="pack.actors, pack.scalap, pack.subscript, pack.subscript-swing, pack.subscript-akka">
     <copy todir="${build-pack.dir}/lib">
       <path refid="external-modules-nocore" />
+      <mapper type="flatten" />
+    </copy>
+    <copy todir="${build-pack.dir}/lib">
+      <path refid="akka-nocore" />
       <mapper type="flatten" />
     </copy>
   </target>
