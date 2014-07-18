@@ -1,0 +1,67 @@
+apply plugin: 'maven'
+ant.importBuild 'build.xml'
+
+// Enumeration of all the artifacts to be uploaded
+def artifactNames = [
+  // Scala
+  'scala-library',
+  'scala-compiler',
+  'scala-reflect',
+
+  // SubScript VM
+  'scala-subscript',
+  'scala-subscript-swing',
+  'scala-subscript-akka'
+]
+
+def jarsDir   = "build/pack/lib"
+def pomsDir   = "src/build/maven"
+def pomSuffix = "-pom-filtered.xml"
+
+// Artifacts definitions
+artifacts {
+  artifactNames.each {name ->
+    archives file: file("${jarsDir}/${name}.jar"), name: name
+  }
+}
+
+// Task for filtering poms. It subscritutes real values to variables.
+task filterPoms {
+  description = "Creates the required Maven metadata"
+
+  doLast {
+    artifactNames.each {name ->
+      ant."filter-pom"(path: "${pomsDir}/${name}", name: name)
+    }
+  }
+}
+
+// Override the default clean task, the new one will delegate to ant's clean target
+tasks.replace "clean"
+clean.dependsOn clean_ant
+clean.description = clean_ant.description
+
+// Upload task configuration
+uploadArchives {
+  dependsOn build, filterPoms
+
+  repositories.mavenDeployer {
+    // Local reporitory, if specified
+    if (project.hasProperty('localMavenUrl')) repository url: "file://${project.localMavenUrl}"
+
+    // Remote repository, if specified
+    if (project.hasProperty('remoteMavenUrl')) repository(url: project.remoteMavenUrl) {
+      authentication userName: project.mavenUser, password: project.mavenPassword
+    }
+
+    // Configuring the POMs
+    artifactNames.each {name ->
+      addFilter(name) {artifact, file -> artifact.name == name}
+      pom(name).withXml {provider ->
+        StringBuilder builder = provider.asString()
+        builder.length = 0
+        builder.append file("${pomsDir}/${name}${pomSuffix}").text
+      }
+    }
+  }
+}
