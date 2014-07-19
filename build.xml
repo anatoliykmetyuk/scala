@@ -125,7 +125,7 @@ TODO:
 
   <target name="nightly-nopt" depends="all.done"/>
 
-  <target name="clean"       depends="quick.clean"  description="Removes binaries of compiler and library. Locker and distributions are untouched."/>
+  <target name="clean_ant"       depends="quick.clean"  description="Removes binaries of compiler and library. Locker and distributions are untouched."/>
   <target name="docsclean"   depends="docs.clean"   description="Removes generated documentation. Distributions are untouched."/>
 
 

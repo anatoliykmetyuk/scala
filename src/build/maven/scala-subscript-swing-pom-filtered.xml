@@ -2,12 +2,12 @@
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.subscript-lang</groupId>
-  <artifactId>scala-reflect</artifactId>
+  <artifactId>subscript-swing</artifactId>
   <packaging>jar</packaging>
-  <version>@VERSION@</version>
-  <name>Scala Compiler</name>
-  <description>Compiler for the SubScript extension of the Scala Programming Language</description>
-  <url>http://www.scala-lang.org/</url>
+  <version>1.0</version>
+  <name>SubScript Swing</name>
+  <description>SubScript extensions for the Swing library</description>
+  <url>http://www.subscript-lang.org/</url>
   <inceptionYear>2012</inceptionYear>
   <organization>
     <name>LAMP/EPFL</name>
@@ -28,14 +28,16 @@
     <system>JIRA</system>
     <url>https://issues.scala-lang.org/</url>
   </issueManagement>
-  <properties>
-    <info.apiURL>http://www.scala-lang.org/api/@VERSION@/</info.apiURL>
-  </properties>
   <dependencies>
     <dependency>
       <groupId>org.subscript-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>@VERSION@</version>
+      <version>2.11.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.subscript-lang</groupId>
+      <artifactId>subscript</artifactId>
+      <version>1.0</version>
     </dependency>
   </dependencies>
   <developers>

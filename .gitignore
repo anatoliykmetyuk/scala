@@ -26,6 +26,9 @@
 /build.properties
 /buildcharacter.properties
 
+# Developer specific Gradle properties
+/gradle.properties
+
 # target directories for ant build
 /build/
 /dists/
