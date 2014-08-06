@@ -1,4 +1,7 @@
-apply plugin: 'maven'
+import org.apache.tools.ant.taskdefs.Jar
+
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
 ant.importBuild 'build.xml'
 
 // Enumeration of all the artifacts to be uploaded
@@ -13,26 +16,22 @@ def artifactNames = [
   'scala-subscript-swing',
   'scala-subscript-akka'
 ]
+def classifiers = [
+  'sources',
+  'javadoc'
+]
+def dummyReadme = 'src/build/maven/README'
 
 def jarsDir   = "build/pack/lib"
-def pomsDir   = "src/build/maven"
-def pomSuffix = "-pom-filtered.xml"
 
-// Artifacts definitions
-artifacts {
-  artifactNames.each {name ->
-    archives file: file("${jarsDir}/${name}.jar"), name: name
-  }
-}
+ext.pomsDir   = "src/build/maven"
+ext.pomSuffix = "-pom-filtered.xml"
+def pomPath(String name) {return "${pomsDir}/${name}${project.pomSuffix}"}
 
 // Task for filtering poms. It subscritutes real values to variables.
-task filterPoms {
-  description = "Creates the required Maven metadata"
-
-  doLast {
-    artifactNames.each {name ->
-      ant."filter-pom"(path: "${pomsDir}/${name}", name: name)
-    }
+task filterPoms << {
+  artifactNames.each {name ->
+    ant."filter-pom"(path: "${pomsDir}/${name}", name: name)
   }
 }
 
@@ -40,6 +39,93 @@ task filterPoms {
 tasks.replace "clean"
 clean.dependsOn clean_ant
 clean.description = clean_ant.description
+
+publish.dependsOn filterPoms
+
+publishing {
+
+  publications {
+    artifactNames.each {artifactName ->
+      create("$artifactName", MavenPublication) {
+
+        // Binaries
+        artifact file("$jarsDir/${artifactName}.jar")
+
+        // Jars, sources, others
+        classifiers.each {classifierName ->
+          def taskName = "$artifactName-$classifierName"
+
+          task "$taskName"(type: org.gradle.api.tasks.bundling.Jar) {
+            from dummyReadme
+            classifier = classifierName
+          }
+
+          artifact(tasks["$taskName"]) {
+            classifier = classifierName
+          }
+        }
+
+        def p = file pomPath(artifactName)
+
+        // POM file
+        pom.withXml { provider ->
+          StringBuilder builder = provider.asString()
+          builder.length = 0
+          builder.append p.text
+        }
+
+        // Properties. This hack is needed due to a weird way Gradle treats POM
+        // scripts, refraining to change what needs to be changed the most
+        def pomXml = new XmlParser().parse p
+
+        groupId    pomXml.groupId.text()
+        artifactId pomXml.artifactId.text()
+        version    pomXml.version.text()
+      }
+    }
+  }
+
+  repositories {
+    maven {
+      url "file://${project.localMavenUrl}"
+    }
+  }
+}
+
+/* Old way to upload things
+// Artifacts definitions
+artifacts {
+  def tmpDestination
+  def classifiers = ['sources', 'javadoc']
+
+  task "bichch"(type: org.gradle.api.tasks.bundling.Jar) {
+    archiveName = "biiichch.jar"
+    from dummyReadme
+  }
+
+  archives(bichch) {
+    type = 'javadoc'
+    classifier = 'javadoc'
+  }
+
+  artifactNames.each {name ->
+    // Main jar with the binaries
+    archives file: file("${jarsDir}/${name}.jar"), name: name
+
+
+    // Dummy jar-files with sources and javadocs
+    classifiers.each {clsf ->
+      // Defining a task
+      task "$name-$clsf"(type: org.gradle.api.tasks.bundling.Jar) {
+        classifier = clsf
+        from dummyReadme
+      }
+
+      // Populating the archives with already defined task
+      archives tasks["$name-$clsf"]
+    }
+  }
+}
 
 // Upload task configuration
 uploadArchives {
@@ -65,3 +151,4 @@ uploadArchives {
     }
   }
 }
+*/

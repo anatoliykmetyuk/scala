@@ -608,7 +608,7 @@
           -->
         </filterset>
       </copy>
-      <!-- <artifact:pom id="@{name}.pom" file="@{path}-pom-filtered.xml" /> -->
+      <artifact:pom id="@{name}.pom" file="@{path}-pom-filtered.xml" />
     </sequential>
   </macrodef>
 
@@ -622,7 +622,7 @@
 
       <echo>Deploying ${path}-[pom.xml|src.jar|docs.jar].</echo>
 
-      <filter-pom name="@{name}" path="@{path}"/>
+      <filter-pom name="@{name}" path="${path}"/>
 
       <if><equals arg1="@{signed}" arg2="false"/><then>
         <if><isset property="docs.skip"/><then>
@@ -667,7 +667,7 @@
 
       <echo>Deploying ${path}.jar with ${path}-pom.xml.</echo>
 
-      <filter-pom name="@{name}" path="@{path}"/>
+      <filter-pom name="@{name}" path="${path}"/>
 
       <if><equals arg1="@{signed}" arg2="false"/><then>
         <deploy-to local="@{local}" jar="${path}.jar" pom="@{name}.pom"/>
@@ -701,7 +701,7 @@
 
       <echo>Deploying ${path}-pom.xml.</echo>
 
-      <filter-pom name="@{name}" path="@{path}"/>
+      <filter-pom name="@{name}" path="${path}"/>
 
       <if><equals arg1="@{signed}" arg2="false"/><then>
         <deploy-to local="@{local}" pom="@{name}.pom"/>
@@ -733,6 +733,9 @@
       <deploy-one name="scala-library"     local="@{local}" signed="@{signed}"/>
       <deploy-one name="scala-reflect"     local="@{local}" signed="@{signed}"/>
       <deploy-one name="scala-compiler"    local="@{local}" signed="@{signed}"/>
+      <deploy-one name="subscript"         local="@{local}" signed="@{signed}"/>
+      <deploy-one name="subscript-swing"   local="@{local}" signed="@{signed}"/>
+      <deploy-one name="subscript-akka"    local="@{local}" signed="@{signed}"/>
 
       <!-- TODO modularize compiler.
       <deploy-one name="scala-compiler-doc"         local="@{local}" signed="@{signed}"/>
@@ -811,6 +814,18 @@
         </then>
       </if>
       <delete file="@{name}.tar"/>
+    </sequential>
+  </macrodef>
+
+  <macrodef name="maven-stage">
+    <attribute name="name" description="Name of the artifact to stage to the maven directory"/>
+    <sequential>
+      <copy tofile="${dist.maven}/@{name}/@{name}-pom.xml" file="${src.dir}/build/maven/@{name}-pom.xml" overwrite="true"/>
+      <copy tofile="${dist.maven}/@{name}/@{name}.jar" file="${@{name}.jar}" overwrite="true"/>
+      <jar destfile="${dist.maven}/@{name}/@{name}-src.jar" basedir="${src.dir}/@{name}" whenmanifestonly="fail"/>
+      <if><not><isset property="docs.skip"/></not><then>
+        <jar destfile="${dist.maven}/@{name}/@{name}-docs.jar" basedir="${build-docs.dir}/@{name}"/>
+      </then></if>
     </sequential>
   </macrodef>
 </project>
