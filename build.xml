@@ -57,7 +57,6 @@ TODO:
   - (rework the build to pack locker and build using that when using zinc)
 -->
 
-
 <!-- ===========================================================================
                                   END-USER TARGETS
 ============================================================================ -->
@@ -919,6 +918,10 @@ TODO:
     <path id="docs.interactive.build.path">           <path refid="quick.interactive.build.path"/> </path>
     <path id="docs.scalap.build.path">                <path refid="quick.scalap.build.path"/>   </path>
     <path id="docs.actors.build.path">                <path refid="quick.actors.build.path"/>   </path>
+    <path id="docs.subscript.build.path">             <path refid="quick.subscript.build.path"/>   </path>
+    <path id="docs.subscript-swing.build.path">       <path refid="quick.subscript-swing.build.path"/>   </path>
+    <path id="docs.subscript-akka.build.path">        <path refid="quick.subscript-akka.build.path"/>   </path>
+
 
     <!-- run-time classpath for scaladoc TODO: resolve through maven -->
     <path id="scaladoc.classpath">
@@ -1676,9 +1679,28 @@ TODO:
     </staged-docs>
   </target>
 
+  <target name="docs.subscript-core" depends="docs.start" unless="docs.skip">
+    <staged-docs project="subscript">
+      <include name="**/*.scala"/>
+    </staged-docs>
+  </target>
+
+  <target name="docs.subscript-swing" depends="docs.start" unless="docs.skip">
+    <staged-docs project="subscript-swing">
+      <include name="**/*.scala"/>
+    </staged-docs>
+  </target>
+
+  <target name="docs.subscript-akka" depends="docs.start" unless="docs.skip">
+    <staged-docs project="subscript-akka">
+      <include name="**/*.scala"/>
+    </staged-docs>
+  </target>
+
+  <target name="docs.subscript" depends="docs.subscript-core, docs.subscript-swing, docs.subscript-akka" />
   <target name="docs.core" depends="docs.lib, docs.reflect, docs.comp" unless="docs.skip"/>
   <!-- TODO modularize compiler:  docs.scaladoc, docs.interactive, -->
-  <target name="docs.done" depends="docs.core, docs.actors, docs.scalap" unless="docs.skip"/>
+  <target name="docs.done" depends="docs.core, docs.subscript, docs.actors, docs.scalap" unless="docs.skip"/>
 
   <!-- doc/ and man/ -->
   <target name="pack.doc" depends="scaladoc.task" unless="docs.skip"> <!-- depends on scaladoc.task for scalac taskdef -->
@@ -1756,12 +1778,17 @@ MAIN DISTRIBUTION PACKAGING
     <mvn-package project="actors"/>
 
     <!-- don't bother fitting scalap into the mould: it will move out soon -->
-    <copy tofile="${dist.maven}/scalap/scalap-pom.xml" file="${src.dir}/build/maven/scalap-pom.xml" overwrite="true"/>
+    <!-- <copy tofile="${dist.maven}/scalap/scalap-pom.xml" file="${src.dir}/build/maven/scalap-pom.xml" overwrite="true"/>
     <copy tofile="${dist.maven}/scalap/scalap.jar" file="${scalap.jar}" overwrite="true"/>
     <jar destfile="${dist.maven}/scalap/scalap-src.jar" basedir="${src.dir}/scalap" whenmanifestonly="fail"/>
     <if><not><isset property="docs.skip"/></not><then>
       <jar destfile="${dist.maven}/scalap/scalap-docs.jar" basedir="${build-docs.dir}/scalap"/>
-    </then></if>
+    </then></if> -->
+
+    <maven-stage name="scalap"/>
+    <maven-stage name="subscript"/>
+    <maven-stage name="subscript-swing"/>
+    <maven-stage name="subscript-akka"/>
 
     <copy tofile="${dist.maven}/scala-dist/scala-dist-pom.xml" file="${src.dir}/build/maven/scala-dist-pom.xml" overwrite="true"/>
     <jar whenmanifestonly="fail" destfile="${dist.maven}/scala-dist/scala-dist.jar" basedir="${build-pack.dir}">
