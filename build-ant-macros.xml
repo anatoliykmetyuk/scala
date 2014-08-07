@@ -651,7 +651,8 @@
           <arg value="-Dsources=${path}-src.jar" />
           <arg value="-Djavadoc=${path}-docs.jar" />
           <arg value="-Pgpg" />
-          <arg value="-Dgpg.useagent=true" />
+          <arg value="-Dgpg.useagent=false" />
+          <arg value="-Dgpg.passphrase=${passphrase}" />
         </artifact:mvn>
       </else></if>
     </sequential>
