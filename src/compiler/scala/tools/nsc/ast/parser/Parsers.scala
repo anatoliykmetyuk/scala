@@ -1368,6 +1368,7 @@ self =>
     val   there_Name  = newTermName("there")
     val     tmp_Name  = newTermName("$tmp")
     val    tmp1_Name  = newTermName("$tmp1")
+    val  sender_Name  = newTermName("sender")
     val MsgSCRIPT_Name: TermName = newTermName("r$")
 
     val            bind_inParam_Name  = newTermName(scala.reflect.NameTransformer.encode("~"))
@@ -2607,15 +2608,19 @@ self =>
     //
     // r$ is a method (presumably in SubScriptActor) that accepts a pf and sets it up for msg reception:
     //
-    //   def script r$(handler: PartialFunction[Any, Script[Any]]) 
-    //   = var s:Script[Any]=null
-    //     @{initForReceive(there, handler)}: {. s=handlerResult; Debug.info(s"$this.r$$") .}
-    //     if (s != null) s
+    //  def script r$(handler: PartialFunction[Any, Script[Any]])
+    //  = var s:Script[Any]=null
+    //    @{val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.eventHappened}}
+    //                          synchronized {callHandlers += handlerWithExecuteAA}
+    //      there.onDeactivate {synchronized {callHandlers -= handlerWithExecuteAA}}
+    //    }:
+    //    {. Debug.info(s"$this.r$$") .}
+    //    if s != null then s
     //
     // Note: we also do transformations for <<....>> here.
     // Probably different method required for general partial script closures...
     
-    case class ScriptMsgCase(offset: Offset, pat:Tree, guard:Tree, scriptCaseBlock: Tree, scriptCaseScript:Tree)
+    case class ScriptMsgCase(offset: Offset, pat:Tree, guard:Tree, scriptCaseBlockStatSeq: List[Tree], scriptCaseScript:Tree)
     
     def makeMessageHandler(scriptMsgCases: List[ScriptMsgCase]): Tree = {
       val offset        = scriptMsgCases.head.offset
@@ -2629,13 +2634,25 @@ self =>
       // append the script lambda to the normal case def; null if absent
       val scriptLambdaValue: Tree = if  (smct.scriptCaseScript==EmptyTree) newLiteral(null)
                                     else smct.scriptCaseScript
-                        
-      val caseBlock = makeBlock(List(smct.scriptCaseBlock, scriptLambdaValue))
+          
+      val scriptCaseBlockStatSeq_maybe_with_sender = 
+        
+        if (smct.scriptCaseScript==EmptyTree) smct.scriptCaseBlockStatSeq                              
+        else { // generate: val sender=this.sender
+           val this_sender = atPos(smct.offset) {Select(atPos(smct.offset) {This(tpnme.EMPTY)}, sender_Name)}
+           val val_Sender_assigned_this_Sender:Tree = atPos(smct.offset) {
+             
+             ValDef(NoMods, sender_Name, TypeTree(), this_sender)
+           }
+           val_Sender_assigned_this_Sender::smct.scriptCaseBlockStatSeq
+        }
+                                    
+      val caseBlock = makeBlock(scriptCaseBlockStatSeq_maybe_with_sender :+ scriptLambdaValue)
       // construct the usual case def
       atPos(smct.offset){makeCaseDef(smct.pat, smct.guard, caseBlock)}
     }
     def scriptMsgCaseClause(): ScriptMsgCase = {
-      new ScriptMsgCase(in.offset, pattern(), guard(), scriptCaseBlock(), scriptCaseScript())
+      new ScriptMsgCase(in.offset, pattern(), guard(), scriptCaseBlockStatSeq(), scriptCaseScript())
     }
     
     /** {{{
@@ -2645,7 +2662,8 @@ self =>
      */
     def scriptMsgCaseClauses(): List[ScriptMsgCase] = caseSeparated { scriptMsgCaseClause() }
 
-    def scriptCaseBlock( ): Tree = if (in.token==ARROW ) atPos(accept(ARROW ))(block()) else EmptyTree
+ // def scriptCaseBlock       ( ): Tree       = if (in.token==ARROW ) atPos(accept(ARROW ))(block()) else EmptyTree
+    def scriptCaseBlockStatSeq( ): List[Tree] = if (in.token==ARROW ) {accept(ARROW ); blockStatSeq()} else Nil
     def scriptCaseScript(): Tree = if (in.token==ARROW2) {
                                       in.start_SubScript_partialScript_caseScript; 
                                       atPos(accept(ARROW2)){
