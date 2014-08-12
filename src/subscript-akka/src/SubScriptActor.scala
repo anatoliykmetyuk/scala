@@ -48,7 +48,8 @@ trait SubScriptActor extends Actor {
 
   def script r$(handler: PartialFunction[Any, Script[Any]])
   = var s:Script[Any]=null
-    @{val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.eventHappened}}
+    @{val here = there.parent.asInstanceOf[CallGraphTreeNode] // Bug: here is not yet known; is needed to access local variable s
+      val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.eventHappened}}
                           synchronized {callHandlers += handlerWithExecuteAA}
       there.onDeactivate {synchronized {callHandlers -= handlerWithExecuteAA}}
     }:
