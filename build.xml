@@ -1243,7 +1243,7 @@ TODO:
 
   <!-- TODO modularize compiler: pack.scaladoc, pack.interactive, -->
   <!-- Note: we don't pack subscript-supplements, since it doesn't make any sence -->
-  <target name="pack.modules" depends="pack.actors, pack.scalap, pack.subscript, pack.subscript-swing, pack.subscript-akka">
+  <target name="pack.modules" depends="pack.actors, pack.scalap, pack.subscript, pack.subscript-swing, pack.subscript-akka, pack.subscript-supplements">
     <copy todir="${build-pack.dir}/lib">
       <path refid="external-modules-nocore" />
       <mapper type="flatten" />
