@@ -283,7 +283,7 @@ object Scripts {
   */
  implicit def script ..  // TBD: handle tabs in scanner so that line position becomes reasonable
    stateChange(slider: Slider)                   = event(SliderStateChangedReactor[Any,N_code_eventhandling[Any]](slider))
-   clicked(button:Button)                        = event(           ClickedReactor[Any,N_code_eventhandling[Any]](button))
+   clicked(button:AbstractButton)                = event(           ClickedReactor[Any,N_code_eventhandling[Any]](button))
 
  def script ..   // TBD: uncomment /*@gui:*/ and make it compile
   event[E <: Event] (reactor:ScriptReactor[Any,N_code_eventhandling[Any]], ?e: E) =  /*@gui:*/ @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: {. e = reactor.currentEvent.asInstanceOf[E] .}
