@@ -98,7 +98,7 @@ def script..
     setSpeed(s: Int)   = @{gui(there)}: {!setSpeedValue(s)!}
 
       speedKeyInput    = times(10) 
-                       + val c:Any=(pass_up1(here)+'0') key(chr(c)) setSpeed(char2Value(c)) // TBD: make here an implicit parameter
+                       + ( val c:Any = pass_up1(here)+'0'; key(chr(c)) setSpeed(char2Value(c))) // TBD: make here an implicit parameter
                           
                        // Note: first "("...")" pair is needed because else the ifs would be nested
    speedButtonInput = (if speed>minSpeed then speedDecButton)
@@ -110,18 +110,20 @@ def script..
    speedSliderInput = speedSlider setSpeed,speedSlider.value
 
       mouseInput    = (mouseClickInput & mouseDragInput)
-                    /  doubleClick (mouseMoveInput / doubleClick {!resetLastMousePos!})       ; ...
+                      /  doubleClick (mouseMoveInput / doubleClick {!resetLastMousePos!})
+                      ...
 
  //mouseClickInput  = mouseSingleClick (board, ?p:java.awt.Point) {! doMouseSingleClick(p) !} ... 
 //                     !@#%^&$ mouseSingleClick also reacts on double clicks!!! 
 //                     So wait 220 ms; if by then no mouseDoubleClick as arrived, do the singleClick action:
    mouseClickInput  = var p:java.awt.Point=null
-                    ; mouseSingleClick( board, ?p) 
-                      {! resetLastMousePos !}
-                      ( {*sleep_ms(220)*} break_up2 / mouseDoubleClick(board, ?p) )
+                      mouseSingleClick( board, ?p) 
+                        ...
+                      ; {! resetLastMousePos !}
+                      ; ( {*sleep_ms(220)*} break_up2 / mouseDoubleClick(board, ?p) )
+                      ; ...
+                      {! handleMouseSingleClick(p) !}
                       ...
-                    ; {! handleMouseSingleClick(p) !}
-                    ; ...
                     
    doubleClick      = var p:java.awt.Point=null mouseDoubleClick(board, ?p)
    mouse_Released   = var p:java.awt.Point=null mouseReleased(   board, ?p)
