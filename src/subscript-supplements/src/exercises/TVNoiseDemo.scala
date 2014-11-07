@@ -130,7 +130,7 @@ class TVNoiseDemoApp  extends SimpleSubscriptApplication {
   
     TBD = {*Thread.sleep(34567)*}
 
-    numKey(??i: Int)       = var c:Char='0' key(ActualConstrainedParameter(c, (v:Char)=>c=v, (v:Char)=>v.isDigit)) {!i=c-'0'!}    //key(c? if?(c.isDigit)) 
+    numKey(??i: Int)       = var c:Char='0'; key(ActualConstrainedParameter(c, (v:Char)=>c=v, (v:Char)=>v.isDigit)) {!i=c-'0'!}    //key(c? if?(c.isDigit)) 
     setSpeedValue(s: Int)  = @{gui(there)}: {!setSliderValue(s)!}
 
   override def script..
@@ -203,13 +203,13 @@ class TVNoiseDemoApp  extends SimpleSubscriptApplication {
        ////////////////////////////////                           //////////////////////////////// 
        ////////////////////////////////    speedControl     =     //////////////////////////////// ...; speedKeyInput + speedButtonInput + speedSliderInput
        ////////////////////////////////                           //////////////////////////////// 
-       ////////////////////////////////    speedKeyInput    =     //////////////////////////////// var i: Int = 0 numKey(ActualOutputParameter(i,(v:Int)=>i=v)) setSpeedValue(int2Value(i)) // numKey(i?)
+       ////////////////////////////////    speedKeyInput    =     //////////////////////////////// var i: Int = 0; numKey(ActualOutputParameter(i,(v:Int)=>i=v)) setSpeedValue(int2Value(i)) // numKey(i?)
        ////////////////////////////////                           ////////////////////////////////  
        ////////////////////////////////   speedKeyInput1    =     //////////////////////////////// times(10) 
-       ////////////////////////////////                     +     //////////////////////////////// val c:Any=(pass_up1(here)+'0') key(chr(c)) setSpeedValue(char2Value(c)) // TBD: make "here" an implicit parameter
+       ////////////////////////////////                     +     //////////////////////////////// ( val c:Any=pass_up1(here)+'0'; key(chr(c)) setSpeedValue(char2Value(c))) // TBD: make "here" an implicit parameter
        ////////////////////////////////                           ////////////////////////////////  
-       //////////////////////////////// speedButtonInput    =     //////////////////////////////// if (speedValue>minValue) (minButton setSliderValue,minValue + decrementButton setSpeedValue(speedValue-1))
-       ////////////////////////////////                     +     //////////////////////////////// if (speedValue<maxValue) (maxButton setSliderValue,maxValue + incrementButton setSpeedValue(speedValue+1))
+       //////////////////////////////// speedButtonInput    =     //////////////////////////////// (if (speedValue>minValue) minButton setSliderValue,minValue + decrementButton setSpeedValue(speedValue-1))
+       ////////////////////////////////                     +     //////////////////////////////// (if (speedValue<maxValue) maxButton setSliderValue,maxValue + incrementButton setSpeedValue(speedValue+1))
        ////////////////////////////////                           //////////////////////////////// 
        //////////////////////////////// speedSliderInput    =     //////////////////////////////// slider setSpeedValue,slider.value
 

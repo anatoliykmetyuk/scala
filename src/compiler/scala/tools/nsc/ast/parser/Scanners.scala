@@ -110,18 +110,23 @@ trait Scanners extends ScannersCommon {
     var isInSubScript_script        = false
     var isInSubScript_header        = false
     var isInSubScript_nativeCode    = false
+    var isInSubScript_val_var_init  = false
     def isInSubScript_expression  = isInSubScript_script && 
                                    !isInSubScript_header && 
                                    !isInSubScript_nativeCode && 
                                   (!isInSubScript_partialScript || isInSubScript_partialScript_caseScript)
     
     var sepRegions_SubScript_partialScript = -1
-    var isInSubScript_partialScript            = false
-    var isInSubScript_partialScript_caseScript = false
-    def start_SubScript_partialScript            = {isInSubScript_partialScript            =  true}
-    def   end_SubScript_partialScript            = {isInSubScript_partialScript            = false}
-    def start_SubScript_partialScript_caseScript = {isInSubScript_partialScript_caseScript =  true}
-    def   end_SubScript_partialScript_caseScript = {isInSubScript_partialScript_caseScript = false}
+    var level_SubScript_partialScript            = 0
+    var level_SubScript_partialScript_caseScript = 0
+    def   isInSubScript_partialScript            = level_SubScript_partialScript            > 0
+    def   isInSubScript_partialScript_caseScript = level_SubScript_partialScript_caseScript > 0
+    def start_SubScript_partialScript            = {level_SubScript_partialScript            += 1}
+    def   end_SubScript_partialScript            = {level_SubScript_partialScript            -= 1}
+    def start_SubScript_partialScript_caseScript = {level_SubScript_partialScript_caseScript += 1}
+    def   end_SubScript_partialScript_caseScript = {level_SubScript_partialScript_caseScript -= 1}
+    def start_SubScript_val_var_init             = {isInSubScript_val_var_init = true; isInSubScript_nativeCode = true}
+    def   end_SubScript_val_var_init             = {isInSubScript_val_var_init =false; isInSubScript_nativeCode =false}
 
     private var openComments = 0
     protected def putCommentChar(): Unit = nextChar()
@@ -333,7 +338,7 @@ trait Scanners extends ScannersCommon {
         if (inStringInterpolation) fetchStringPart() 
         else                       fetchToken()
 
-//println("fetched:  "+this)        
+//println("fetched:  "+this)        //////////
 
         if(token == ERROR) {
           if (  inMultiLineInterpolation) sepRegions = sepRegions.tail.tail
@@ -342,19 +347,22 @@ trait Scanners extends ScannersCommon {
       } else {
         this copyFrom next
         next.token = EMPTY
-//println("Fetched:  "+this)        
+//println("Fetched:  "+this)        ///////////
       }
 
       /** Insert NEWLINE or NEWLINES if
        *  - we are after a newline
        *  - we are within a { ... } or on toplevel (wrt sepRegions)
-       *  - NOT isInSubScript_expression and the current token can start a statement and the one before can end it
+       *  - NOT isInSubScript_expression (except isInSubScript_val_var_init) 
+       *    AND the current token can start a statement and the one before can end it
        *  insert NEWLINES if we are past a blank line, NEWLINE otherwise
        * 
        *  TBD: maybe require different handling if isInSubScript_expression
        */
       if (!applyBracePatch() && afterLineEnd() && 
-          (!isInSubScript_expression && inLastOfStat(lastToken) && inFirstOfStat(token)) &&
+          (
+           (!isInSubScript_expression || isInSubScript_val_var_init) && 
+           inLastOfStat(lastToken) && inFirstOfStat(token)) &&
           (sepRegions.isEmpty || sepRegions.head == RBRACE)) {
         next copyFrom this
         offset = if (lineStartOffset <= offset) lineStartOffset else lastLineStartOffset
@@ -386,7 +394,7 @@ trait Scanners extends ScannersCommon {
         }
       }
 
-//      print("["+this+"]")
+// print("["+this+"]")  ///////////
     }
 
     /** Is current token first one after a newline? */
@@ -442,7 +450,7 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-       case '~' => if (isInSubScript_expression) {
+       case '~' => if (isInSubScript_expression || isInSubScript_val_var_init) {
                       val lookahead = lookaheadReader; lookahead.nextChar()
                       if (lookahead.ch == '~') {lookahead.nextChar()
                        if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYARROW2; return} 
@@ -465,7 +473,8 @@ trait Scanners extends ScannersCommon {
        case '>' => if (isInSubScript_partialScript) {nextChar(); 
                                                      if (ch=='>') {nextChar(); token = GREATER2; return} else putChar('>')}
                    getOperatorRest()
-       case '<' => if (isInSubScript_expression   ) {nextChar(); if (ch=='<') {nextChar(); token =    LESS2; return} else putChar('<')} 
+       case '<' => if (isInSubScript_expression 
+                   || isInSubScript_val_var_init  ) {nextChar(); if (ch=='<') {nextChar(); token =    LESS2; return} else putChar('<')} 
           // is XMLSTART?
           def fetchLT() = {
             val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
@@ -498,11 +507,13 @@ trait Scanners extends ScannersCommon {
         case '*' =>
           val chOld = ch
           nextChar()
-          if      (isInSubScript_nativeCode && ch=='}') {nextChar(); token = RBRACE_ASTERISK}
-          else if (isInSubScript_expression && ch==')') {nextChar(); token = RPAREN_ASTERISK}
-          else if (isInSubScript_expression && ch=='*') {nextChar()
-                                           if (ch==')') {nextChar(); token = RPAREN_ASTERISK2}
-                                           else {putChar('*'); putChar('*'); getOperatorRest()}
+          if      (isInSubScript_nativeCode  && ch=='}') {nextChar(); token = RBRACE_ASTERISK}
+          else if ((isInSubScript_expression 
+               ||isInSubScript_val_var_init) && ch==')') {nextChar(); token = RPAREN_ASTERISK}
+          else if ((isInSubScript_expression 
+               ||isInSubScript_val_var_init) && ch=='*') {nextChar()
+                                            if (ch==')') {nextChar(); token = RPAREN_ASTERISK2}
+                                            else {putChar('*'); putChar('*'); getOperatorRest()}
           }                                 
           else {
             putChar(chOld)
@@ -592,7 +603,7 @@ trait Scanners extends ScannersCommon {
           nextChar()
           if ('0' <= ch && ch <= '9') {putChar('.'); getFraction()}
           else                   {            token = DOT }
-          if (isInSubScript_header || isInSubScript_expression) {
+          if (isInSubScript_header || isInSubScript_expression || isInSubScript_val_var_init) {
                  if  (ch == '.') {nextChar()
                   if (ch == '.') {nextChar(); token = DOT3}
                   else           {            token = DOT2}}
@@ -606,7 +617,7 @@ trait Scanners extends ScannersCommon {
                   else           {syntaxError( "'..' unexpected")}}
           } 
         case '{' => nextChar(); token = LBRACE
-          if (isInSubScript_expression) {
+          if (isInSubScript_expression || isInSubScript_val_var_init) {
             (ch: @switch) match {
               case '?' => nextChar(); token = LBRACE_QMARK
               case '!' => nextChar(); token = LBRACE_EMARK
@@ -621,7 +632,7 @@ trait Scanners extends ScannersCommon {
             }
           }
         case '(' => nextChar(); token = LPAREN
-          if (isInSubScript_expression) { // (+)  (-)  (+-)  (;) (* (**
+          if (isInSubScript_expression || isInSubScript_val_var_init) { // (+)  (-)  (+-)  (;) (* (**
             if   (ch == '*') {nextChar(); token = LPAREN_ASTERISK // no }
               if (ch == '*') {nextChar(); token = LPAREN_ASTERISK2}
             }
@@ -647,8 +658,9 @@ trait Scanners extends ScannersCommon {
             }
           }          
         case ')' => nextChar(); token = RPAREN
-        case ';' => if (!isInSubScript_expression) {nextChar(); token = SEMI}
-                    else   {putChar(ch); nextChar(); getOperatorRest()}
+        case ';' => //if (!isInSubScript_expression) 
+                             {nextChar(); token = SEMI}
+                    //else   {putChar(ch); nextChar(); getOperatorRest()}
         case ',' => nextChar(); token = COMMA
         case '}' => nextChar(); token = RBRACE
         case '[' => nextChar(); token = LBRACKET

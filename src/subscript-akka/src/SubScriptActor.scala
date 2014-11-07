@@ -85,14 +85,12 @@ trait SubScriptActor extends Actor {
     super.aroundPostStop()
   }
 
-  final def receive: Actor.Receive = {case _ =>}
-
+  def receive: Actor.Receive = {case _ =>}
 
   def sendSynchronizationMessage(lock: AnyRef) {
     val vm = runner.executor
     vm insert SynchronizationMessage(vm.rootNode, lock)
   }
-
 }
 
 case class SynchronizationMessage(node: CallGraphNode, lock: AnyRef) extends CallGraphMessageN {

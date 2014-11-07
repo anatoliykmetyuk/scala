@@ -50,12 +50,12 @@ class LookupFrame2Application extends SimpleSubscriptApplication {
     cancelCommand     = cancelButton + Key.Escape 
     exitCommand       =   exitButton + windowClosing,top
     
-    doExit            =   exitCommand var r: Boolean =false @{gui(there)}: {r=confirmExit} while (!r)
+    doExit            =   exitCommand var r: Boolean = false @{gui(there)}: {r=confirmExit} while (!r)
     cancelSearch      = cancelCommand @{gui(there)}: showCanceledText
     
     live              = ...searchSequence || doExit
-    searchSequence    = guard(searchTF, ()=> !searchTF.text.isEmpty); // searchCommand should not be active if the text field is empty
-                        searchCommand; 
+    searchSequence    = guard(searchTF, ()=> !searchTF.text.isEmpty) // searchCommand should not be active if the text field is empty
+                        searchCommand 
                         showSearchingText searchInDatabase showSearchResults / cancelSearch
     
     showSearchingText = @{gui(there)}: {outputTA.text = "Searching: "+searchTF.text}
