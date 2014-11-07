@@ -4000,7 +4000,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       def wrapErrors(tree: Tree, typeTree: Typer => Tree): Tree = silent(typeTree) orElse (err => DynamicRewriteError(tree, err.head))
     }
 
-      val here_Name = newTermName("here")
+      val  here_Name = newTermName("here")
+      val _node_Name = newTermName("_node")
       val actualValueParameter_Name = newTermName("ActualValueParameter")
       val normalCode_NodeString = "N_code_normal"
       val scriptCall_NodeString = "N_call"
@@ -4038,7 +4039,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       def sSubScriptDSL_call_default        = sSubScriptDSL_call_typed         (sSubScriptDefaultType)
       def sSubScriptDSL_code_normal_default = sSubScriptDSL_code_normal_typed(sSubScriptDefaultType)
 
-      def here_Ident                 : Tree = Ident(here_Name)
+      def  here_Ident                      : Tree = Ident( here_Name)
+      def _node_Ident                      : Tree = Ident(_node_Name)
       def sSubScriptVM_ActualValueParameter: Tree = Select(sSubScriptVM, actualValueParameter_Name)
 
       def underscore_name(name: Name) = newTermName("_"+name)
@@ -4047,9 +4049,12 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       def blockToFunction(block: Tree, nodeType: Tree, pos: Position): Function = {
         val vparams = List(
           atPos(pos) {
+            //makeParam(_node_Name, nodeType setPos pos)
             makeParam(here_Name, nodeType setPos pos)
           }
         )
+        //val implicitVal          = atPos(pos) {ValDef(Modifiers(IMPLICIT), here_Name, TypeTree(), _node_Ident)}
+        //val implicitVal_seq_body = Block(implicitVal,block)
         Function(vparams , block)
       }
 

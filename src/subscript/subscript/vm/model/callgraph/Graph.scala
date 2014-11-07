@@ -59,7 +59,7 @@ trait GraphTreeNode extends GraphNode {
 }
 
 /**
- * Graph node that can't have children.
+ * Graph tree node that can't have children.
  */
 trait GraphLeafNode extends GraphTreeNode {
   override def addChild(c: Child) = throw new RuntimeException("This node can't have children")

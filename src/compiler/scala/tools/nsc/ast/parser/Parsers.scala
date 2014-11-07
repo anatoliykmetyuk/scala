@@ -1365,6 +1365,7 @@ self =>
     val      at_Name  = newTermName("at")
     val   value_Name  = newTermName("value")
     val    here_Name  = newTermName("here")
+    val   _node_Name  = newTermName("_node")
     val   there_Name  = newTermName("there")
     val     tmp_Name  = newTermName("$tmp")
     val    tmp1_Name  = newTermName("$tmp1")
@@ -1387,6 +1388,7 @@ self =>
     
     def    here_Ident = Ident( here_Name) // Note: such items should be def's rather than val's; else the Typer will get confused
     def   there_Ident = Ident(there_Name)
+    def   _node_Ident = Ident(_node_Name)
                                                      
     val nameScala       = newTermName("scala")
     val nameSubScript   = newTermName("subscript")
@@ -1503,17 +1505,25 @@ self =>
 	def underscore_TermName(n: TermName) = newTermName(underscore_prefix(n.toString))
 
     /*
-     * Enclose the given block with a function with parameter "here" of the given node type 
-     * i.e.: here: NodeType => body
+     * Enclose the given block with a function with parameter "here" (or "there", or "script") of the given node type 
+     * i.e.: 
+     *         here: NodeType => body
+     * 
+     * Actually, we add implicitness this item, through an extra value:
+     * 
+     *         _node: NodeType => implicit val here=_node; body
+     * 
      */
     def blockToFunction(body: Tree, nodeType: Tree, pos: Position, hereOrThere: TermName): Function = {
       val vparams = List(
           atPos(pos) {
-            makeParam(hereOrThere, nodeType setPos pos)
+            makeParam(_node_Name, nodeType setPos pos)
           }
       )
-      //val block = body match {case Block(_,_) => body case _ => Block(body)}
-      Function(vparams , body)
+      val implicitVal          = atPos(pos) {ValDef(Modifiers(Flags.IMPLICIT), hereOrThere, TypeTree(), _node_Ident)}
+      val implicitVal_seq_body = makeBlock(List(implicitVal,body))
+      
+      Function(vparams , implicitVal_seq_body)
     }
     
     // answer Script[scriptResultType]
@@ -1527,11 +1537,13 @@ self =>
      * Ideally the type parameter should be the return type of the given block
      * Probably this can be done, but in the Typer phase. 
      * That would be done when this Parser is cleaned up again, or replaced by SugarScala.
+     * 
+     * Beware: (FTTB) blockToFunction had been copied to Typers.scala
      */
     def blockToFunction_here  (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos,  here_Name)
     def blockToFunction_there (block: Tree, nodeType: Tree, pos: Position): Function = blockToFunction(block, nodeType, pos, there_Name) //  TBD Clean up
-    def blockToFunction_script(block: Tree, scriptResultType: Tree, pos: Position): Function = {
-        blockToFunction       (block, TypeTree(), pos, script_Name) //  TBD Clean up
+    def blockToFunction_script(block: Tree, 
+                                    scriptResultType: Tree, pos: Position): Function = {blockToFunction(block,TypeTree(),pos,script_Name) //  TBD Clean up
     }
     //{ val vparams = List(makeParam(there_Name, TypeTree()))
     //  Function(vparams , block)
@@ -2379,7 +2391,11 @@ self =>
         // Copy pasting is not good - further abstractin will be required
         // for `rhs` computation
         case _ =>
-          val rhs = {
+          if (true) {
+            syntaxError(in.offset, "For the time being local script vars and vals must be explicitly typed"); EmptyTree
+          }
+          else {
+            val rhs = {
               accept(EQUALS)
               val annotation = if (in.token==AT) parseAnnotation else null
                 
@@ -2389,8 +2405,9 @@ self =>
                            newmods = newmods | Flags.DEFAULTINIT; EmptyTree}
                        else {in.start_SubScript_val_var_init; try expr() finally in.end_SubScript_val_var_init}
               if (annotation==null) ex else ex // TBD: make something using annotation
+            }
+            operationPattern(rhs, Ident(newTypeName("T")), false)
           }
-          operationPattern(rhs, Ident(newTypeName("T")), false)
       }
 
       

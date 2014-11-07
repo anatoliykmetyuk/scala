@@ -349,7 +349,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
       activate
     }
 
-    private def succeed = if (shouldSucceed) insert(Success(node))   // TBD: prevent multiple successes at same "time"
+    private def succeed = if (shouldSucceed) insert(SuccessMsg(node))   // TBD: prevent multiple successes at same "time"
 
     private def exclude = {
       if (nodesToBeExcluded !=null) nodesToBeExcluded .foreach(n => insert(Exclude(node, n)))

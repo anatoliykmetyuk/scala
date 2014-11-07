@@ -98,7 +98,7 @@ def script..
     setSpeed(s: Int)   = @{gui(there)}: {!setSpeedValue(s)!}
 
       speedKeyInput    = times(10) 
-                       + ( val c:Any = pass_up1(here)+'0'; key(chr(c)) setSpeed(char2Value(c))) // TBD: make here an implicit parameter
+                       + ( val c:Int = pass_up1+'0'; key(chr(c)) setSpeed(char2Value(c))) // TBD: make here an implicit parameter
                           
                        // Note: first "("...")" pair is needed because else the ifs would be nested
    speedButtonInput = (if speed>minSpeed then speedDecButton)

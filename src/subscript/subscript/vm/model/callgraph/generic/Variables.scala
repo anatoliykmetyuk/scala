@@ -6,7 +6,12 @@ import subscript.DSL._
 import subscript.vm.VariableHolder
 import scala.collection.mutable.HashMap
 
-trait Variables {this: CallGraphNode =>
+trait Variables {this: CallGraphTreeNode =>
+  
+  /** Pass flag; should possibly move elsewhere */
+  var pass = 0
+  
+  
   def passToBeUsedToGetVariableNamed(name: Symbol) = pass
   def getLocalVariableHolder[V<:Any](name: Symbol): VariableHolder[V] = {
     //var usePass = this match {
@@ -31,7 +36,7 @@ trait Variables {this: CallGraphNode =>
   }
 }
 
-trait VariablesContainer extends Variables {this: CallGraphNode =>
+trait VariablesContainer extends Variables {this: CallGraphTreeNode =>
   val mapNamePassToVariableHolder = new HashMap[(Symbol,Int), VariableHolder[_]]
   
   def initLocalVariable[V<:Any](name: Symbol, fromPass: Int, value: V) =

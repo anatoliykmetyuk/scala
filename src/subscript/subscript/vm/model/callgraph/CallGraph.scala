@@ -14,7 +14,6 @@ trait CallGraphNode extends GraphNode
     with State
     with ChildrenState
     with Informational
-    with Variables
     with OldCallGraphNodeApi
 {
   type T <: TemplateNode
@@ -28,7 +27,7 @@ trait CallGraphNode extends GraphNode
   override def toString = f"$index%2d $template"
 }
 trait ScriptResultHolder[R] {var $:Try[R] = null}
-trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode
+trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode with Variables
 trait CallGraphLeafNode extends CallGraphTreeNode with GraphLeafNode
 
 trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] {

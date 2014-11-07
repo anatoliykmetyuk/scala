@@ -126,7 +126,7 @@ import scala.language.existentials
 	case class Resume             (node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Resume}
 	case class Exclude          (parent: CallGraphNode, 
 	                               node: CallGraphNode) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Exclude}
-	case class Success            (node: CallGraphNode, 
+	case class SuccessMsg         (node: CallGraphNode, 
 	                              child: CallGraphNode = null) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Success}
 	case class Break              (node: CallGraphNode, 
 	                              child: CallGraphNode, activationMode: ActivationMode.ActivationModeType) extends CallGraphMessageN {type N = CallGraphNode; def priority = PRIORITY_Break}

@@ -44,7 +44,7 @@ case class N_call[R](template: T_call[R]) extends CallGraphTreeNode {
 
 // Root script types
 case class Script[R](template: T_script, p: FormalParameter[_]*)
-  extends CallGraphTreeNode with ScriptResultHolder[R]
+  extends CallGraphNode with ScriptResultHolder[R]
   {type T = T_script}
 
 //case class N_communication(var template: T_communication) extends CallGraphNode {

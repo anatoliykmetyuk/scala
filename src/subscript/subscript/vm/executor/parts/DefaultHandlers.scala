@@ -47,8 +47,8 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
            case n@N_optional_break_loop        (t) => setIteration_n_ary_op_ancestor(n); doNeutral(n); insert(Break(n, null, ActivationMode.Optional)); insertDeactivation(n,null)
            case n@N_loop                       (t) => setIteration_n_ary_op_ancestor(n); doNeutral(n); insertDeactivation(n,null)
            case n@N_delta                      (t) =>                     insertDeactivation(n,null)
-           case n@N_epsilon                    (t) => insert(Success(n)); insertDeactivation(n,null)
-           case n@N_nu                         (t) => doNeutral(n);       insertDeactivation(n,null)
+           case n@N_epsilon                    (t) => insert(SuccessMsg(n)); insertDeactivation(n,null)
+           case n@N_nu                         (t) => doNeutral(n);          insertDeactivation(n,null)
            case n@N_while                      (t) => setIteration_n_ary_op_ancestor(n); 
                                                       n.hasSuccess = executeCode(n)
                                                       doNeutral(n)
@@ -126,7 +126,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
    * execute "onSuccess" code, if defined
    * insert success messages for each parent node
    */
-  def handleSuccess(message: Success): Unit = {
+  def handleSuccess(message: SuccessMsg): Unit = {
          // The following lines had been inserted on 10 April 2014 [c8f7a57], and outcommented on 22 April 2014.
          // These were wrong: a success message for a [while] would not be processed any more
          //if (message.node.hasSuccess) {
@@ -148,7 +148,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
           }
          message.node.hasSuccess = true
          executeCodeIfDefined(message.node, message.node.onSuccess)
-         message.node.forEachParent(p => insert(Success(p, message.node)))
+         message.node.forEachParent(p => insert(SuccessMsg(p, message.node)))
   }
   /*
    * Handle an AAActivated message: activated atomic actions 
@@ -462,7 +462,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
       case a@Suspend            (_) => {}
       case a@Resume             (_) => {}
       case a@Exclude          (_,_) => handleExclude    (a)
-      case a@Success          (_,_) => handleSuccess    (a)
+      case a@SuccessMsg       (_,_) => handleSuccess    (a)
       case a@Break        (_, _, _) => handleBreak      (a)
       case a@AAActivated      (_,_) => handleAAActivated(a)
    // case a@CAActivated      (_,_) => handleCAActivated(a)

@@ -15,9 +15,6 @@ trait State {this: CallGraphNode =>
   /** Exclusion flag */
   var isExcluded = false
   
-  /** Pass flag */
-  var pass = 0
-  
   def isExecuting  = false
   var numberOfBusyActions = 0
   def isActionBusy = numberOfBusyActions>0
