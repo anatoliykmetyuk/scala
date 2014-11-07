@@ -301,6 +301,7 @@ object Scripts {
    mousePresses  (comp: Component, task: MouseEvent=>Unit) = event_loop( MousePressedReactor[Any,N_code_eventhandling_loop[Any]](comp), task)
    mouseDraggings(comp: Component, task: MouseEvent=>Unit) = event_loop( MouseDraggedReactor[Any,N_code_eventhandling_loop[Any]](comp), task)
    mouseMoves    (comp: Component, task: MouseEvent=>Unit) = event_loop(   MouseMovedReactor[Any,N_code_eventhandling_loop[Any]](comp), task)
+   mouseReleases (comp: Component, task: MouseEvent=>Unit) = event_loop(MouseReleasedReactor[Any,N_code_eventhandling_loop[Any]](comp), task)
 
    mouseSingleClick (comp: Component, ?p : java.awt.Point) = mouseClicks(1, comp, ?p) // TBD: "p?"
    mouseDoubleClick (comp: Component, ?p : java.awt.Point) = mouseClicks(2, comp, ?p)
@@ -311,10 +312,10 @@ object Scripts {
    mouseMove        (comp: Component, ?p : java.awt.Point) = var mme: MouseMoved=null 
                                                              event(   MouseMovedReactor[Any,N_code_eventhandling[Any]](comp), ActualOutputParameter(mme, (v:MouseMoved)=>mme=v) ) // TBD: "mme?" instead of "ActualOutputParameter(...)"
                                                              {! p=mme.point !}
-   mousePressed     (comp: Component, ?p : java.awt.Point) = var mpe: MousePressed=null 
+   mousePressed     (comp: Component, ?p : java.awt.Point) = var mpe: MousePressed=null
                                                              event(   MousePressedReactor[Any,N_code_eventhandling[Any]](comp), ActualOutputParameter(mpe, (v:MousePressed)=>mpe=v) ) // TBD: ...
                                                              {! p=mpe.point !}
-   mouseReleased    (comp: Component, ?p : java.awt.Point) = var mre: MouseReleased=null 
+   mouseReleased    (comp: Component, ?p : java.awt.Point) = var mre: MouseReleased=null
                                                              event(   MouseReleasedReactor[Any,N_code_eventhandling[Any]](comp), ActualOutputParameter(mre, (v:MouseReleased)=>mre=v) ) // TBD: ...
                                                              {! p=mre.point !}
 
