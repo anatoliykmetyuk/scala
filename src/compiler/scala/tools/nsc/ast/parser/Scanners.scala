@@ -463,7 +463,7 @@ trait Scanners extends ScannersCommon {
                       }
                    }
                    getOperatorRest()
-       case '=' => if (isInSubScript_partialScript) {
+       case '=' => if (isInSubScript_expression || isInSubScript_partialScript) {
                       val lookahead = lookaheadReader; lookahead.nextChar()
                       if (lookahead.ch == '=') {lookahead.nextChar()
                        if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = ARROW2; return} 

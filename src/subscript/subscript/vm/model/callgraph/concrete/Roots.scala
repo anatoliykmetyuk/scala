@@ -24,6 +24,8 @@ case class N_launch_anchor(template: T_launch_anchor)
 case class N_call[R](template: T_call[R]) extends CallGraphTreeNode {
   type T = T_call[R]
   var t_callee: T_script  = null
+  def callee = children.head.asInstanceOf[Script[R]]
+  
 //var t_commcallee: T_commscript = null
 
 //def communicator: Communicator = if (t_commcallee==null) null else t_commcallee.communicator

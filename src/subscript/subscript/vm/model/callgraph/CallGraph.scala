@@ -26,7 +26,14 @@ trait CallGraphNode extends GraphNode
   
   override def toString = f"$index%2d $template"
 }
-trait ScriptResultHolder[R] {var $:Try[R] = null}
+trait ScriptResultHolder[R] {
+  var $:Try[R] = null; 
+  def $success:R = $.get; 
+  def $success_=(v:R) = $ = Success(v); 
+  def $failure:Throwable = if ($==null||$.isSuccess)null else $.asInstanceOf[Failure[R]].exception
+  def $failure_=(f:Throwable) = $ = Failure[R](f)
+  
+}
 trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode with Variables
 trait CallGraphLeafNode extends CallGraphTreeNode with GraphLeafNode
 

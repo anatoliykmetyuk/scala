@@ -211,6 +211,20 @@ object DSL {
   def _do_then     (c0: Child, c1: Child           )  = T_do_then     (c0, c1) 
   def _do_else     (c0: Child, c1: Child           )  = T_do_else     (c0, c1) 
   def _do_then_else(c0: Child, c1: Child, c2: Child)  = T_do_then_else(c0, c1, c2) 
+
+  // we do not want scripts in DSL.scala, because a regular Scala compiler should be able to translate this. 
+  // So we manually translate the following script:
+  //
+  // def script dataflow_then[T,U](s: Script[T], t: T=>Script[U]): U = 
+  //     var s_node: N_call[T] = null
+  //     do @{s_node = there}: s then t(s_node.callee.$.get)
+  
+  def _dataflow_then[T,U](s: Script[T], t: T=>Script[U]): Script[U] = 
+    _script(this, 'dataflow_then) { 
+         _node => 
+                  {implicit val script= _node; var s_node: N_call[T] = null
+                   _do_then(_call("s", (_n:N_call[T]) => {s_node = _n; s}), 
+                            _call("t", (_n:N_call[U]) => {t(s_node.callee.$.get)}))}}
   
 //def _dataflow_then     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_then", [ do s then t(null.asInstanceOf[R])])
 //def _dataflow_else     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_else", [ do s else t(null.asInstanceOf[R]) ])
