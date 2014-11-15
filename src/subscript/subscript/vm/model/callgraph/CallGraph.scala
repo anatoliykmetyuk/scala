@@ -15,6 +15,8 @@ trait CallGraphNode extends GraphNode
     with ChildrenState
     with Informational
     with OldCallGraphNodeApi
+    
+    with Variables // TBD: move to CallGraphTreeNode
 {
   type T <: TemplateNode
   type S
@@ -34,7 +36,7 @@ trait ScriptResultHolder[R] {
   def $failure_=(f:Throwable) = $ = Failure[R](f)
   
 }
-trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode with Variables
+trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode /* TBD: `with Variables` to be moved to here*/
 trait CallGraphLeafNode extends CallGraphTreeNode with GraphLeafNode
 
 trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] {

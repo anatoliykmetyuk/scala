@@ -45,8 +45,12 @@ case class N_call[R](template: T_call[R]) extends CallGraphTreeNode {
 
 
 // Root script types
+/*
+ * Note: maybe this should become a CallGraphNode, since it may not have a unique parent.
+ * There is quite some code that assumes all nodes have such a unique parent, so this change would not be easy
+ */
 case class Script[R](template: T_script, p: FormalParameter[_]*)
-  extends CallGraphNode with ScriptResultHolder[R]
+  extends CallGraphTreeNode with ScriptResultHolder[R]
   {type T = T_script}
 
 //case class N_communication(var template: T_communication) extends CallGraphNode {

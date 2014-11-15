@@ -49,6 +49,13 @@ object Predef {
   def pass    (implicit node: CallGraphTreeNode): Int = node.pass
   def pass_up1(implicit node: CallGraphTreeNode): Int = node.n_ary_op_ancestor.pass
   def pass_up2(implicit node: CallGraphTreeNode): Int = node.n_ary_op_ancestor.n_ary_op_ancestor.pass
+
+  /* type mismatch errors in these hand-compiled versions:
+  def _times(   n:Int) = _script(this, 'times)     {(script:Script[Any]) => _while{_node=>{implicit val here=_node; pass<n}}}
+  def _break_up(n:Int) = _script(this, 'break_up)  {(script:Script[_]) => _tiny{ (_node:N_code_tiny[Unit])=>{implicit val here=_node; here.break_up(n)}}}
+  def _break_up1       = _script(this, 'break_up1) {(script:Script[Unit]) => _call("break_up", (_node:N_call[Unit])=>{implicit val here=_node; _break_up(1)})}
+  def _break_up2       = _script(this, 'break_up2) {(script:Script[Unit]) => _call("break_up", (_node:N_call[_])=>{implicit val here=_node; _break_up(2)})}
+  */
   
   def script..
     times(n:Int) = while(here.pass<n) // TBD: make here implicit
@@ -60,7 +67,6 @@ object Predef {
     break_up(n:Int) = {!here.break_up(n)!}
     break_up1 = break_up,1
     break_up2 = break_up,2
-  
 
 // TBD: Tests don't work so far. Maybe we need to use Script[Any] instead of Script[Unit] in the _times1
 //    test = times1(100)

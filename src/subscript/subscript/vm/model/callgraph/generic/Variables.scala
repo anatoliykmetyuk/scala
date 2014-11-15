@@ -6,7 +6,7 @@ import subscript.DSL._
 import subscript.vm.VariableHolder
 import scala.collection.mutable.HashMap
 
-trait Variables {this: CallGraphTreeNode =>
+trait Variables {this: CallGraphNode => // TBD: change CallGraphNode into CallGraphTreeNode
   
   /** Pass flag; should possibly move elsewhere */
   var pass = 0

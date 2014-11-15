@@ -83,7 +83,7 @@ import subscript.vm.model.callgraph._
 
 	  var activation: Activation = null
 	  var deactivations: List[Deactivation] = Nil
-	  var success: Success = null
+	  var success: SuccessMsg = null
 	  var break: Break = null
 	  var aaActivated: AAActivated = null
 	  var caActivated: CAActivated = null

@@ -71,7 +71,7 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
 trait MQExtras {this: MessageQueue =>
   
   def doNeutral(n: CallGraphNode) =
-    if (n.getLogicalKind_n_ary_op_ancestor!=LogicalKind.Or) insert(Success(n))
+    if (n.getLogicalKind_n_ary_op_ancestor!=LogicalKind.Or) insert(SuccessMsg(n))
   
   def insertDeactivation(n:CallGraphNode,c:CallGraphNode) = insert(Deactivation(n, c, false))
   
@@ -91,7 +91,7 @@ trait MQExtras {this: MessageQueue =>
         if (child!=null) child
         else message match {
           case Break(an,c,m) => c
-          case Success(an,c) => c
+          case SuccessMsg(an,c) => c
           case _ => message.node
         }
     }
@@ -99,7 +99,7 @@ trait MQExtras {this: MessageQueue =>
       case a@ Activation  (node: CallGraphNode) => c.activation = a
       case a@Deactivation (node: CallGraphNode,
                           child: CallGraphNode, excluded: Boolean) => c.deactivations ::= a
-      case a@Success      (node: CallGraphNode,
+      case a@SuccessMsg   (node: CallGraphNode,
                           child: CallGraphNode)  => c.success = a
       case a@Break        (node: CallGraphNode, 
                           child: CallGraphNode, 

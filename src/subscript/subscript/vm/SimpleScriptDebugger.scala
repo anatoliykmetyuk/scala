@@ -20,7 +20,7 @@ import subscript.vm.model.callgraph.CallGraphNode
  *    _execute(scriptDef, debugger, executor)
  */
 
-object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
+object SimpleScriptDebugger extends SimpleScriptDebuggerClass {
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) return
 
@@ -45,7 +45,7 @@ object SimpleScriptDebuggerApp extends SimpleScriptDebugger {
   }
 }
 
-class SimpleScriptDebugger extends MsgListener {
+class SimpleScriptDebuggerClass extends MsgListener {
   protected var throttle: Long = -1
 
   private var _scriptExecutor: ScriptExecutor[_] = null

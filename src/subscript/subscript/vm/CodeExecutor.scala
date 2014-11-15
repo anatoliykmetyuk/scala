@@ -112,7 +112,7 @@ abstract class AACodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor
       executionFinished
   }
   def aaHappened(mode:AAHappenedMode) = scriptExecutor.insert(AAHappened(n,null,mode))
-  def succeeded                       = scriptExecutor.insert(Success   (n,null))
+  def succeeded                       = scriptExecutor.insert(SuccessMsg(n,null))
 
   override def executeAA: Unit = executeAA(this) // for Atomic Action execution...should ensure that executionFinished is called
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = {

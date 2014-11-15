@@ -219,12 +219,20 @@ object DSL {
   //     var s_node: N_call[T] = null
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
   
-  def _dataflow_then[T,U](s: Script[T], t: T=>Script[U]): Script[U] = 
+  def _dataflow_then[S,T](s: Script[S], t: S=>Script[T]): Script[T] = 
     _script(this, 'dataflow_then) { 
          _node => 
-                  {implicit val script= _node; var s_node: N_call[T] = null
-                   _do_then(_call("s", (_n:N_call[T]) => {s_node = _n; s}), 
-                            _call("t", (_n:N_call[U]) => {t(s_node.callee.$.get)}))}}
+                  {implicit val script= _node; var s_node: N_call[S] = null
+                   _do_then(_call("s", (_n:N_call[S]) => {s_node = _n; s}), 
+                            _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}))}}
+  
+  def _dataflow_then_else[S,T,U](s: Script[S], t: S=>Script[T], u: Throwable=>Script[U]): Script[Any/*T&U*/] = 
+    _script(this, 'dataflow_then_else) { 
+         _node => 
+                  {implicit val script= _node; var s_node: N_call[S] = null
+                   _do_then_else(_call("s", (_n:N_call[S]) => {s_node = _n; s}), 
+                                 _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}), 
+                                 _call("u", (_n:N_call[U]) => {u(s_node.callee.$.asInstanceOf[scala.util.Failure[T]].exception)}))}}
   
 //def _dataflow_then     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_then", [ do s then t(null.asInstanceOf[R])])
 //def _dataflow_else     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_else", [ do s else t(null.asInstanceOf[R]) ])
