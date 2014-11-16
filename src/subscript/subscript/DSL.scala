@@ -52,13 +52,13 @@ import subscript.vm.model.callgraph.generic._
  * Usage: see example programs
  */
 object DSL {
-  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: (=>Script[S])=>TemplateNode.Child): Script[S] = {
+  def _script[S](owner:AnyRef, name:Symbol, p: FormalParameter[_]*)(childTemplateAt: (=>Script[S])=>TemplateNode.Child): ScriptNode[S] = {
     // In order to create the Script, we need to know T_script, the tempalte
     // To create the template, we need to know its children
     // To create the children, we need to know Script
     // Hence, we create the children with a by-name Script and proceed in a usual manner
     var template: T_script = null
-    lazy val result: Script[S] = new Script(template, p:_*)
+    lazy val result: ScriptNode[S] = new ScriptNode(template, p:_*)
     val child = childTemplateAt(result)
     template = T_script(owner, "script", name, child)
     result
@@ -73,26 +73,26 @@ object DSL {
 //    (_c: N_communication) => _c.inits(T_communication("communication", names.toList.map(_.asInstanceOf[Symbol])), owner)
 //  }
 
-  def getScriptTemplate    [S](s: Script[S]): T_script     = s.template // TBD: check; was: {val nc = N_call(T_call("", null)); s(nc); nc.t_callee}
-  def getScriptBodyTemplate[S](s: Script[S]): TemplateNode = getScriptTemplate(s).child0
-  def toScriptString       [S](s: Script[S]): String       = getScriptTemplate(s).hierarchyString
-  def toScriptBodyString   [S](s: Script[S]): String       = {val c = getScriptBodyTemplate(s); if(c==null) "" else c.hierarchyString}
+  def getScriptTemplate    [S](s: ScriptNode[S]): T_script     = s.template // TBD: check; was: {val nc = N_call(T_call("", null)); s(nc); nc.t_callee}
+  def getScriptBodyTemplate[S](s: ScriptNode[S]): TemplateNode = getScriptTemplate(s).child0
+  def toScriptString       [S](s: ScriptNode[S]): String       = getScriptTemplate(s).hierarchyString
+  def toScriptBodyString   [S](s: ScriptNode[S]): String       = {val c = getScriptBodyTemplate(s); if(c==null) "" else c.hierarchyString}
 //def _communication(body: N_communication => TemplateNode) = Communication(body)
 //def _communicator(name: Symbol) = Communicator(name)
 //def _relate(communication: Communication, crs: CommunicatorRole*): Unit = communication.setCommunicatorRoles(crs.toList)
 
 //implicit def communicatorToCommunicatorRole(c: Communicator) = new CommunicatorRole(c)
   
-  def _execute[S     ](_script: Script[S]                             ): ScriptExecutor[S] = _execute(_script, null, true)
-  def _execute[S<:X,X](_script: Script[S], executor: ScriptExecutor[X]): ScriptExecutor[X] = _execute(_script, null, executor)
-  def _execute[S     ](_script: Script[S], debugger: MsgListener      ): ScriptExecutor[S] = _execute(_script, debugger, false)
-  def _execute[S     ](_script: Script[S], allowDebugger: Boolean     ): ScriptExecutor[S] = _execute(_script, null, allowDebugger)
-  def _execute[S     ](_script: Script[S], debugger: MsgListener
+  def _execute[S     ](_script: ScriptNode[S]                             ): ScriptExecutor[S] = _execute(_script, null, true)
+  def _execute[S<:X,X](_script: ScriptNode[S], executor: ScriptExecutor[X]): ScriptExecutor[X] = _execute(_script, null, executor)
+  def _execute[S     ](_script: ScriptNode[S], debugger: MsgListener      ): ScriptExecutor[S] = _execute(_script, debugger, false)
+  def _execute[S     ](_script: ScriptNode[S], allowDebugger: Boolean     ): ScriptExecutor[S] = _execute(_script, null, allowDebugger)
+  def _execute[S     ](_script: ScriptNode[S], debugger: MsgListener
                                          , allowDebugger: Boolean     ): ScriptExecutor[S] = {
     val executor = ScriptExecutorFactory.createScriptExecutor[S](allowDebugger && debugger == null)
     _execute(_script, debugger, executor)
   }
-  def _execute[S<:X,X](_script: Script[S], debugger: MsgListener, executor: ScriptExecutor[X]): ScriptExecutor[X] = {
+  def _execute[S<:X,X](_script: ScriptNode[S], debugger: MsgListener, executor: ScriptExecutor[X]): ScriptExecutor[X] = {
     if (debugger!=null) debugger.attach(executor)
     executor.run(_script)
   }
@@ -113,7 +113,7 @@ object DSL {
   def _eventhandling0     [R](cf: => R ) = T_code_eventhandling     ((_here:N_code_eventhandling     [R]) => cf)
   def _eventhandling_loop0[R](cf: => R ) = T_code_eventhandling_loop((_here:N_code_eventhandling_loop[R]) => cf)
 
-  implicit def _call      [R](calleeName: String, code: N_call[R] => Script[R]) = T_call[R](calleeName, code)
+  implicit def _call      [R](calleeName: String, code: N_call[R] => ScriptNode[R]) = T_call[R](calleeName, code)
   
   implicit def valueToActualValueParameter[T<:Any](value: T) = new ActualValueParameter(value)
 
@@ -219,14 +219,14 @@ object DSL {
   //     var s_node: N_call[T] = null
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
   
-  def _dataflow_then[S,T](s: Script[S], t: S=>Script[T]): Script[T] = 
+  def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): ScriptNode[T] = 
     _script(this, 'dataflow_then) { 
          _node => 
                   {implicit val script= _node; var s_node: N_call[S] = null
                    _do_then(_call("s", (_n:N_call[S]) => {s_node = _n; s}), 
                             _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}))}}
   
-  def _dataflow_then_else[S,T,U](s: Script[S], t: S=>Script[T], u: Throwable=>Script[U]): Script[Any/*T&U*/] = 
+  def _dataflow_then_else[S,T,U](s: ScriptNode[S], t: S=>ScriptNode[T], u: Throwable=>ScriptNode[U]): ScriptNode[Any/*T&U*/] = 
     _script(this, 'dataflow_then_else) { 
          _node => 
                   {implicit val script= _node; var s_node: N_call[S] = null

@@ -5,7 +5,7 @@ package subscript.test
 import org.junit._
 import org.junit.runner.RunWith
 import subscript.DSL._
-import subscript.vm.{N_code_unsure, SimpleScriptDebugger, Script}
+import subscript.vm.{N_code_unsure, SimpleScriptDebuggerClass, ScriptNode}
 import subscript.vm.executor._
 import subscript.vm.model.template.TemplateNode.Child
 import subscript.vm.model.callgraph._
@@ -166,7 +166,7 @@ class OperatorsSuite {
   /*
    * Low level stuff
    */
-  def testScriptBehaviours(scriptDef: Script[Any], scriptString: String, behaviours: String) {
+  def testScriptBehaviours(scriptDef: ScriptNode[Any], scriptString: String, behaviours: String) {
     
     import scala.util.matching.Regex
     val pattern = new Regex(" +") // replace all multispaces by a single space, just before splitting behaviours:
@@ -189,7 +189,7 @@ class OperatorsSuite {
   var executor: ScriptExecutor[Any] = null
   var currentTestIndex = 0
 
-  def testScriptBehaviour(scriptDef: Script[Any], scriptString: String, input: String, expectedResult: String, expectTestFailure: Boolean) {
+  def testScriptBehaviour(scriptDef: ScriptNode[Any], scriptString: String, input: String, expectedResult: String, expectTestFailure: Boolean) {
     
     currentTestIndex += 1
     
@@ -218,7 +218,7 @@ class OperatorsSuite {
       scriptSuccessAtEndOfInput = None
       
       executor     = new CommonScriptExecutor
-      val debugger = if (debug) new SimpleScriptDebugger else null
+      val debugger = if (debug) new SimpleScriptDebuggerClass else null
       if (doVerbose && debug) {executor.doTrace = true; debugger.traceLevel = if (doVerboseLevel==1) 3 else 4}
       
       try {
@@ -527,7 +527,7 @@ class OperatorsSuite {
   def testBehaviours: Unit = {
     val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
     for ( (key, behaviours) <- behaviours) {
-      val aScript = key.asInstanceOf[Script[Any]]
+      val aScript = key.asInstanceOf[ScriptNode[Any]]
       val bodyString = toScriptBodyString(aScript)
       testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
     }

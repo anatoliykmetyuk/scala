@@ -42,12 +42,12 @@ trait SubScriptActor extends Actor {
 
 
   // Scripts
-  def _live(): Script[Any]
+  def _live(): ScriptNode[Any]
   private def script terminate = Terminator.block
   private def script die       = {if (context ne null) context stop self}
 
-  def script r$(handler: PartialFunction[Any, Script[Any]])
-  = var s:Script[Any]=null
+  def script r$(handler: PartialFunction[Any, ScriptNode[Any]])
+  = var s:ScriptNode[Any]=null
     @{val here = there.parent.asInstanceOf[CallGraphTreeNode] // Bug: here is not yet known; is needed to access local variable s
       val handlerWithExecuteAA = handler andThen {hr => {s = hr; there.eventHappened}}
                           synchronized {callHandlers += handlerWithExecuteAA}

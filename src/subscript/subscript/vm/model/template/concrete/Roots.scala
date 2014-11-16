@@ -19,8 +19,8 @@ case class T_launch_anchor(
 
 case class T_call[R](
              val calleeName: String, // TBD: make symbol ?
-    override val code      : N_call[R] => Script[R]
-) extends T_0_ary with TemplateCodeHolder[Script[R],N_call[R]]
+    override val code      : N_call[R] => ScriptNode[R]
+) extends T_0_ary with TemplateCodeHolder[ScriptNode[R],N_call[R]]
 
 // Root script types
 case class T_script (

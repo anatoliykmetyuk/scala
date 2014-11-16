@@ -11,7 +11,7 @@ import subscript.vm.model.callgraph.CallGraphNode
 trait TaskSupplyInterface {this: ScriptExecutor[_] =>
   def invokeFromET(f: => Unit) = msgQueue sInsert InvokeFromET(graph.rootNode, () => f)
   
-  def launch[R](n: CallGraphNode, aScript: Script[R])  {
+  def launch[R](n: CallGraphNode, aScript: ScriptNode[R])  {
     val launchAnchor       = CallGraphNode.getLowestLaunchAnchorAncestor(n) // could be rootNode
     val callAnchorTemplate =     T_call[R]("<launched>", null)
     val callAnchorNode     =     N_call(callAnchorTemplate)

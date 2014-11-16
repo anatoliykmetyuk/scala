@@ -4011,7 +4011,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       val nameSubScript        = newTermName("subscript")
       val nameDSL              = newTermName("DSL")
       val nameVM               = newTermName("vm")
-      val name_scriptType      = newTypeName("Script")
+      val name_scriptNodeType  = newTypeName("ScriptNode")
       val name_fun_code_normal = newTermName("_normal")
       val name_fun_call        = newTermName("_call")
 
@@ -4021,7 +4021,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       def sSubScriptVM_N_call        : Tree = Select(sSubScriptVM, scriptCall_NodeName)
       def sSubScriptDSL_code_normal  : Tree = Select(sSubScriptDSL, name_fun_code_normal)
       def sSubScriptDSL_call         : Tree = Select(sSubScriptDSL, name_fun_call)
-      def sSubScriptVM_scriptType    : Tree = Select(sSubScriptVM, name_scriptType)
+      def sSubScriptVM_scriptNodeType: Tree = Select(sSubScriptVM , name_scriptNodeType)
 
       // Types with type arguments
       def sSubScriptVM_N_call_typed(t: Tree) = AppliedTypeTree(sSubScriptVM_N_call, List(t))
@@ -4588,7 +4588,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           /* Given a script tree `script`, it will build the following:
            *
            * here: N_call[Any] => {
-               val s: subscript.vm.Script[Any] = script
+               val s: subscript.vm.ScriptNode[Any] = script
                here.calls(s.template, (s.p: _*));
                s
              }
@@ -4628,11 +4628,11 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
               import scala.reflect.internal.ModifierFlags._
 
               val scriptTermName = newTermName("s")
-              val scriptValDef = ValDef(                    // val s: Script[Any] = script
+              val scriptValDef = ValDef(                    // val s: ScriptNode[Any] = script
                 Modifiers(PARAM),
                 scriptTermName,                             // s
-                AppliedTypeTree(                            // subscript.vm.Script[Any]
-                    sSubScriptVM_scriptType,
+                AppliedTypeTree(                            // subscript.vm.ScriptNode[Any]
+                    sSubScriptVM_scriptNodeType,
                     List(
                       Ident(newTypeName("Any"))
                     )

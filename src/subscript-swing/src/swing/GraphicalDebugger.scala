@@ -225,7 +225,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     def getScriptTemplates: List[T_script] = {
       val lb = new ListBuffer[T_script]
       def getScriptTemplates(n: CallGraphNode): Unit = {
-        n match {case ns: Script[_]     => if (!lb.exists(_.name.name==ns.template.name.name)) lb += ns.template case _ =>}
+        n match {case ns: ScriptNode[_] => if (!lb.exists(_.name.name==ns.template.name.name)) lb += ns.template case _ =>}
         n match {case pn: CallGraphNode => pn.forEachChild{getScriptTemplates(_)} case _ =>}
       } 
       getScriptTemplates(rootNode)
@@ -375,8 +375,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         val text:String = if (currentMessage==null) null else
           currentMessage match { // node.index is not checked by node.equals!!!!
             case AAHappened(mp,mc,mode) if(p.index==mp.index&&c.index==mc.index)  => "AA Happened"
-            case Success   (mp,null)                                              =>  null
-            case Success   (mp,mc)      if (p.index==mp.index&&c.index==mc.index) => "Success"
+            case SuccessMsg(mp,null)                                              =>  null
+            case SuccessMsg(mp,mc)      if (p.index==mp.index&&c.index==mc.index) => "Success"
             case Break     (mp,mc,mode) if (p.index==mp.index&&c.index==mc.index) => getBreakText(mode)
             case Exclude   (mp,mc)      if (p.index==mp.index&&c.index==mc.index) => "Exclude"
             case _                                                                => null
@@ -397,7 +397,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
             val fontMetrics = g.getFontMetrics
             interestingContinuationInternals(nn.continuation).foreach{s: String=>drawStringTopLeft(g, s, x, y); y += fontMetrics.getHeight - 2}
           case _ => if (currentMessage!=null&&currentMessage.node==n) currentMessage match {
-            case s: Success    if (s.child==null) => drawStringTopLeft(g, "Success"    , x, y) 
+            case s: SuccessMsg if (s.child==null) => drawStringTopLeft(g, "Success"    , x, y) 
             case a: AAHappened if (a.child==null) => drawStringTopLeft(g, "AA Happened", x, y) 
             case _ => 
           }
@@ -582,7 +582,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       case Deactivation(_,_,_) => checkBox_step_Deactivation  .selected
       case AAToBeExecuted(_)   => checkBox_step_AAToBeExecuted.selected
       case AAHappened(_,_,_)   => checkBox_step_AAHappened    .selected
-      case Success(_,_)        => checkBox_step_Success       .selected
+      case SuccessMsg(_,_)     => checkBox_step_Success       .selected
       case Break(_,_,_)        => checkBox_step_Break         .selected
       case Exclude(_,_)        => checkBox_step_Exclude       .selected
       case c:Continuation      => checkBox_step_Continuation  .selected && !interestingContinuationInternals(c).isEmpty
@@ -611,7 +611,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         case Deactivation(_,_,_) => checkBox_log_Deactivation  .selected
         case AAToBeExecuted(_)   => checkBox_log_AAToBeExecuted.selected
         case AAHappened(_,_,_)   => checkBox_log_AAHappened    .selected
-        case Success(_,_)        => checkBox_log_Success       .selected
+        case SuccessMsg(_,_)     => checkBox_log_Success       .selected
         case Break(_,_,_)        => checkBox_log_Break         .selected
         case Exclude(_,_)        => checkBox_log_Exclude       .selected
         case c:Continuation      => checkBox_log_Continuation  .selected

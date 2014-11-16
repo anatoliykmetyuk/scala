@@ -367,6 +367,9 @@ trait Scanners extends ScannersCommon {
         next copyFrom this
         offset = if (lineStartOffset <= offset) lineStartOffset else lastLineStartOffset
         token  = if (pastBlankLine()) NEWLINES else NEWLINE
+        
+        // uncomment to see where the NEWLINE(S)'s are inserted
+        // error(lastOffset, if (pastBlankLine()) "NEWLINES" else "NEWLINE")
       }
 
       // Join CASE + CLASS => CASECLASS, CASE + OBJECT => CASEOBJECT, SEMI + ELSE => ELSE

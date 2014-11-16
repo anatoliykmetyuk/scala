@@ -82,7 +82,7 @@ class SliderDemoApp  extends SimpleSubscriptApplication {
     TBD = {*Thread.sleep(34567)*}
 
     key(   ??c: Char) =  key2(top, ??c)
-    numKey(??i: Int)  = var c:Char='0' key(ActualConstrainedParameter(c, (v:Char)=>c=v, (v:Char)=>v.isDigit)) {!i=c-'0'!}    //key(c? if?(c.isDigit)) 
+    numKey(??i: Int)  = var c:Char='0'; key(ActualConstrainedParameter(c, (v:Char)=>c=v, (v:Char)=>v.isDigit)) {!i=c-'0'!}    //key(c? if?(c.isDigit)) 
     setValue(s: Int)  = @{gui(there)}: {!setSliderValue(s)!}
 
   override def script..
