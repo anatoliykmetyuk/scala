@@ -1394,6 +1394,7 @@ self =>
     val nameSubScript   = newTermName("subscript")
     val nameDSL         = newTermName("DSL")
     val nameVM          = newTermName("vm")
+    val name_scriptNodeType = newTypeName("ScriptNode")
     val name_scriptType = newTypeName("Script")
     val name_unitType   = newTypeName("Unit")
  
@@ -1410,6 +1411,7 @@ self =>
 
     def s_Unit       : Tree = Select(Ident(nameScala), name_unitType)
     def s__script    : Tree = Select(sSubScriptDSL, _script_Name)
+    def s_scriptNodeType : Tree = Select(sSubScriptVM, name_scriptNodeType)
     def s_scriptType : Tree = Select(sSubScriptVM, name_scriptType)
   //def s_scriptType : Tree = AppliedTypeTree(s_scriptType0, List(s_Unit))
     
@@ -1527,7 +1529,7 @@ self =>
     }
     
     // answer Script[scriptResultType]
-	  def scriptType_resultType(scriptResultType: Tree) = AppliedTypeTree(s_scriptType, List(scriptResultType))
+	  def scriptNodeType_resultType(scriptResultType: Tree) = AppliedTypeTree(s_scriptNodeType, List(scriptResultType))
   
     /*
      * Enclose the given block with a function with parameter "here" or "there" of the given node type 
@@ -2021,7 +2023,7 @@ self =>
 		        val underscored_script_name      = newTermName(underscore_prefix(   name.toString))
 
 	            // to enable moving this all to a later phase, we should create a ScriptDef rather than a DefDef
-	            DefDef(newmods, underscored_script_name, tparams, List(underscored_param_defs), scriptType_resultType(resultType), scriptHeaderAndLocalsAndBody)
+	            DefDef(newmods, underscored_script_name, tparams, List(underscored_param_defs), scriptNodeType_resultType(resultType), scriptHeaderAndLocalsAndBody)
 		      }
 	          signalParseProgress(scriptDef.pos)
 
