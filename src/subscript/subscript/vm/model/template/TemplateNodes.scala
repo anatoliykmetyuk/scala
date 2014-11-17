@@ -50,7 +50,7 @@ object TemplateNode {
       case T_annotation             (_,_)             => "@:"
       case T_local_valueCode        (_, _, _)         => "T_local_valueCode???"
       case T_call                   (calleeName,_)    => calleeName
-      case T_script                 (_, kind: String, name: Symbol, _) => name.toString
+      case T_script                 (_, kind: String, name: Symbol) => name.toString
     //case T_commscript             [S](_, kind: String, _)                     => "cscript"
     //case T_communication          [S](_, kind: String, names: Seq[Symbol]) => "comm"
       case _ => getClass.getName
@@ -113,7 +113,7 @@ object TemplateNode {
       case t@T_do_then_else    (_,_,_) =>       "do[" + hierarchyString(children.head, thisNode, false) + "]then[" + hierarchyString(children.tail.head, thisNode, false) + 
                                                                                                           "]else[" + hierarchyString(children.tail.tail.head, thisNode, false) + "]"
       case t@T_annotation      (_,_)   => thisNode.kind + hierarchyString(children.head, thisNode, false)
-      case t@T_script          (_, kind: String, name: Symbol, _) => name.toString + " = " + hierarchyString(children.head, thisNode, false)
+      case t@T_script          (_, kind: String, name: Symbol) => name.toString + " = " + hierarchyString(children.head, thisNode, false)
     //case T_commscript(_, kind: String, _)                     => "cscript"
     //case T_communication(_, kind: String, names: Seq[Symbol]) => "comm"
       case _ => thisNode.kind

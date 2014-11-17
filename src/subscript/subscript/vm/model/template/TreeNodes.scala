@@ -51,18 +51,20 @@ trait ChildNode extends TreeNode {
 trait RootNode extends TreeNode {
   def parent = null.asInstanceOf[Parent]
   def root   = this.asInstanceOf[Root]
-  
-  TreeNode.setIndexes(this, 0, 0)
 }
 
 /*
  * Differentiation of the nodes based on how many children do they contain.
  */
 trait TreeNode_0 extends TreeNode   {
-  override val children: Seq[Child] = Nil
+  override def children: Seq[Child] = Nil
 }
 
-trait TreeNode_1 extends TreeNode_0 {
+trait TreeNode_1_def extends TreeNode_0 {
+  def child0: Child
+}
+
+trait TreeNode_1 extends TreeNode_1_def {
   val child0: Child
   override val children: Seq[Child] = child0::Nil
 }

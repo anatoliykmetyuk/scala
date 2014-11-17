@@ -26,10 +26,19 @@ case class T_call[R](
 case class T_script (
     override val owner : AnyRef,
     override val kind  : String,
-                 name  : Symbol,
-    override val child0: Child
-) extends TemplateNode with TreeNode_1 with RootNode {
+                 name  : Symbol
+) extends TemplateNode with TreeNode_1_def with RootNode {
+  var _child0: Child = null
   override def toString = name.name
+  override def child0: Child = _child0
+  override def children: Seq[Child] = _children
+  var _children: Seq[Child] = null
+  def setChild(c: Child) = {
+    _child0 = c
+    _children = child0::Nil
+    TreeNode.setIndexes(this, 0, 0)
+  }
+  
 }
 
 //case class T_commscript(
