@@ -2,6 +2,7 @@ package subscript.test
 
 //import org.scalatest.FunSuite
 
+import scala.util.Try
 import org.junit._
 import org.junit.runner.RunWith
 import subscript.DSL._
@@ -180,6 +181,8 @@ class OperatorsSuite {
     }
   }
 
+  val mainThread = Thread.currentThread
+  
   var acceptedAtoms : String       = null
   var inputStream   : Stream[Char] = null
   var expectedAtoms :   List[Char] = null
@@ -208,7 +211,7 @@ class OperatorsSuite {
 	if (expectedResultFailure && !expectedResultAtoms.isEmpty)                              
        println(s"$testInfo - Error in test specification: no atoms should be expected in combination with 0") // very unlikely to occur
     else {
-      if (debug) println (testInfo)
+      if (debug)         println(testInfo)
       else if (doVerbose) {print(testInfo); testInfo = ""}
         
       acceptedAtoms         = ""
@@ -219,12 +222,21 @@ class OperatorsSuite {
       
       executor     = new CommonScriptExecutor
       val debugger = if (debug) new SimpleScriptDebuggerClass else null
-      if (doVerbose && debug) {executor.doTrace = true; debugger.traceLevel = if (doVerboseLevel==1) 3 else 4}
+      if (doVerbose && debug) {executor.traceLevel = 2; debugger.traceLevel = if (doVerboseLevel==1) 3 else 4}
       
+      val watchDogThread = new Thread(new Runnable {def run() { 
+          if (!Thread.interrupted)
+          try {Thread.sleep(1500); doPostMortemDump(testInfo)}
+          catch {case e: InterruptedException => /*println("Interrupted") this is actually Ok*/
+                 case e: Throwable => e.printStackTrace
+          }
+      }})
       try {
+        watchDogThread.start
         _execute(scriptDef, debugger, executor)
       }
       catch {case e: Throwable => println(s"$testInfo - an exception occurred"); throw e}
+      finally {/*println(s"Interrupting...");*/ watchDogThread.interrupt()}
       
       val executionSuccess = scriptSuccessAtEndOfInput.getOrElse(executor.hasSuccess)
       val expectedAtomsAtEndOfInputString = expectedAtomsAtEndOfInput.getOrElse(Nil).sortWith(_<_).mkString
@@ -248,6 +260,16 @@ class OperatorsSuite {
     }
   }
 
+  def doPostMortemDump(testInfo: String) = {
+    println(s"$testInfo - timeout reached") /*; interrupted = ${Thread.interrupted}"*/
+    val debugger = new SimpleScriptDebuggerClass
+    debugger.attach(executor)
+    debugger.traceLevel = 4
+    debugger.traceTree
+    debugger.traceMessages
+    mainThread.getStackTrace.foreach(println)
+  }
+  
   // utility method: remove 1 occurrence of elt from list; see http://stackoverflow.com/a/5640727
   def remove1Element[T](list: List[T], elt: T): List[T] = list diff List(elt)
   
@@ -284,7 +306,7 @@ class OperatorsSuite {
     e = atom('e')
 
   val scriptBehaviourList_for_debug = List(
-     [a..; b]       -> "->a  a->ab aa->ab ab aab"
+     // [a {*println("Hello")*} .. ; b]       -> "->a  a->ab aa->ab ab aab"
   )
     
   /*
@@ -293,7 +315,9 @@ class OperatorsSuite {
    *   the outcomes are a input traces in relation to their outcomes, see #testScriptBehaviour
    */
   val scriptBehaviourList = List( // list, not a map, to remain ordered
-              
+
+     // [a {*println("Hello"); here.onSuccess{println("onSuccess")}*} .. ; b]   -> "->a  a->ab aa->ab aaa->ab ab aab"   ,
+      
    // simple terms
      [(-)]     -> "->0"
    , [(+)]     -> "->1"
@@ -482,7 +506,7 @@ class OperatorsSuite {
    , [ do a (-) then b c else d e ]   -> "->a a->d ad->e ade"
    
    // Threaded code fragments. TBD: check whether the test mechanism can handle this; maybe not
-   , [ a {**} .. ; b ]         -> "->a a->ab aa->ab ab aab"
+   , [ a {**} .. ; b ]         -> "->a a->ab aa->ab aaa->ab ab aab"
 
    // launching
    , [ (** a **) ]             -> "a"
@@ -542,12 +566,34 @@ class OperatorsSuite {
 
 }
 
+
 object OperatorsSuiteApp extends OperatorsSuite {
+  
+  def usage = println(
+"""Usage: <scala> subscript.test.OperatorsSuite [option] [testIndex]
+
+Options:
+  -v: verbose
+  -V: more verbose
+      
+If a testIndex is supplied, only that test is run, in debug mode (which means very verbose)
+If that testIndex is 0 the tests marked for debugging are run.
+Else all tests are run  
+""")
+
   def main(args: Array[String]): Unit = {
-    for (i <- 0 to args.length-1) {
-      if      (args(i)=="-v") doVerboseLevel = 1
-      else if (args(i)=="-V") doVerboseLevel = 2
-      else testIndexForDebugging = args(i).toInt
+    if (args.length > 0) {
+      val argsList = args.toList
+      val head::tail = argsList
+      val numList = head match {
+                  case "-v" => doVerboseLevel = 1; tail
+                  case "-V" => doVerboseLevel = 2; tail
+                  case   _  => argsList
+      }
+      numList match {
+        case h::t => testIndexForDebugging = Try(h.toInt).getOrElse{usage; return}
+        case   _  =>
+      }
     }
     testBehaviours
   }

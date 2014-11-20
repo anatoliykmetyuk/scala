@@ -42,7 +42,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     decideExclusion
     decideSuccess
 
-    if (doTrace) trace
+    trace
 
     executeDecisions
   }
@@ -218,12 +218,12 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
      *
      */
     private def parallelBreakPause {
-      if (doTrace) traceAttributes(node, "A")
+      traceAttributes(node, "A")
       switchOptionalPart(false)
     }
 
     private def parallelBreakOptional {
-      if (doTrace) traceAttributes(node, "B")
+      traceAttributes(node, "B")
       switchOptionalPart(false)
     }
 
@@ -231,26 +231,26 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
        val b = message.break
        if (b==null) {
          if (message.aaHappeneds != Nil || message.activation != null) {
-           if (doTrace) traceAttributes(node, "C")
+           traceAttributes(node, "C")
            activateNextOrEnded = true
            childNode = node.lastActivatedChild
          }
-         else if (doTrace) traceAttributes(node, "D")
+         else traceAttributes(node, "D")
        }
        else if (b.activationMode==ActivationMode.Optional) {
          if (node.aaActivated_optional) {
-           if (doTrace) traceAttributes(node, "E")
+           traceAttributes(node, "E")
            switchOptionalPart(false)
          }
          else if (message.aaActivated != null
               ||  node.indexChild_marksOptionalPart < 0 && node.aaActivated){ // TBD: possibly wrong test;
                                         // we should ask whether any AA had been activated in the part before "."
-           if (doTrace) traceAttributes(node, "F")
+           traceAttributes(node, "F")
            node.activationMode = ActivationMode.Optional // TBD: may possibly be dropped???; check node.indexChild_marksPause >= 0
            node.indexChild_marksPause = b.child.index
          }
          else {
-           if (doTrace) traceAttributes(node, "G")
+           traceAttributes(node, "G")
            switchOptionalPart(true)
          }
        }

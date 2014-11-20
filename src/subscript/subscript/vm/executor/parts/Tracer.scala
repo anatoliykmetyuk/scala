@@ -6,24 +6,29 @@ import subscript.vm._
  * Simple tracing and error tracking
  */
 trait Tracer {
-  var doTrace = false
-  def trace(s: String) = if (doTrace) println(s)
+  def traceLevel: Int
+  def trace(s: => String) = if (traceLevel>0) {println(s); Console.flush}
+  def trace_nonl(s: => String) = if (traceLevel>0) {print(s); Console.flush}
   def error(s: String) {throw new Exception(s)}
   
-  def traceAttribute(name: String, value: Any) = println(f"$name%41s: $value")
-  def traceAttributes(n: N_n_ary_op, str: String) = {
+  def traceAttribute(name: => String, value: Any) = traceAttribute_internal(name, value)
+  private def traceAttribute_internal(name: String, value: Any) = if (traceLevel>=2) println(f"$name%41s: $value")
+  def traceAttributes(n: N_n_ary_op, str: => String) = {
+    if (traceLevel>=2)
+    {
     println(s"$str:")
-    traceAttribute("activationMode", n.activationMode)
-    traceAttribute("hadFullBreak", n.hadFullBreak)
-    traceAttribute("nActivatedMandatoryChildren", n.nActivatedMandatoryChildren)
-    traceAttribute("nActivatedMandatoryChildrenWithSuccess", n.nActivatedMandatoryChildrenWithSuccess)
-    traceAttribute("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
-    traceAttribute("nActivatedOptionalChildren", n.nActivatedOptionalChildren)
-    traceAttribute("nActivatedOptionalChildrenWithSuccess", n.nActivatedOptionalChildrenWithSuccess)
-    traceAttribute("nActivatedOptionalChildrenWithoutSuccess", n.nActivatedOptionalChildrenWithoutSuccess)
-    traceAttribute("indexChild_marksOptionalPart", n.indexChild_marksOptionalPart)
-    traceAttribute("indexChild_marksPause", n.indexChild_marksPause)
-    traceAttribute("aaActivated", n.aaActivated)
-    traceAttribute("aaActivated_optional", n.aaActivated_optional)
+    traceAttribute_internal("activationMode", n.activationMode)
+    traceAttribute_internal("hadFullBreak", n.hadFullBreak)
+    traceAttribute_internal("nActivatedMandatoryChildren", n.nActivatedMandatoryChildren)
+    traceAttribute_internal("nActivatedMandatoryChildrenWithSuccess", n.nActivatedMandatoryChildrenWithSuccess)
+    traceAttribute_internal("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
+    traceAttribute_internal("nActivatedOptionalChildren", n.nActivatedOptionalChildren)
+    traceAttribute_internal("nActivatedOptionalChildrenWithSuccess", n.nActivatedOptionalChildrenWithSuccess)
+    traceAttribute_internal("nActivatedOptionalChildrenWithoutSuccess", n.nActivatedOptionalChildrenWithoutSuccess)
+    traceAttribute_internal("indexChild_marksOptionalPart", n.indexChild_marksOptionalPart)
+    traceAttribute_internal("indexChild_marksPause", n.indexChild_marksPause)
+    traceAttribute_internal("aaActivated", n.aaActivated)
+    traceAttribute_internal("aaActivated_optional", n.aaActivated_optional)
+    }
   }  
 }

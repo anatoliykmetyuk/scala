@@ -31,6 +31,9 @@ object ScriptExecutorFactory {
 trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Tracer with OldApi with ScriptResultHolder[S] {
   // Internal state
   // TBD: change restriction from `subscript` to `vm`
+
+  var traceLevel: Int
+  
   val stateAccessLock = new Object
   val msgQueue        = new MessageQueue   (stateAccessLock) with MQExtras with TrackToBeExecuted
   val msgHandlers     = new MessageHandlers(stateAccessLock)
@@ -118,6 +121,8 @@ abstract class AbstractScriptExecutor[S] extends ScriptExecutor[S] {
 
 class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
     DefaultHandlers {
+  var traceLevel = 0
+
   msgQueue addListener new MessageQueuedNotifier(this)
   msgHandlers sInsert defaultHandler
   msgHandlers sInsert communicationHandler
@@ -134,10 +139,14 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
   }
   
   def awaitMessages {
+    trace("awaitMessages")
     messageAwaiting
     synchronized { // TBD: there should also be a synchronized call in the CodeExecutors
-      if (msgQueue.collection.size == 0) // looks stupid, but event may have happened&notify() may have been called during tracing
+      if (msgQueue.collection.size == 0) { // looks stupid, but event may have happened&notify() may have been called during tracing
+          trace("wait - start")
           wait() // for an event to happen 
+          trace("wait - end")
+      }
     }
     // note: there may also be deadlock because of unmatching communications
     // so there should preferably be a check for the existence of waiting event handling actions
@@ -148,7 +157,12 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
  * This is for compatibility with not yet refactored part of the VM.
  */
 trait OldApi {this: ScriptExecutor[_] =>
-  def insert(m: CallGraphMessage) = msgQueue sInsert m  
+  def insert(m: CallGraphMessage) = msgQueue insert /*sInsert*/ m  // TBD: do sInsert here
+  def insert_traced(m: CallGraphMessage) = {
+    trace_nonl(s"(inserting ${m.getClass}...")
+    insert(m)  
+    trace_nonl("done)")
+  }
   def rootNode = graph.rootNode
   def addHandler(h: MessageHandler) = msgHandlers sInsert h
 }
