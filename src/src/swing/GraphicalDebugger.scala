@@ -489,8 +489,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   val maxLogListMsgs    = 5000
   val logListMsgsCleanups = 1000
-  val msgLogListModel   = new javax.swing.DefaultListModel[String]
-  val msgQueueListModel = new javax.swing.DefaultListModel[CallGraphMessage]
+  val msgLogListModel   = new javax.swing.DefaultListModel
+  val msgQueueListModel = new javax.swing.DefaultListModel
   val currentMessageTF  = new TextField {
     //preferredSize       = new Dimension(400,24)
     //minimumSize         = preferredSize
@@ -503,11 +503,11 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   val msgQueueList      = new ListBuffer[String]
   val msgLogListView    = new ListView(msgLogList) {
     font                = fixedWidthFont
-    peer.asInstanceOf[JList[String]].setModel(msgLogListModel)   // Compiler throws an exception without a cast
+    peer.asInstanceOf[JList].setModel(msgLogListModel)   // Compiler throws an exception without a cast
   }
   val msgQueueListView  = new ListView(msgQueueList) {
     font                = fixedWidthFont
-    peer.asInstanceOf[JList[CallGraphMessage]].setModel(msgQueueListModel)
+    peer.asInstanceOf[JList].setModel(msgQueueListModel)
   }
   val msgLogListViewScrollPane   = new ScrollPane
   {
