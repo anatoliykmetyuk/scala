@@ -41,7 +41,9 @@ trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Trace
   
   def hasSuccess: Boolean = graph.rootNode.hasSuccess
   def hasActiveProcesses = !graph.rootNode.children.isEmpty
-  
+
+  def doCodeThatInsertsMsgs_synchronized(code: =>Unit): Unit
+ 
   // Initialization
   graph.init()
   
@@ -151,6 +153,13 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
     // note: there may also be deadlock because of unmatching communications
     // so there should preferably be a check for the existence of waiting event handling actions
   }
+  
+  /*
+   * Execute the given code that may insert some call graph messages into the message queue.
+   * This must be done in a synchronized way, and it may need to cause the call to wait()
+   * in awaitMessages to end. Therefore this method does notify as well.
+   */
+  def doCodeThatInsertsMsgs_synchronized(code: =>Unit): Unit = synchronized{ code; notify }
 }
 
 /**

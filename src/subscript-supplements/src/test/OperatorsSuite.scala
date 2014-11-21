@@ -6,7 +6,7 @@ import scala.util.Try
 import org.junit._
 import org.junit.runner.RunWith
 import subscript.DSL._
-import subscript.vm.{N_code_unsure, SimpleScriptDebuggerClass, ScriptNode}
+import subscript.vm.{N_code_unsure, SimpleScriptDebuggerClass, ScriptNode, Script}
 import subscript.vm.executor._
 import subscript.vm.model.template.TemplateNode.Child
 import subscript.vm.model.callgraph._
@@ -142,7 +142,7 @@ import subscript.vm.model.callgraph._
  */
 //@RunWith(classOf[JUnitRunner])
 @Test
-class OperatorsSuite {
+abstract class OperatorsSuiteBase {
 
   var doVerboseLevel = 0
   def doVerbose = doVerboseLevel>0
@@ -233,7 +233,7 @@ class OperatorsSuite {
       }})
       try {
         watchDogThread.start
-        _execute(scriptDef, debugger, executor)
+        _execute(scriptDef, debugger, executor) ///////////////////////////////// Script Execution //////////////////////////
       }
       catch {case e: Throwable => println(s"$testInfo - an exception occurred"); throw e}
       finally {/*println(s"Interrupting...");*/ watchDogThread.interrupt()}
@@ -305,7 +305,72 @@ class OperatorsSuite {
     d = atom('d')
     e = atom('e')
 
-  val scriptBehaviourList_for_debug = List(
+  def scriptBehaviourList_for_debug: Seq[(Script[Any],String)]
+  def scriptBehaviourList          : Seq[(Script[Any],String)]
+
+  def scriptBehaviourMap = scriptBehaviourList.toMap
+
+  // Tests behaviours  marked with FAIL: have been known to fail. 
+  //   if such a behaviour unexpectedly passes the test then this results in a JUnit failure.
+  //   That should be a trigger to regard the issue underlying to the FAIL: marking to be resolved.
+  //   So then the FAIL: marking should be removed and JUnit will be able to proceed further.
+  @Test
+  def testBehaviours: Unit = {
+    val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
+    for ( (key, behaviours) <- behaviours) {
+      val aScript = key.asInstanceOf[ScriptNode[Any]]
+      val bodyString = toScriptBodyString(aScript)
+      testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
+    }
+  }
+  
+  /*
+   * High level calls that will be tested:
+   */
+  //testBehaviours
+  //testLogicalOr
+  //testLogicalAnd
+
+}
+
+
+object OperatorsSuiteApp extends OperatorsSuite {
+  
+  def usage = println(
+"""Usage: <scala> subscript.test.OperatorsSuite [option] [testIndex]
+
+Options:
+  -v: verbose
+  -V: more verbose
+      
+If a testIndex is supplied, only that test is run, in debug mode (which means very verbose)
+If that testIndex is 0 the tests marked for debugging are run.
+Else all tests are run  
+""")
+
+  def main(args: Array[String]): Unit = {
+    if (args.length > 0) {
+      val argsList = args.toList
+      val head::tail = argsList
+      val numList = head match {
+                  case "-v" => doVerboseLevel = 1; tail
+                  case "-V" => doVerboseLevel = 2; tail
+                  case   _  => argsList
+      }
+      numList match {
+        case h::t => testIndexForDebugging = Try(h.toInt).getOrElse{usage; return}
+        case   _  =>
+      }
+    }
+    testBehaviours
+  }
+}
+
+
+
+class OperatorsSuite extends OperatorsSuiteBase {
+
+    val scriptBehaviourList_for_debug = List(
      // [a {*println("Hello")*} .. ; b]       -> "->a  a->ab aa->ab ab aab"
   )
     
@@ -541,60 +606,4 @@ class OperatorsSuite {
    , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
   )
 
-  val scriptBehaviourMap = scriptBehaviourList.toMap
-
-  // Tests behaviours  marked with FAIL: have been known to fail. 
-  //   if such a behaviour unexpectedly passes the test then this results in a JUnit failure.
-  //   That should be a trigger to regard the issue underlying to the FAIL: marking to be resolved.
-  //   So then the FAIL: marking should be removed and JUnit will be able to proceed further.
-  @Test
-  def testBehaviours: Unit = {
-    val behaviours = if (testIndexForDebugging==0) scriptBehaviourList_for_debug else scriptBehaviourList
-    for ( (key, behaviours) <- behaviours) {
-      val aScript = key.asInstanceOf[ScriptNode[Any]]
-      val bodyString = toScriptBodyString(aScript)
-      testScriptBehaviours(aScript, bodyString, behaviours.asInstanceOf[String])
-    }
-  }
-  
-  /*
-   * High level calls that will be tested:
-   */
-  //testBehaviours
-  //testLogicalOr
-  //testLogicalAnd
-
-}
-
-
-object OperatorsSuiteApp extends OperatorsSuite {
-  
-  def usage = println(
-"""Usage: <scala> subscript.test.OperatorsSuite [option] [testIndex]
-
-Options:
-  -v: verbose
-  -V: more verbose
-      
-If a testIndex is supplied, only that test is run, in debug mode (which means very verbose)
-If that testIndex is 0 the tests marked for debugging are run.
-Else all tests are run  
-""")
-
-  def main(args: Array[String]): Unit = {
-    if (args.length > 0) {
-      val argsList = args.toList
-      val head::tail = argsList
-      val numList = head match {
-                  case "-v" => doVerboseLevel = 1; tail
-                  case "-V" => doVerboseLevel = 2; tail
-                  case   _  => argsList
-      }
-      numList match {
-        case h::t => testIndexForDebugging = Try(h.toInt).getOrElse{usage; return}
-        case   _  =>
-      }
-    }
-    testBehaviours
-  }
 }

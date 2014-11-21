@@ -122,26 +122,17 @@ abstract class AACodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = {
     n.hasSuccess = true
   } // for Atomic Action execution...should ensure that executionFinished is called
-  // afterExecuteAA: to be called by executor, asynchronously, in reaction to executionFinished (through a message queue, not through a call inside a call)
+
+  // afterExecuteAA: to be called asynchronously by executor, 
+  // in reaction to executionFinished (through the message queue, not through a call inside a call)
   final override def afterExecuteAA = { // finally notify; make sure things go synchronized
-    trace_nonl("afterExecuteAA")
-    scriptExecutor.synchronized {
-      trace_nonl("...")
-      afterExecuteAA_internal
-      trace_nonl("scriptExecutor.notify: ")
-      scriptExecutor.notify()
-      trace("done")
-    }
+    scriptExecutor.doCodeThatInsertsMsgs_synchronized {afterExecuteAA_internal}
   }
   def afterExecuteAA_internal
-  def executionFinished = {
+  def executionFinished = { // make scriptExecutor call afterRun here, in its own message handling loop
     trace_nonl("executionFinished")
-    scriptExecutor.synchronized {
-      trace_nonl("...")
-      scriptExecutor.insert_traced(AAExecutionFinished(naa)) // so that executor calls afterRun here
-      trace_nonl("scriptExecutor.notify: ")
-      scriptExecutor.notify() // kick the scriptExecutor, just in case it was waiting
-      trace("done")
+    scriptExecutor.doCodeThatInsertsMsgs_synchronized {
+      scriptExecutor.insert_traced(AAExecutionFinished(naa))
     }
   }
   def toBeReexecuted    = scriptExecutor.insert(AAToBeReexecuted   (naa)) // so that executor reschedules n for execution
