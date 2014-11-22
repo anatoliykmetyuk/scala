@@ -58,7 +58,7 @@
 
 # Various files, added by Andre van Delft #
 ######################
-*.bnd
+# o*.bnd
 *.complete
 *.out
 *.out1

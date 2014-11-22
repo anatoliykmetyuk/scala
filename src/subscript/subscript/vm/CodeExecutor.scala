@@ -75,7 +75,7 @@ trait CodeExecutorTrait extends subscript.vm.executor.parts.Tracer {
   private def shouldNotBeCalledHere = throw new Exception("Illegal Call")
   def executeAA     : Unit                                     = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
   def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
-  def afterExecuteAA: Unit                                     = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
+  def afterExecuteAA: Unit                                     = afterExecuteAA_internal // TBD: clean up class/trait hierarchy so that this def can be ditched
   def afterExecuteAA_internal: Unit                            = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
   def interruptAA   : Unit                                     = shouldNotBeCalledHere // TBD: clean up class/trait hierarchy so that this def can be ditched
   def n: CallGraphNode

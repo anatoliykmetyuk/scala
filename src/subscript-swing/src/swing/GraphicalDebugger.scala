@@ -152,9 +152,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     override def paint(g: Graphics2D) {
         g.setColor(AWTColor.white)
         g.fillRect(0, 0, size.width, size.height)
-        try {
-          onPaintCallGraph(g)
-        } catch {case ex:Exception => println(ex.getStackTrace)}
+        try onPaintCallGraph(g)
+        catch {case ex:Exception => ex.printStackTrace()}
     }
   }
   val templateTreesPanel = new Panel {
@@ -432,7 +431,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         val vCenter   = boxTop  + BOX_H/2
         
         val s: String = n match {
-          case ns: Script[_]  => ns.template.name.name
+          case ns: ScriptNode[_]  => ns.template.name.name
           case no: N_n_ary_op => no.template.kind + (if (no.isIteration) " ..." else "")
           case _              => n .template.kind
         }
@@ -489,8 +488,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   val maxLogListMsgs    = 5000
   val logListMsgsCleanups = 1000
-  val msgLogListModel   = new javax.swing.DefaultListModel
-  val msgQueueListModel = new javax.swing.DefaultListModel
+  val msgLogListModel   = new javax.swing.DefaultListModel[String]
+  val msgQueueListModel = new javax.swing.DefaultListModel[CallGraphMessage]
   val currentMessageTF  = new TextField {
     //preferredSize       = new Dimension(400,24)
     //minimumSize         = preferredSize
@@ -503,11 +502,11 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   val msgQueueList      = new ListBuffer[String]
   val msgLogListView    = new ListView(msgLogList) {
     font                = fixedWidthFont
-    peer.asInstanceOf[JList].setModel(msgLogListModel)   // Compiler throws an exception without a cast
+    peer.asInstanceOf[JList[String]].setModel(msgLogListModel)   // Compiler throws an exception without a cast
   }
   val msgQueueListView  = new ListView(msgQueueList) {
     font                = fixedWidthFont
-    peer.asInstanceOf[JList].setModel(msgQueueListModel)
+    peer.asInstanceOf[JList[CallGraphMessage]].setModel(msgQueueListModel)
   }
   val msgLogListViewScrollPane   = new ScrollPane
   {
@@ -648,13 +647,14 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   override def live = _execute(_live, doesThisAllowToBeDebugged) 
   
   def script..
-     live       = {*awaitMessageBeingHandled(true)*}
-                  ( if shouldStep then @{gui(there)}: {!updateDisplay!} stepCommand
-                                    || if autoCheckBox.selected then {*waitForStepTimeout*} else (-)
-                  )
-                  {messageBeingHandled(false)}
-                  ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
-               || exitDebugger
+     live       = (
+                    {*awaitMessageBeingHandled(true)*}
+                    ( if shouldStep then @{gui(there)}: {!updateDisplay!} stepCommand
+                                      || if autoCheckBox.selected then {*waitForStepTimeout*} else (-)
+                    )
+                    {messageBeingHandled(false)}
+                    ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
+                  ) || exitDebugger
   
    stepCommand  = stepButton
    exitCommand  = exitButton
