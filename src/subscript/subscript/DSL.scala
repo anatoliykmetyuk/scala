@@ -218,12 +218,40 @@ object DSL {
   //     var s_node: N_call[T] = null
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
   
-  def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): ScriptNode[T] = 
-    _script(this, 'dataflow_then) { 
-         _node => 
-                  {implicit val script= _node; var s_node: N_call[S] = null
-                   _do_then(_call("s", (_n:N_call[S]) => {s_node = _n; s}), 
-                            _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}))}}
+  def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_call[T] = {
+    val dataflowScript: ScriptNode[T] = _script(this, 'dataflow_then) {script =>
+      var s_node: N_call[S] = null
+
+      val sCall: N_call[S] => ScriptNode[S] = here => {
+        s_node = here
+        here.calls(s.template, s.p: _*)
+        s
+      }
+
+      val tCall: N_call[T] => ScriptNode[T] = here => {
+        val res: S =
+          s_node                                   // Call node with the name "s"
+          .callee                                  // script    with the name "~~>"
+          .children.head.asInstanceOf[N_call[S]]   // Call node that calls the target script
+          .callee                                  // Finally, the actual lhs script itself
+          .$.get                                   // And its result value
+
+
+        val s = t(res)
+        here.calls(s.template, s.p: _*)
+        s
+      }
+
+      _do_then(_call("s", sCall), _call("t", tCall))
+    }
+
+    _call("~~>[Call]", here => {
+      val s = dataflowScript
+      here.calls(s.template, s.p: _*)
+      s
+    })
+  }
+
   
   def _dataflow_then_else[S,T,U](s: ScriptNode[S], t: S=>ScriptNode[T], u: Throwable=>ScriptNode[U]): ScriptNode[Any/*T&U*/] = 
     _script(this, 'dataflow_then_else) { 
