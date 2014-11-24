@@ -658,9 +658,9 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
    stepCommand  = stepButton
    exitCommand  = exitButton
-   exitDebugger = exitCommand var exitConfirmed:Boolean=false @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
+   exitDebugger = exitCommand @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
   
-  
+  var exitConfirmed = false 
 /*  
   override def _live  = _script(this, 'live) {_par_or2(_seq(_threaded0{awaitMessageBeingHandled(true)}, 
                                                       _if0{shouldStep} (_par_or(_seq(_at{gui} (_tiny0{updateDisplay}), _stepCommand), 
