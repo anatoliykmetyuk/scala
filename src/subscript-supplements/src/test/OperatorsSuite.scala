@@ -2,9 +2,10 @@ package subscript.test
 
 //import org.scalatest.FunSuite
 
-import scala.util.Try
+import scala.util.{Try, Success, Failure}
 import org.junit._
 import org.junit.runner.RunWith
+import subscript.Predef._
 import subscript.DSL._
 import subscript.vm.{N_code_unsure, SimpleScriptDebuggerClass, ScriptNode, Script}
 import subscript.vm.executor._
@@ -185,7 +186,7 @@ abstract class OperatorsSuiteBase {
   
   var acceptedAtoms : String       = null
   var inputStream   : Stream[Char] = null
-  var expectedAtoms :   List[Char] = null
+  var expectedAtoms : List[Char] = null
   
   var expectedAtomsAtEndOfInput: Option[List[Char]] = None
   var scriptSuccessAtEndOfInput: Option[Boolean]    = None
@@ -274,12 +275,12 @@ abstract class OperatorsSuiteBase {
   def remove1Element[T](list: List[T], elt: T): List[T] = list diff List(elt)
   
   // add expectation of the given atom; also prepares for the symmetric to unexpect during the inevitable deactivation
-  def expect   (where: N_code_unsure[_], atom: Char) {where.onDeactivate(unexpect(where, atom)); expectedAtoms ::= atom}
+  def expect   (where: N_code_unsure[_], atomName: Char) {where.onDeactivate(unexpect(where, atomName)); expectedAtoms ::= atomName}
   // remove expectation of the given atom
-  def unexpect (where: N_code_unsure[_], atom: Char) {expectedAtoms = remove1Element(expectedAtoms, atom)}
+  def unexpect (where: N_code_unsure[_], atomName: Char) {expectedAtoms = remove1Element(expectedAtoms, atomName)}
   
   // try to accept the token from the input (if any); match it to the current atom.
-  def tryAccept(where: N_code_unsure[_], atom: Char) {
+  def tryAccept(where: N_code_unsure[_], atomName: Char) {
     if (inputStream.isEmpty || !expectedAtoms.contains(inputStream.head)) {
        where.result = ExecutionResult.Failure; 
        if (expectedAtomsAtEndOfInput== None) {
@@ -290,20 +291,22 @@ abstract class OperatorsSuiteBase {
                              +                                          s" scriptSuccess=$scriptSuccessAtEndOfInput")
        }
     }
-    else if (inputStream.head==atom) {inputStream = inputStream.drop(1); acceptedAtoms += atom}
-    else                             {where.result = ExecutionResult.Ignore}
+    else if (inputStream.head == atomName) {inputStream = inputStream.drop(1); acceptedAtoms += atomName}
+    else                                   {where.result = ExecutionResult.Ignore}
     
     //println("<<<tryAccept: "+where+" inputStream "+ (if (inputStream.isEmpty) "Empty" else ("head = "+inputStream.head))+"  has success = "+where.hasSuccess)
   } 
 
   //  script expression structure for an atom. It essentially comes down to the following script:
   def script ..
-    atom(name: Char) = @{expect(there,name)}: {?tryAccept(here, name)?}
+    atom(name: Char):Any = @{expect(there,name)}: {?tryAccept(here, name); $success_=('v':Any) ?}
     a = atom('a')
     b = atom('b')
     c = atom('c')
     d = atom('d')
     e = atom('e')
+    v = atom('v')
+    p(i:Any) = atom(i.toString.charAt(0))
 
   def scriptBehaviourList_for_debug: Seq[(Script[Any],String)]
   def scriptBehaviourList          : Seq[(Script[Any],String)]
@@ -370,10 +373,6 @@ Else all tests are run
 
 class OperatorsSuite extends OperatorsSuiteBase {
 
-    val scriptBehaviourList_for_debug = List(
-     // [a {*println("Hello")*} .. ; b]       -> "->a  a->ab aa->ab ab aab"
-  )
-    
   /*
    * scriptBehaviourMap: relation between scripts and outcomes
    *   keys are script strings, which should also be keys in the scriptBodyMap, so that bodies can be found
@@ -606,4 +605,10 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
   )
 
+   
+  val scriptBehaviourList_for_debug = List(
+     [a ~~> (i:Any)==>p(i)]       -> "a->v"
+  )
+    
+  
 }
