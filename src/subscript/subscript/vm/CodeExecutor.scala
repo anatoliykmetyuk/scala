@@ -132,7 +132,7 @@ abstract class AACodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor
   def executionFinished = { // make scriptExecutor call afterRun here, in its own message handling loop
     trace_nonl("executionFinished")
     scriptExecutor.doCodeThatInsertsMsgs_synchronized {
-      scriptExecutor.insert_traced(AAExecutionFinished(naa))
+      scriptExecutor.insert(AAExecutionFinished(naa))
     }
   }
   def toBeReexecuted    = scriptExecutor.insert(AAToBeReexecuted   (naa)) // so that executor reschedules n for execution
