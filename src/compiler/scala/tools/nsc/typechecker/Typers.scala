@@ -4677,7 +4677,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
            */
           def normalNode(code: Tree): Tree = {
             val hereToCode = blockToFunction(code, sSubScriptVM_N_code_normal_default, tree.pos)
-            Apply(sSubScriptDSL_code_normal_default, List(hereToCode))
+            atPos(tree.pos) {Apply(sSubScriptDSL_code_normal_default, List(hereToCode))}
           }
 
           // 1st try: an explicit script call
@@ -4732,7 +4732,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                  if (mode.inExprMode) tree else context.tree) match {
             case SilentTypeError  (err)  => err_notFound_methodResolution = err
             case SilentResultValue(fun1) =>
-              def appliedFunction: Tree = Apply(fun1, args)
+              def appliedFunction: Tree = atPos(tree.pos) {Apply(fun1, args)}
 
               // Check whether the method with such arguments exist
               silent(op => op.typed(appliedFunction)) match {
