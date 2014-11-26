@@ -86,7 +86,7 @@ def script..
 
       do1Step          = {*board.calculateGeneration*} @{gui(there)}: {!board.validate!}
       
-      noise            = 'n'; ... @{gui(there)}: board.doRandomize {*sleep*}
+      noise            = 'n'; ... @{gui(there)}: {board.doRandomize()} {*sleep*}
       randomize        =   randomizeCommand @{gui(there)}: {!board.doRandomize()!}
       clear            =       clearCommand @{gui(there)}: {!board.doClear!}
       singleStep       =        stepCommand do1Step

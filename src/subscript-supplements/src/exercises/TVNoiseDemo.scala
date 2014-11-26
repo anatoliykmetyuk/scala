@@ -149,7 +149,7 @@ class TVNoiseDemoApp  extends SimpleSubscriptApplication {
 
    drawingPanelControl = TBD
 
-      do1Step          = @{gui(there)}: tvNoisePanel.doRandomize
+      do1Step          = @{gui(there)}: {tvNoisePanel.doRandomize()}
       clear            = TBD
       speedControl     = TBD
                     
