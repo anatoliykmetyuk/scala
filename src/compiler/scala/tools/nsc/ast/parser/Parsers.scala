@@ -1400,7 +1400,15 @@ self =>
  
     def sSubScriptDSL: Tree = Select(Ident(nameSubScript), nameDSL)
     def sSubScriptVM : Tree = Select(Ident(nameSubScript), nameVM )
-
+    
+    // only for annotations: subscript.vm.model.template.concrete
+    val nameModel         = newTermName("model")
+    val nameTemplate      = newTermName("template")
+    val nameConcrete      = newTermName("concrete")
+    def sSubScriptVMModel                 : Tree = Select(sSubScriptVM             , nameModel   )
+    def sSubScriptVMModelTemplate         : Tree = Select(sSubScriptVMModel        , nameTemplate)
+    def sSubScriptVMModelTemplateConcrete : Tree = Select(sSubScriptVMModelTemplate, nameConcrete)
+    
     def sActualValueParameter      : Tree = Select(sSubScriptVM,       actualValueParameter_Name)
     def sFormalOutputParameter     : Tree = Select(sSubScriptVM,      formalOutputParameter_Name)
     def sFormalConstrainedParameter: Tree = Select(sSubScriptVM, formalConstrainedParameter_Name)
@@ -1507,7 +1515,7 @@ self =>
 	def underscore_TermName(n: TermName) = newTermName(underscore_prefix(n.toString))
 
     /*
-     * Enclose the given block with a function with parameter "here" (or "there", or "script") of the given node type 
+     * Enclose the given block with a function with parameter "here" (or "script") of the given node type 
      * i.e.: 
      *         here: NodeType => body
      * 
@@ -1516,13 +1524,13 @@ self =>
      *         _node: NodeType => implicit val here=_node; body
      * 
      */
-    def blockToFunction(body: Tree, nodeType: Tree, pos: Position, hereOrThere: TermName): Function = {
+    def blockToFunction(body: Tree, nodeType: Tree, pos: Position, hereOrScript: TermName): Function = {
       val vparams = List(
           atPos(pos) {
             makeParam(_node_Name, nodeType setPos pos)
           }
       )
-      val implicitVal          = atPos(pos) {ValDef(Modifiers(Flags.IMPLICIT), hereOrThere, TypeTree(), _node_Ident)}
+      val implicitVal          = atPos(pos) {ValDef(Modifiers(Flags.IMPLICIT), hereOrScript, TypeTree(), _node_Ident)}
       val implicitVal_seq_body = makeBlock(List(implicitVal,body))
       
       Function(vparams , implicitVal_seq_body)
@@ -1642,18 +1650,23 @@ self =>
         LPAREN_PLUS_MINUS_RPAREN -> "nu"                 ,
         WHILE                    -> "while"       
     )
-    val mapTokenToVMNodeTypeName = mapTokenToVMNodeString map {case(k,v) => (k, newTypeName("N_"+v): Name)}
+    val mapTokenToVMNodeTypeName     = mapTokenToVMNodeString map {case(k,v) => (k, newTypeName("N_"+v): Name)}
+    val mapTokenToVMTemplateTypeName = mapTokenToVMNodeString map {case(k,v) => (k, newTypeName("T_"+v): Name)} // tmp, used for annotations
     
     def dslFunForBreak       : Select = Select(sSubScriptDSL, break_Name)
     def dslFunFor(token: Int): Select = Select(sSubScriptDSL, mapTokenToDSLFunName(token))
     def vmNodeFor(token: Int): Select = Select(sSubScriptVM , mapTokenToVMNodeTypeName(token))
     
+    def vmNodeForCall_Any = AppliedTypeTree(Select(sSubScriptVM , newTypeName("N_call")), List(Ident(any_TypeName)))
+    
     val any_TypeName  = newTypeName("Any")
 
-    def vmNodeOf (tree: Tree): Tree   = tree match { // for @ nodes; these need to know the node type of their operand; very messy...
+    // for @ nodes; these need to know the node type of their operand; very messy...
+    def vmNodeOf (tree: Tree): Tree   = tree match { 
       case Apply(fun, Function(List(ValDef(_,_, nodeType,_)),block)::_) => nodeType
       case Apply(Select(_, fun_name), _) => vmNodeFor(LPAREN_ASTERISK2) // brutally assuming that fun_name is _launch_anchor
-      case _ => Ident(any_TypeName)
+      case ScriptApply(_,_) => vmNodeForCall_Any
+      case _ => Ident(any_TypeName) // TBD
     }
       
     def eatNewlines(): Boolean = {
@@ -1843,7 +1856,9 @@ self =>
 		        // Note: actual adapting parameters have already got an underscore in their name prefix (...)
 		        // so these will not be found in the scriptFormalOutputParameters list etc.
 		        val scriptLocalDataTransformer = new Transformer {
-		          override def transform(tree: Tree): Tree = tree match {
+		          override def transform(tree: Tree): Tree = {
+		            //println(s"transforming: $tree")
+		            tree match {
 		            case ident @ Ident(name) => 
 		              if      (isFormalOutputParameter      (name)
 		                    || isFormalConstrainedParameter (name)) atPos(ident.pos) {Select(Ident(newTermName(underscore_prefix(name.toString))), value_Name)} // _p.value
@@ -1856,6 +1871,7 @@ self =>
 		                      atPos(ident.pos)(ScriptVal(name))
 		              } else ident
 		            case _ => super.transform(tree)
+		            }
 		          }
 		        }
 		        val rhs_withAdjustedScriptLocalDataTransformed = scriptLocalDataTransformer.transform(scriptBody)
@@ -2436,15 +2452,68 @@ self =>
         annotationCode
       }
     }
-    def parseAnnotationScriptTerm = {
+    
+    // for input: @{annotationCode}: body     
+    // generate : DSL._at( (here:N_annotation[CN,CT])=>{implicit val there=here.there; annotationCode}) {body}
+    // in DSL:
+    //
+    // def _at[N<:CallGraphNode,T<:Child](_cf:N_annotation[N,T]=>Unit)  
+    //   = (_child: T) => T_annotation[N,T]((here:N_annotation[N,T]) => _cf(here), _child)
+    //
+    // activation: case n@N_annotation(t  ) => activateFrom(n, t.child0); executeCode(n)
+    // createNode: case t@T_annotation(_,_) => N_annotation(t)
+
+
+    def parseAnnotationScriptTerm: Tree = {
       atPos(in.token) {
+        val offset = in.offset
         val startPos = r2p(in.offset, in.offset, in.lastOffset max in.offset)
         val annotationCode = parseAnnotation
         val body           = stripParens(unaryPrefixScriptTerm(allowParameterList = false))
-        
-        val parameterizedType = vmNodeOf(body)
 
-        val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, parameterizedType, startPos)))
+        val vmNodeTypeOfBody = vmNodeOf(body)
+        
+        // OLD:
+        // val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, vmNodeTypeOfBody, startPos)))
+        // Apply(applyAnnotationCode, List(body))
+//*
+        val termName_N_annotation = newTermName("N_annotation") // must be term name! 
+        val typeName_N_annotation = newTypeName("N_annotation")  
+                                 // see case class TypeApply(fun: Tree, args: List[Tree])... assert(fun.isTerm, fun)
+        val vmnodeType_N_annotation = Select(sSubScriptVM, typeName_N_annotation)
+
+        // Generate: DSL._at{here: N_annotation[N_..., T_...] => implicit val there = here.there; annotationCode}{body}
+        
+        // N_annotation has two parameters; the first one is the node type of the child; the second one is the template type thereof.
+        // This is redundant, but FTTB there is no alternative and we have to provide this second parameter.
+        // A wildcard type ("_") would be possible, but it seems hard to generate the appropriate code 
+        // (with a fresh type name, an ExistentialTypeTree etc.)
+        // So here we create a new type from the node type, replacing N_ by T_, and substituting the package path
+        //
+        def templateTypeNameForNodeTypeName(tn: Name) = newTypeName("T"+tn.toString.substring(1))
+        def templateTypePathForNodeTypeName(tn: Name) = Select(sSubScriptVMModelTemplateConcrete, templateTypeNameForNodeTypeName(tn))
+        val templateOfBodyType = vmNodeTypeOfBody match {
+          case                 Select(_ , vmNodeClassName)                 =>                 templateTypePathForNodeTypeName(vmNodeClassName)
+          case AppliedTypeTree(Select(_ , vmNodeClassName), typeParamList) => AppliedTypeTree(templateTypePathForNodeTypeName(vmNodeClassName), typeParamList)
+          case anything => anything // println(s"templateOfBodyType unmatched: $vmNodeTypeOfBody")
+                     
+        }
+        val typeTree = AppliedTypeTree(vmnodeType_N_annotation, List(vmNodeTypeOfBody, templateOfBodyType))
+        
+        val lambda_here_annotationCode = { // elsewhere similar things are done in "blockToFunction"
+          
+          val vparams = List(
+            atPos(startPos) {
+              makeParam(here_Name, typeTree setPos startPos)
+            }
+          )
+          val implicitVal                    = atPos(startPos) {ValDef(Modifiers(Flags.IMPLICIT), there_Name, TypeTree(),  Select(here_Ident, there_Name))}
+          val implicitVal_seq_annotationCode = makeBlock(List(implicitVal, annotationCode))
+       
+          Function(vparams, implicitVal_seq_annotationCode)
+        }
+        val applyAnnotationCode = Apply(dslFunFor(AT), List(lambda_here_annotationCode))
+        
         Apply(applyAnnotationCode, List(body))
       }
     }

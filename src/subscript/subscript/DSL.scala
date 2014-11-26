@@ -116,8 +116,11 @@ object DSL {
   
   implicit def valueToActualValueParameter[T<:Any](value: T) = new ActualValueParameter(value)
 
-  def _at[N<:CallGraphNode,T<:Child](_cf:N=>Unit)  
-  = (_child: T) => T_annotation[N,T]((here:N_annotation[N,T]) => _cf(here.there), _child)
+  //def _at[N<:CallGraphNode,T<:Child](_cf:N=>Unit)  
+  //= (_child: T) => T_annotation[N,T]((here:N_annotation[N,T]) => _cf(here.there), _child)
+ 
+  def _at[N<:CallGraphNode,T<:Child](_cf:N_annotation[N,T]=>Unit)  
+  = (_child: T) => T_annotation[N,T]((here:N_annotation[N,T]) => _cf(here), _child)
  
   def _declare[T](name: Symbol) = new LocalVariable[T](name)
   
@@ -214,9 +217,19 @@ object DSL {
   // we do not want scripts in DSL.scala, because a regular Scala compiler should be able to translate this. 
   // So we manually translate the following script:
   //
-  // def script dataflow_then[T,U](s: Script[T], t: T=>Script[U]): U = 
-  //     var s_node: N_call[T] = null
+  //def script dataflow_then[T,U](s: Script[T], t: T=>Script[U]): U = 
+  //     var s_node: N_call[T] = null;
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
+  //def script dataflow_then(s: Script[Any], t: Any=>Script[Any]): Any = 
+  //     var s_node: N_call[Any] = null;
+  //     do @{s_node = there}: s then t(s_node.callee.$.get)
+  
+  //def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): ScriptNode[T] = 
+  //  _script(this, 'dataflow_then) {
+  //       _node => 
+  //                {implicit val script= _node; var s_node: N_call[S] = null
+  //                 _do_then(_call("s", (_n:N_call[S]) => {println(" _dataflow_then >> _do_then S"); s_node = _n; s}), 
+  //                          _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}))}}
   
   def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_call[T] = {
     val dataflowScript: ScriptNode[T] = _script(this, 'dataflow_then) {script =>
