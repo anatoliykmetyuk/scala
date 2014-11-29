@@ -26,7 +26,7 @@ trait GraphNode {
   /**
    * Unlinks the parent.
    */
-  def removeParent(p: Parent) {p removeChild this.asInstanceOf[p.Child]}
+  def removeParent(p: Parent) {if (p!=null)/*test should not be needed*/ p removeChild this.asInstanceOf[p.Child]}
   
   /**
    * Links a new child.

@@ -19,6 +19,7 @@ case class N_launch_anchor(template: T_launch_anchor)
 {
   type T = T_launch_anchor
   override def infoString = extendedInfoString
+  override def removeParent(p: Parent) {if (p!=null) super.removeParent(p)}
 }
 
 case class N_call[R](template: T_call[R]) extends CallGraphTreeNode {

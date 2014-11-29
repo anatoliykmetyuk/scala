@@ -32,15 +32,15 @@ trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Trace
   // Internal state
   // TBD: change restriction from `subscript` to `vm`
 
+  var name: String
   var traceLevel: Int
-  
   val stateAccessLock = new Object
   val msgQueue        = new MessageQueue   (stateAccessLock) with MQExtras with TrackToBeExecuted
   val msgHandlers     = new MessageHandlers(stateAccessLock)
   val graph           = new CallGraph(this)
   
   def hasSuccess: Boolean = graph.rootNode.hasSuccess
-  def hasActiveProcesses = !graph.rootNode.children.isEmpty
+  def hasActiveProcesses = !graph.rootNode.children.isEmpty || !msgQueue.isEmpty
 
   def doCodeThatInsertsMsgs_synchronized(code: =>Unit): Unit
  
@@ -87,6 +87,10 @@ trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Trace
 }
 
 abstract class AbstractScriptExecutor[S] extends ScriptExecutor[S] {
+
+  override var name = "" // for debugging
+  override def toString = s"${super.toString} $name"
+
   // Initialization
   msgQueue addListener this
   
@@ -136,18 +140,19 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
       updateCollections()
       if (tryHandleMessage(Int.MinValue)==null) awaitMessages
     }
+    trace(s"$this Exit main loop")
     $ = s.$
     this
   }
   
   def awaitMessages {
-    trace("awaitMessages")
+    trace(s"$this awaitMessages")
     messageAwaiting
     synchronized { // TBD: there should also be a synchronized call in the CodeExecutors
       if (msgQueue.collection.size == 0) { // looks stupid, but event may have happened&notify() may have been called during tracing
-          trace("wait - start")
+          trace(s"$this wait - start")
           wait() // for an event to happen 
-          trace("wait - end")
+          trace(s"$this wait - end")
       }
     }
     // note: there may also be deadlock because of unmatching communications

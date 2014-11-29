@@ -10,6 +10,8 @@ import subscript.vm.model.callgraph._
 class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] with MsgPublisher with MessagePriorities {self =>
   private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
   
+  def isEmpty = collection.isEmpty
+  
   /* Internal state */
   val ordering = new Ordering[CallGraphMessage] {
     def compare(x: CallGraphMessage, y: CallGraphMessage): Int = {

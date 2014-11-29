@@ -40,12 +40,20 @@ object GraphicalDebugger2 extends GraphicalDebuggerApp {
 //    
 
 class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
+
+  def traceLevel = 2
+  def otherTraceLevel = 1
+  def trace(s: => Any) = if (traceLevel>0) {println(s); Console.flush}
   
-  private var _scriptExecutor: ScriptExecutor[_] = null
-  def scriptExecutor = _scriptExecutor
+  private var _otherScriptExecutor: ScriptExecutor[_] = null
+  var vmThread: Thread = null
+  
+  def otherScriptExecutor = _otherScriptExecutor
   override def attach(p: MsgPublisher) {
     super.attach(p)
-    _scriptExecutor = p.asInstanceOf[ScriptExecutor[_]]
+    _otherScriptExecutor = p.asInstanceOf[ScriptExecutor[_]]
+    _otherScriptExecutor.traceLevel = otherTraceLevel
+    _otherScriptExecutor.name = "otherScriptExecutor"
   }
   
   override def main(args: Array[String]): Unit = {
@@ -59,10 +67,11 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
                    lArgs = lArgs.tail; if (lArgs.isEmpty) return
       case _ =>
     }
-    new Thread{override def run={
+    vmThread = new Thread{override def run={
       live
       quit
-    }}.start()
+    }}
+    vmThread.start()
     
     val className = lArgs.head
     try {
@@ -304,7 +313,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
         (resultW, thisX)
     }
     
-    if (scriptExecutor==null) return
+    if (otherScriptExecutor==null) return
     g.setFont(normalFont)
     var currentXGrid = 0d // drawn width of template trees so far, in Grid coordinates
     getScriptTemplates.foreach { t => currentXGrid += drawTemplateTree(t, currentXGrid, 0)._1}
@@ -483,7 +492,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
 	    }
         (resultW, thisX)
 	  }
-      if (scriptExecutor!=null) drawTree(rootNode, 0, 0)
+      if (otherScriptExecutor!=null) drawTree(rootNode, 0, 0)
   }
   
   val maxLogListMsgs    = 5000
@@ -545,6 +554,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   }
   val autoCheckBox      = new CheckBox {
     text                = "Auto"
+  //selected            = true
   }
   val speedSlider       = new Slider {
     min                 =   0
@@ -564,16 +574,6 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   def sleep(duration_ms: Long) = try {Thread.sleep(duration_ms)} catch {case e: InterruptedException => println("sleep interrupted")}
   def confirmExit: Boolean = Dialog.showConfirmation(exitButton, "Are you sure?", "About to exit")==Dialog.Result.Yes
-  
-  object MessageStatusLock
-  def messageBeingHandled(value: Boolean): Unit = MessageStatusLock.synchronized {
-    messageBeingHandled = value
-    MessageStatusLock.notifyAll()
-  }
-  
-  def awaitMessageBeingHandled(value: Boolean) = MessageStatusLock.synchronized {
-    while (messageBeingHandled != value) MessageStatusLock.wait()
-  }
   
   def shouldStep: Boolean =
     currentMessage match {
@@ -602,6 +602,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       }
     }
     catch {case e: InterruptedException => }
+    trace(f"waitForStepTimeout done")
   }
   def logMessage_GUIThread(m: String, msg: CallGraphMessage) {
     
@@ -631,7 +632,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     
     // Sorting the list of scriptExecutor messages
     // before rendering
-    val ord = scriptExecutor.msgQueue.ordering
+    val ord = otherScriptExecutor.msgQueue.ordering
     val orderedMessages = callGraphMessages.toList.sorted(ord).reverse
     orderedMessages.foreach(msgQueueListModel.addElement(_)) 
   }
@@ -643,24 +644,84 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     callGraphPanel    .repaint()
     templateTreesPanel.repaint()
   }
-  def doesThisAllowToBeDebugged = false
-  override def live = _execute(_live, doesThisAllowToBeDebugged) 
+  def doesThisAllowToBeDebugged = false // overridden in GraphicalDebugger2
+  val myScriptExecutor = ScriptExecutorFactory.createScriptExecutor[Any](doesThisAllowToBeDebugged)
+  myScriptExecutor.name = "myScriptExecutor";
+  
+  override def live =  try {
+    _execute(_live, debugger=null, myScriptExecutor)
+  }
+  catch{ case t:Throwable => t.printStackTrace; throw t}
+//override def live = myExecutor = _execute(_live, doesThisAllowToBeDebugged) 
   
   def script..
      live       = (
                     {*awaitMessageBeingHandled(true)*}
-                    ( if shouldStep then @{gui(there)}: {!updateDisplay!} stepCommand
-                                      || if autoCheckBox.selected then {*waitForStepTimeout*} else (-)
-                    )
+                    ( if shouldStep then ( 
+                        @{gui(there)}: {!updateDisplay!} 
+                        stepCommand || if autoCheckBox.selected then {*waitForStepTimeout*} 
+                    ) )
                     {messageBeingHandled(false)}
                     ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
-                  ) || exitDebugger
+                  )
+                  || exitDebugger
   
    stepCommand  = stepButton
    exitCommand  = exitButton
    exitDebugger = exitCommand @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
   
   var exitConfirmed = false 
+
+  def kickExecutors = {kickExecutor(myScriptExecutor); kickExecutor(otherScriptExecutor)}
+  def kickExecutor(executor: ScriptExecutor[_]) = {
+    if (executor!=null) {                       //trace(f"kickExecutor start: $executor")
+      executor.synchronized{executor.notify()}; //trace(f"kickExecutor   end: $executor")
+    }  
+  }
+  
+  object MessageStatusLock
+  def messageBeingHandled(value: Boolean): Unit = {
+    trace(f" messageBeingHandled($value%5s) start")
+    MessageStatusLock.synchronized {
+      //trace(f" messageBeingHandled($value%5s) synchronized")
+      // maybe needed because sometimes (=race condition) the other script executor would stay waiting
+      kickExecutor(otherScriptExecutor)
+      messageBeingHandled = value
+      MessageStatusLock.notifyAll()
+    }
+    trace(f" messageBeingHandled($value%5s) end")
+  }
+  
+  def awaitMessageBeingHandled(value: Boolean) = {
+    //trace(f"awaitMsgBeingHandled($value%5s) start")
+    MessageStatusLock.synchronized {
+      //trace(f"awaitMsgBeingHandled($value%5s) wait start")
+      while (messageBeingHandled != value) MessageStatusLock.wait()
+    //trace(f"awaitMsgBeingHandled($value%5s) wait end")
+    }
+    //trace(f"awaitMsgBeingHandled($value%5s) end")
+  }
+    
+  import scala.collection.JavaConversions._
+  def dumpStacks = for ((thread,sts) <- mapAsScalaMap(Thread.getAllStackTraces)) {
+     trace(thread)
+     sts foreach {trace(_)}
+     trace("")
+   }
+   def dumpExecutors = {dumpExecutor(myScriptExecutor); dumpExecutor(otherScriptExecutor);}
+   def dumpExecutor(executor: ScriptExecutor[_]) = {
+     if (traceLevel > 1) {
+       trace(executor)
+       trace("====================")
+       val debugger = new SimpleScriptDebuggerClass
+       debugger.attach(executor)
+       debugger.traceLevel = 4
+       debugger.traceTree
+       debugger.traceMessages
+       trace("")
+     }
+   }
+   
 /*  
   override def _live  = _script(this, 'live) {_par_or2(_seq(_threaded0{awaitMessageBeingHandled(true)}, 
                                                       _if0{shouldStep} (_par_or(_seq(_at{gui} (_tiny0{updateDisplay}), _stepCommand), 
@@ -676,8 +737,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
 //def   _exitDebugger = _script('exitDebugger) {_seq(  _exitCommand, _at{gui}(_normal{exitConfirmed=confirmExit}), _while{!exitConfirmed})}
   
   */
-  def callGraphMessages = scriptExecutor.msgQueue.collection
-  def rootNode          = scriptExecutor.rootNode
+  def callGraphMessages = otherScriptExecutor.msgQueue.collection
+  def rootNode          = otherScriptExecutor.rootNode
   
   override def messageHandled(m: CallGraphMessage): Unit = {
     currentMessage = m
@@ -689,6 +750,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   override def messageDequeued    (m: CallGraphMessage                 ) = logMessage_GUIThread("--", m)
   override def messageContinuation(m: CallGraphMessage, c: Continuation) = logMessage_GUIThread("**", c)
   override def messageAwaiting: Unit = {
+    trace(f"messageAwaiting")
     if (checkBox_log_Wait .selected) currentMessageTF.text = "Waiting..."
     if (checkBox_step_Wait.selected) callGraphPanel.repaint()
 }
