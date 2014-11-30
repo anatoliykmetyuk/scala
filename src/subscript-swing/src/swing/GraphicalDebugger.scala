@@ -2,6 +2,7 @@ package subscript.swing
 
 import java.awt.{Font, BasicStroke, Stroke, Color => AWTColor}
 import java.awt.geom.AffineTransform
+import java.util.concurrent.Executors
 
 import javax.swing.JList
 
@@ -39,7 +40,7 @@ object GraphicalDebugger2 extends GraphicalDebuggerApp {
 }
 //    
 
-class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
+class GraphicalDebuggerApp extends SimpleSwingApplication with MsgListener {
 
   def traceLevel = 2
   def otherTraceLevel = 1
@@ -69,7 +70,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     }
     vmThread = new Thread{override def run={
       live
-      quit
+//      quit
     }}
     vmThread.start()
     
@@ -602,7 +603,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       }
     }
     catch {case e: InterruptedException => }
-    trace(f"waitForStepTimeout done")
+//    trace(f"waitForStepTimeout done")
   }
   def logMessage_GUIThread(m: String, msg: CallGraphMessage) {
     
@@ -647,28 +648,70 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   def doesThisAllowToBeDebugged = false // overridden in GraphicalDebugger2
   val myScriptExecutor = ScriptExecutorFactory.createScriptExecutor[Any](doesThisAllowToBeDebugged)
   myScriptExecutor.name = "myScriptExecutor";
-  
-  override def live =  try {
-    _execute(_live, debugger=null, myScriptExecutor)
+
+
+
+  def live = {
+    import scala.concurrent.{Future, Promise, ExecutionContext}
+    import scala.swing.event._
+
+    implicit val executionContext = ExecutionContext fromExecutorService Executors.newCachedThreadPool()
+
+    def stepCommand: Future[Unit] = {
+      val promise = Promise[Unit]()
+      new Reactor {
+        stepButton.enabled = true
+        listenTo(stepButton)
+        reactions += {case _: ButtonClicked => promise.success(()); deafTo(stepButton)}
+      }
+      promise.future
+    }
+
+    def autoStepCommand: Future[Unit] = {
+      lazy val never = Promise[Unit]().future
+      if (autoCheckBox.selected) Future {waitForStepTimeout} else never
+    }
+
+    def again: Unit = Future {awaitMessageBeingHandled(true)}.flatMap {_ =>
+      if (shouldStep) {
+        Swing.onEDTWait(updateDisplay)
+        Future firstCompletedOf Seq(stepCommand, autoStepCommand)
+      } else Future.successful(())
+    }.onSuccess {case _ =>
+      messageBeingHandled(false)
+      again
+    }
+
+    new Reactor {
+      exitButton.enabled = true
+      listenTo(exitButton)
+      reactions += {case _: ButtonClicked => System.exit(1)}
+    }
+
+    again
   }
-  catch{ case t:Throwable => t.printStackTrace; throw t}
+
+//  override def live =  try {
+//    _execute(_live, debugger=null, myScriptExecutor)
+//  }
+//  catch{ case t:Throwable => t.printStackTrace; throw t}
 //override def live = myExecutor = _execute(_live, doesThisAllowToBeDebugged) 
   
-  def script..
-     live       = (
-                    {*awaitMessageBeingHandled(true)*}
-                    ( if shouldStep then ( 
-                        @{gui(there)}: {!updateDisplay!} 
-                        stepCommand || if autoCheckBox.selected then {*waitForStepTimeout*} 
-                    ) )
-                    {messageBeingHandled(false)}
-                    ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
-                  )
-                  || exitDebugger
-  
-   stepCommand  = stepButton
-   exitCommand  = exitButton
-   exitDebugger = exitCommand @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
+//  def script..
+//     live       = (
+//                    {*awaitMessageBeingHandled(true)*}
+//                    ( if shouldStep then (
+//                        @{gui(there)}: {!updateDisplay!}
+//                        stepCommand || if autoCheckBox.selected then {*waitForStepTimeout*}
+//                    ) )
+//                    {messageBeingHandled(false)}
+//                    ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
+//                  )
+//                  || exitDebugger
+//
+//   stepCommand  = stepButton
+//   exitCommand  = exitButton
+//   exitDebugger = exitCommand @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
   
   var exitConfirmed = false 
 
@@ -681,7 +724,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   object MessageStatusLock
   def messageBeingHandled(value: Boolean): Unit = {
-    trace(f" messageBeingHandled($value%5s) start")
+//    trace(f" messageBeingHandled($value%5s) start")
     MessageStatusLock.synchronized {
       //trace(f" messageBeingHandled($value%5s) synchronized")
       // maybe needed because sometimes (=race condition) the other script executor would stay waiting
@@ -689,7 +732,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       messageBeingHandled = value
       MessageStatusLock.notifyAll()
     }
-    trace(f" messageBeingHandled($value%5s) end")
+//    trace(f" messageBeingHandled($value%5s) end")
   }
   
   def awaitMessageBeingHandled(value: Boolean) = {
