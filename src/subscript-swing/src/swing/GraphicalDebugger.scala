@@ -33,14 +33,7 @@ import subscript.vm.model.callgraph._
  *    _execute(scriptDef, debugger, executor)
  */
 
-object GraphicalDebugger  extends GraphicalDebuggerApp
-object GraphicalDebugger2 extends GraphicalDebuggerApp {
-  // extra singleton to allow for GraphicalDebugging a GraphicalDebugger
-  override def doesThisAllowToBeDebugged = true
-}
-//    
-
-class GraphicalDebuggerApp extends SimpleSwingApplication with MsgListener {
+trait GraphicalDebugger extends MsgListener {
 
   def traceLevel = 2
   def otherTraceLevel = 1
@@ -57,7 +50,7 @@ class GraphicalDebuggerApp extends SimpleSwingApplication with MsgListener {
     _otherScriptExecutor.name = "otherScriptExecutor"
   }
   
-  override def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     var lArgs = args
     if (lArgs.isEmpty) return
     ScriptExecutorFactory.addScriptDebugger(this)
@@ -70,7 +63,7 @@ class GraphicalDebuggerApp extends SimpleSwingApplication with MsgListener {
     }
     vmThread = new Thread{override def run={
       live
-//      quit
+      quit
     }}
     vmThread.start()
     
@@ -86,6 +79,9 @@ class GraphicalDebuggerApp extends SimpleSwingApplication with MsgListener {
       case other: Throwable => println(other)
     }
   }
+
+  def live: Unit
+  def quit: Unit
 
   var messageBeingHandled = false
   var currentMessage: CallGraphMessage = null
@@ -650,69 +646,6 @@ class GraphicalDebuggerApp extends SimpleSwingApplication with MsgListener {
   myScriptExecutor.name = "myScriptExecutor";
 
 
-
-  def live = {
-    import scala.concurrent.{Future, Promise, ExecutionContext}
-    import scala.swing.event._
-
-    implicit val executionContext = ExecutionContext fromExecutorService Executors.newCachedThreadPool()
-
-    def stepCommand: Future[Unit] = {
-      val promise = Promise[Unit]()
-      new Reactor {
-        stepButton.enabled = true
-        listenTo(stepButton)
-        reactions += {case _: ButtonClicked => promise.success(()); deafTo(stepButton)}
-      }
-      promise.future
-    }
-
-    def autoStepCommand: Future[Unit] = {
-      lazy val never = Promise[Unit]().future
-      if (autoCheckBox.selected) Future {waitForStepTimeout} else never
-    }
-
-    def again: Unit = Future {awaitMessageBeingHandled(true)}.flatMap {_ =>
-      if (shouldStep) {
-        Swing.onEDTWait(updateDisplay)
-        Future firstCompletedOf Seq(stepCommand, autoStepCommand)
-      } else Future.successful(())
-    }.onSuccess {case _ =>
-      messageBeingHandled(false)
-      again
-    }
-
-    new Reactor {
-      exitButton.enabled = true
-      listenTo(exitButton)
-      reactions += {case _: ButtonClicked => System.exit(1)}
-    }
-
-    again
-  }
-
-//  override def live =  try {
-//    _execute(_live, debugger=null, myScriptExecutor)
-//  }
-//  catch{ case t:Throwable => t.printStackTrace; throw t}
-//override def live = myExecutor = _execute(_live, doesThisAllowToBeDebugged) 
-  
-//  def script..
-//     live       = (
-//                    {*awaitMessageBeingHandled(true)*}
-//                    ( if shouldStep then (
-//                        @{gui(there)}: {!updateDisplay!}
-//                        stepCommand || if autoCheckBox.selected then {*waitForStepTimeout*}
-//                    ) )
-//                    {messageBeingHandled(false)}
-//                    ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
-//                  )
-//                  || exitDebugger
-//
-//   stepCommand  = stepButton
-//   exitCommand  = exitButton
-//   exitDebugger = exitCommand @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
-  
   var exitConfirmed = false 
 
   def kickExecutors = {kickExecutor(myScriptExecutor); kickExecutor(otherScriptExecutor)}
