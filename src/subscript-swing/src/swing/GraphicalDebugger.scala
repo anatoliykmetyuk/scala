@@ -2,6 +2,7 @@ package subscript.swing
 
 import java.awt.{Font, BasicStroke, Stroke, Color => AWTColor}
 import java.awt.geom.AffineTransform
+import java.util.concurrent.Executors
 
 import javax.swing.JList
 
@@ -32,14 +33,7 @@ import subscript.vm.model.callgraph._
  *    _execute(scriptDef, debugger, executor)
  */
 
-object GraphicalDebugger  extends GraphicalDebuggerApp
-object GraphicalDebugger2 extends GraphicalDebuggerApp {
-  // extra singleton to allow for GraphicalDebugging a GraphicalDebugger
-  override def doesThisAllowToBeDebugged = true
-}
-//    
-
-class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
+trait GraphicalDebugger extends MsgListener {
 
   def traceLevel = 2
   def otherTraceLevel = 1
@@ -56,7 +50,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
     _otherScriptExecutor.name = "otherScriptExecutor"
   }
   
-  override def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     var lArgs = args
     if (lArgs.isEmpty) return
     ScriptExecutorFactory.addScriptDebugger(this)
@@ -85,6 +79,9 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       case other: Throwable => println(other)
     }
   }
+
+  def live: Unit
+  def quit: Unit
 
   var messageBeingHandled = false
   var currentMessage: CallGraphMessage = null
@@ -602,7 +599,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       }
     }
     catch {case e: InterruptedException => }
-    trace(f"waitForStepTimeout done")
+//    trace(f"waitForStepTimeout done")
   }
   def logMessage_GUIThread(m: String, msg: CallGraphMessage) {
     
@@ -647,29 +644,8 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   def doesThisAllowToBeDebugged = false // overridden in GraphicalDebugger2
   val myScriptExecutor = ScriptExecutorFactory.createScriptExecutor[Any](doesThisAllowToBeDebugged)
   myScriptExecutor.name = "myScriptExecutor";
-  
-  override def live =  try {
-    _execute(_live, debugger=null, myScriptExecutor)
-  }
-  catch{ case t:Throwable => t.printStackTrace; throw t}
-//override def live = myExecutor = _execute(_live, doesThisAllowToBeDebugged) 
-  
-  def script..
-     live       = (
-                    {*awaitMessageBeingHandled(true)*}
-                    ( if shouldStep then ( 
-                        @{gui(there)}: {!updateDisplay!} 
-                        stepCommand || if autoCheckBox.selected then {*waitForStepTimeout*} 
-                    ) )
-                    {messageBeingHandled(false)}
-                    ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
-                  )
-                  || exitDebugger
-  
-   stepCommand  = stepButton
-   exitCommand  = exitButton
-   exitDebugger = exitCommand @{gui(there)}:{exitConfirmed=confirmExit} while(!exitConfirmed)
-  
+
+
   var exitConfirmed = false 
 
   def kickExecutors = {kickExecutor(myScriptExecutor); kickExecutor(otherScriptExecutor)}
@@ -681,7 +657,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
   
   object MessageStatusLock
   def messageBeingHandled(value: Boolean): Unit = {
-    trace(f" messageBeingHandled($value%5s) start")
+//    trace(f" messageBeingHandled($value%5s) start")
     MessageStatusLock.synchronized {
       //trace(f" messageBeingHandled($value%5s) synchronized")
       // maybe needed because sometimes (=race condition) the other script executor would stay waiting
@@ -689,7 +665,7 @@ class GraphicalDebuggerApp extends SimpleSubscriptApplication with MsgListener {
       messageBeingHandled = value
       MessageStatusLock.notifyAll()
     }
-    trace(f" messageBeingHandled($value%5s) end")
+//    trace(f" messageBeingHandled($value%5s) end")
   }
   
   def awaitMessageBeingHandled(value: Boolean) = {
