@@ -16,7 +16,7 @@ object PureScalaDebugger extends PureScalaDebuggerApp
 class PureScalaDebuggerApp extends SimpleSwingApplication with GraphicalDebugger {
   implicit val executionContext = ExecutionContext fromExecutorService Executors.newCachedThreadPool()
 
-  def live = {
+  def live: Unit = {
     def again: Unit = Future {awaitMessageBeingHandled(true)}.flatMap {_ =>
       if (shouldStep) {
         Swing.onEDTWait(updateDisplay)
@@ -30,7 +30,11 @@ class PureScalaDebuggerApp extends SimpleSwingApplication with GraphicalDebugger
     }
 
     again
-    waitForExit
+
+    while (true) {
+      waitForExit
+      if (confirmExit) return
+    }
   }
 
   // The reactorBank variable is needed to bypass a peculiarity of Scala Swing, which,
