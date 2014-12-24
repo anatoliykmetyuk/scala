@@ -146,7 +146,8 @@ import subscript.vm.model.callgraph._
 abstract class OperatorsSuiteBase {
 
   var doVerboseLevel = 0
-  def doVerbose = doVerboseLevel>0
+  def doSilent       = doVerboseLevel < 0
+  def doVerbose      = doVerboseLevel > 0
   
   /*
    * Behaviour operators characterized by their logic property
@@ -198,7 +199,7 @@ abstract class OperatorsSuiteBase {
     currentTestIndex += 1
     
     lazy val afterInput    = if(input=="") "" else s"after input: $input"
-    lazy val failureString = if(expectTestFailure) "Fails as marked" else "Fails"
+    lazy val failureString = /*if(expectTestFailure) "Fails as marked" else*/ "Fails"
     var testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult%4s"
 
     if (testIndexForDebugging > 0 && 
@@ -248,9 +249,15 @@ abstract class OperatorsSuiteBase {
       ||  acceptedAtoms != input) 
       {
          hadTestFailure = true
-         if (!expectTestFailure||doVerbose||debug) {
-           val expectedItemsStr = " expects: "+(if(executionSuccess) "1" else "")+expectedAtomsAtEndOfInputString
-           val acceptedInputStr = if (acceptedAtoms == input) "" else s" accepted input: $acceptedAtoms"
+         val expectedItemsStr = f" expects: ${(if(executionSuccess) "1" else "")+expectedAtomsAtEndOfInputString}%4s"
+         val acceptedInputStr = if (acceptedAtoms == input) "" else s" accepted input: $acceptedAtoms"
+
+         if (expectTestFailure) {
+           if (!doSilent||debug) {
+             println(s"$testInfo - $failureString;$acceptedInputStr$expectedItemsStr; already marked as FAIL")
+           }
+         }
+         else if (doVerbose||debug) {
            println(s"$testInfo - $failureString;$acceptedInputStr$expectedItemsStr")
          }
       }    
@@ -343,6 +350,7 @@ object OperatorsSuiteApp extends OperatorsSuite {
 """Usage: <scala> subscript.test.OperatorsSuite [option] [testIndex]
 
 Options:
+  -s: silent: do not report tests that fail expectedly
   -v: verbose
   -V: more verbose
       
@@ -356,8 +364,9 @@ Else all tests are run
       val argsList = args.toList
       val head::tail = argsList
       val numList = head match {
-                  case "-v" => doVerboseLevel = 1; tail
-                  case "-V" => doVerboseLevel = 2; tail
+                  case "-s" => doVerboseLevel = -1; tail
+                  case "-v" => doVerboseLevel =  1; tail
+                  case "-V" => doVerboseLevel =  2; tail
                   case   _  => argsList
       }
       numList match {
@@ -524,10 +533,10 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [ . / a b / . / c d ]     -> "FAIL:->1a a->bc ab ac->d acd"
    , [ a b  | .  | (+) ]       -> "->a a->1b ab"
    , [ a b || . || (+) ]       -> "->a a"
-   , [ a b  & .  & (-) ]       -> "->a a->b FAIL:ab->0"
+   , [ a b  & .  & (-) ]       -> "->a a->b ab->0"
    , [ a b && . && (-) ]       -> "->a a->0"
-   , [ (a b+(+))  & .  & (-) ] -> "->1a     FAIL:a->b FAIL:ab->0"
-   , [ (a b+(+)) && . && (-) ] -> "->1a FAIL:a->0"
+   , [ (a b+(+))  & .  & (-) ] -> "->1a a->b ab->0"
+   , [ (a b+(+)) && . && (-) ] -> "->1a a->0"
 
   
    // if
@@ -602,7 +611,7 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [ {} + @{there.priority= -1}:     {}(-)] -> "->1"
    
    // Various
-   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
+   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac ca->bc ac->bc acc->bc acb->ac"
   )
 
    
