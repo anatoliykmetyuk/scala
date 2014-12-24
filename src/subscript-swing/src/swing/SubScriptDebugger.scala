@@ -4,6 +4,10 @@ import subscript.swing.Scripts._
 import subscript.DSL._
 
 object SubScriptDebugger extends SubScriptDebuggerApp
+object SubScriptDebugger2 extends SubScriptDebuggerApp {
+  // extra singleton to allow for GraphicalDebugging the SubScriptDebuggerApp
+  override def doesThisAllowToBeDebugged = true
+}
 
 class SubScriptDebuggerApp extends SimpleSubscriptApplication with GraphicalDebugger {
 
