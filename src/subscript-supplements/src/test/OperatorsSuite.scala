@@ -522,7 +522,8 @@ class OperatorsSuite extends OperatorsSuiteBase {
    // optional break
    , [ a / .     ]             -> "->a a"
    , [ a / ..    ]             -> "->a a"
-   , [ a b / ..  ]             -> "->a FAIL:a->ab ab aa->ab"
+   , [ a b / . / c ]           -> "->ac a->bc ab ac"
+   , [ a b / ..  ]             -> "->a  a->ab ab aa->ab"
    , [ a / . / b ]             -> "->a a"
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
    , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"

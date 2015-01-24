@@ -164,10 +164,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
                                                                    //don't return; just put the continuations in place
                                                                  }
                case n@  N_n_ary_op      (_: T_n_ary, _     )  => if(message.child!=null) {
-                                                                   if (n.indexChild_marksOptionalPart  >= 0 &&
-                                                                       n.indexChild_marksOptionalPart < message.child.index)
-                                                                     n.aaActivated_optional = true
-                                                                   n.aaActivated = true
+                                                                   n.aaActivated_notBeforeLastOptionalBreak = true
                                                                    insertContinuation(message)
                                                                    //don't return; just put the continuations in place
                                                                  }
@@ -311,39 +308,6 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
     message.node match {
        case n@N_1_ary_op(t: T_1_ary)    => insertContinuation1(message) //don't return; just put the continuations in place
        case n@N_n_ary_op(t: T_n_ary, _) => insertContinuation (message) //don't return; just put the continuations in place, mainly used for left merge operators
-                                                                     
-          // decide on exclusions and suspensions; deciding on exclusions must be done before activating next operands, of course
-          var nodesToBeSuspended: Seq[n.Child] = null
-          var nodesToBeExcluded : Seq[n.Child] = null
-      if (T_n_ary_op.isSuspending(n.template)) {
-          val s = message.child
-          if (s.aaHappenedCount==1) {
-            t.kind match {
-              case "%&" | "%;"   => nodesToBeSuspended = n.children diff List(s)
-              case "%"           => nodesToBeExcluded  = n.children.filter(_.index < s.index) 
-                                    nodesToBeSuspended = n.children.filter(_.index > s.index)
-              case "%/" | "%/%/" => nodesToBeSuspended = n.children.filter(_.index < s.index) 
-            }
-          }
-      }
-      else {
-            t.kind match {
-              case ";" | "|;" 
-               | "||;" | "|;|" 
-               | "+"   | "|+"  => nodesToBeExcluded = n.children.filter(_.index != message.child.index)
-                             // after (*), do: nodesToBeExcluded = n.children -- message.aaHappeneds.map( (as:AAHappened) => as.child)  
-                      
-              case "/" | "|/" 
-                 | "|/|"       => nodesToBeExcluded = n.children.filter(_.index < message.child.index)
-                                  // after (*), do: 
-                                  // val minIndex = message.child.index
-                                  // nodesToBeExcluded = n.children -- message.aaHappeneds.map( (as:AAHappened) => as.child)
-              case _ =>
-            }
-          }
-        // do exclusions and suspensions
-        if (nodesToBeExcluded !=null) nodesToBeExcluded .foreach((n) => insert(Exclude(message.node, n)))
-        if (nodesToBeSuspended!=null) nodesToBeSuspended.foreach((n) => insert(Suspend(n)))
        case _ =>      
     }
     

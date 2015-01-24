@@ -13,8 +13,7 @@ trait OptionalChildrenState extends ChildrenState {this: CallGraphNode =>
    * x & . & y
    * x & . & y & . & z
    */
-  var _nActivatedOptionalChildren               = 0
-  def nActivatedOptionalChildren                = _nActivatedOptionalChildren
+  var nActivatedOptionalChildren                = 0
   var nActivatedOptionalChildrenWithSuccess     = 0
   def nActivatedOptionalChildrenWithoutSuccess  = nActivatedOptionalChildren       - nActivatedOptionalChildrenWithSuccess
   def nActivatedMandatoryChildren               = nActivatedChildren               - nActivatedOptionalChildren
@@ -35,15 +34,21 @@ trait OptionalChildrenState extends ChildrenState {this: CallGraphNode =>
    * As soon as such an atomic action has happened, the z part is activated, and 
    * indexChild_marksOptionalPart becomes indexChild_marksPause, and the latter becomes -1.
    */
-  var indexChild_marksOptionalPart = -1
-  var indexChild_marksPause = -1
-  var aaActivated = false
-  var aaActivated_optional = false
-  
-  def resetNActivatedOptionalChildren = {
-    _nActivatedOptionalChildren = 0
-    nActivatedOptionalChildrenWithSuccess = 0
+  var _indexChild_optionalBreak_secondLast = -1
+  var _indexChild_optionalBreak_last       = -1
+  def  indexChild_optionalBreak_secondLast = _indexChild_optionalBreak_secondLast
+  def  indexChild_optionalBreak_last       = _indexChild_optionalBreak_last
+  def  indexChild_optionalBreak_last_=(v:Int) = {
+      _indexChild_optionalBreak_secondLast = _indexChild_optionalBreak_last
+      _indexChild_optionalBreak_last = v
+      aaActivated_notBeforeLastOptionalBreak = false // reset for next time
   }
   
-  def isOptionalChild(c:Child) = {indexChild_marksOptionalPart >= 0 && c.index >= indexChild_marksOptionalPart}
+  var aaActivated_notBeforeLastOptionalBreak = false
+  //var aaActivated_optional = false
+  
+  def resetNActivatedOptionalChildren = {
+    nActivatedOptionalChildren = 0
+    nActivatedOptionalChildrenWithSuccess = 0
+  }
 }

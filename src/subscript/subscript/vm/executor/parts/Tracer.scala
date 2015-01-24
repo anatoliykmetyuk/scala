@@ -18,17 +18,16 @@ trait Tracer {
     {
     println(s"$str:")
     traceAttribute_internal("activationMode", n.activationMode)
-    traceAttribute_internal("hadFullBreak", n.hadFullBreak)
-    traceAttribute_internal("nActivatedMandatoryChildren", n.nActivatedMandatoryChildren)
-    traceAttribute_internal("nActivatedMandatoryChildrenWithSuccess", n.nActivatedMandatoryChildrenWithSuccess)
+    traceAttribute_internal("hadFullBreak"  , n.hadFullBreak)
+    traceAttribute_internal("nActivatedMandatoryChildren"              , n.nActivatedMandatoryChildren)
+    traceAttribute_internal("nActivatedMandatoryChildrenWithSuccess"   , n.nActivatedMandatoryChildrenWithSuccess)
     traceAttribute_internal("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
-    traceAttribute_internal("nActivatedOptionalChildren", n.nActivatedOptionalChildren)
-    traceAttribute_internal("nActivatedOptionalChildrenWithSuccess", n.nActivatedOptionalChildrenWithSuccess)
-    traceAttribute_internal("nActivatedOptionalChildrenWithoutSuccess", n.nActivatedOptionalChildrenWithoutSuccess)
-    traceAttribute_internal("indexChild_marksOptionalPart", n.indexChild_marksOptionalPart)
-    traceAttribute_internal("indexChild_marksPause", n.indexChild_marksPause)
-    traceAttribute_internal("aaActivated", n.aaActivated)
-    traceAttribute_internal("aaActivated_optional", n.aaActivated_optional)
+    traceAttribute_internal("nActivatedOptionalChildren"               , n.nActivatedOptionalChildren)
+    traceAttribute_internal("nActivatedOptionalChildrenWithSuccess"    , n.nActivatedOptionalChildrenWithSuccess)
+    traceAttribute_internal("nActivatedOptionalChildrenWithoutSuccess" , n.nActivatedOptionalChildrenWithoutSuccess)
+    traceAttribute_internal("indexChild_optionalBreak_last"            , n.indexChild_optionalBreak_last)
+    traceAttribute_internal("indexChild_optionalBreak_secondLast"      , n.indexChild_optionalBreak_secondLast)
+    traceAttribute_internal("aaActivated_notBeforeLastOptionalBreak"   , n.aaActivated_notBeforeLastOptionalBreak)
     }
   }  
 }

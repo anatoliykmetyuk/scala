@@ -36,9 +36,94 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
    * - the kind of operator
    * - the state of the node
    * - the received messages
+   * 
+   * The main complication is due to the existence of the optional break operand (".").
+   * For sequential composition this is relatively easy, as the optional break causes
+   * the sequential operator to succeed itself, and also to activate the next operand.
+   * For parallel operators and the semi-parallel disrupt operator ("/") the optional break
+   * is really complicated (as it seems at least for now); 
+   * more information follows below.
+   * 
+   * Note that the "loop with optional break" operand ".." is essentially a "." combined with a "...".
+   * The effect of the latter is rather simple, as it makes the current n_ary_operator a loop, 
+   * as if its template subtree is repeated infinitely many times 
+   * (only with the pass counter being incremented)
+   * 
+   * Note that the disrupt operator ("/") behaves just like "|" except for exclusion:
+   * - when an atomic action happens in an operand, all operands more to the left are excluded
+   * - when an operand deactivates successfully then all operands more to the right are excluded
+   * 
+   * The rest of this comment is rather long, probably too long; 
+   * FTTB it is left here until something better and more concise is available
+   * 
+
+On activation all n-ary operators activate their leftmost operands.
+Moreover, a “continuation” message is inserted into the message queue,
+so that, as soon as the just instigated activation of a subtree has ended,
+the next operand may start activating, and so on, until no new activations are needed.
+
+For a sequential operator (“;”) a next operand is activated when its predecessor
+operand has success; if there is no such a next operand, then the sequential
+operator itself succeeds. The latter also happens when an operand has an optional-break.
+
+For the exclusive-or operator, the behaviour of “.” is different;
+as only in 1 operand of this “+” operator an atomic action may happen,
+the only sensible meaning for the optional break is: only activate the
+next operand if just before an atomic action has been activated.
+The meaning of “just before” needs clarification.
+These are the operands activated since after the previous optional-break operand,
+or from the start if there is no such previous optional-break operand.
+If there were no such “just before” operands, as in . + x and in x + . + .
+for the second optional-break, then keep on activating
+(an alternative definition, not necessarily worse, would be: stop activation).
+
+For parallel operators and for the disruption operator the behaviour is
+more difficult, especially for those that are and-like. Note that for an
+or-like n-ary operator have success, it is enough for any of its operands
+to have a recent success. A success of an operand is recent if after it
+has happened no atomic action it its subtree has happened.
+An and-like parallel operator has in principle success when all its operands
+have success, but the optional break complicates matters.
+E.g. in x&.&y, the optional break says that y is optional;
+as long as no atomic action inside y has happened, the success
+of & depends on the x operand.
+Another effect of “.” here is that y only should be activated
+as soon as at least one atomic action inside x has happened;
+maybe it would be good to add here another possibility:
+no atomic actions inside x have been activated.
+
+To define "more precisely" when “next activations” of parallel operators
+happen, we consider their templates to be of the form
+
+xi & . & yi & . & zi
+
+Here xi etc stand for groups of operands that have no optional-breaks
+activated; each group size is 0 or higher.
+& stands here for any operator of: & && | || /
+
+On activation xi and “.” activate.
+Activation continues with the next group (yi) if no atomic actions in xi have been activated.
+Then when in this continuation again no atomic actions have been activated, zi is activated, etc.
+
+In other cases, so when in a group atomic actions had been activated,
+then the next group is activated shortly after for the first time in
+the previous group an atomic action has happened. 
+
+For the determination of successfulness of a parallel operator
+such a newly activated group, of which no atomic actions have happened,
+does not count. Let's call such a group an "optional group".
+Note that for parallel operators not only the successfulness of the current operands is relevant,
+but also of the past operands. 
+E.g. a past operand of & that has deactivated without recent success
+is a failure, and it prevents & from ever having success.
+Likewise a past operand of | that has deactivated with a recent success makes sure that
+| has a success after each atomic action happening somewhere in the descendant subtree of |.
+These effects do not hold when the operand is in an optional group.
+
+  * 
   */
   def handleContinuation(message: Continuation): Unit = new Decisions(message) {
-    decideProgress
+    decideActivationProgress
     decideExclusion
     decideSuccess
 
@@ -47,19 +132,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     executeDecisions
   }
 
-  trait Stateful extends ProgressState with ExclusionState {
-    val message: Continuation
-    val node = message.node.asInstanceOf[N_n_ary_op]
-
-    val isSequential = node.template.kind match {
-      case ";" | "|;"  | "||;" |  "|;|" => true
-      case _ => false
-    }
-
-    var childNode: CallGraphNode = null // may indicate node from which the a message came
-  }
-
-  trait ProgressState {this: Stateful =>
+  trait ActivationProgressState {this: Stateful =>
     var activateNext              = false
     var activationEnded           = false
     var activationEndedOptionally = false
@@ -75,22 +148,92 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     var nodesToBeSuspended: Seq[CallGraphNode.Child] = null
   }
 
+  trait Stateful extends ActivationProgressState with ExclusionState {
+    val message: Continuation
+    val node = message.node.asInstanceOf[N_n_ary_op]
 
-  trait ProgressDecisions extends Stateful {
+    val isSequential = node.template.kind match {
+      case ";" | "|;"  | "||;" |  "|;|" => true
+      case _ => false
+    }
+  }
+
+  trait ActivationProgressDecisions extends Stateful {
     private var activateNextOrEnded = false
 
-    def decideProgress {
-      if (isSequential       ) sequential else parallel
-      if (activateNextOrEnded) clarifyProgress
+    def decideActivationProgress {
+      if (isSequential) {
+        sequential 
+      }
+      else if (node.activationMode!=ActivationMode.Inactive)
+      {
+        node.template.kind match {
+          
+          case "+" | "|+" | "|+|"                   => plus
+          
+          case kind if T_n_ary_op.isLeftMerge(kind) => parallelLeftMerge // not really implemented yet
+
+          // for parallel operators:
+          // - if aaActivated && isOptionalChild: nActivatedOptionalChildren++
+          // - if optionalBreak activated: set indexChild_optionalBreak_last and determine activateNextOrEnded:
+          //           . & a     => no pause; a is optional
+          //     (+) & . & a     => no pause; a is optional
+          //      a  & . & b     => pause; after a happens b is activated as optional
+          // - if aaHappened  && isOptionalChild: resetNActivatedOptionalChildren
+          // - if success     && isOptionalChild: nActivatedOptionalChildrenWithSuccess++ "automatically" in State.hasSuccess_
+
+          // Note: both message.activation and message.aaHappeneds may be != Nil
+          // e.g. in a b / . after a happened b is activated, and only then the continuation at / is handled
+          //
+          case _ => if (message.activation != null) {
+	                    val b = message.break
+				        if (b==null) {
+	                      traceAttributes(node, "common case for parallel operator: proceed activation")
+				          activateNextOrEnded = true 
+				        }
+				        else if (b.activationMode==ActivationMode.Optional) {
+				          if (node.aaActivated_notBeforeLastOptionalBreak) { // so now pause
+	                        traceAttributes(node, "optional break encountered; pause activation")
+	                        node.aaActivated_notBeforeLastOptionalBreak = false
+				            node.indexChild_optionalBreak_last = b.child.index
+				          }
+				          else
+				          {
+	                        traceAttributes(node, "optional break encountered; proceed activation anyway since no atomic actions had been activated")
+				            node.indexChild_optionalBreak_last = b.child.index
+				            activateNextOrEnded = true
+				          }
+				        }
+				        else {
+				           traceAttributes(node, "mandatory break encountered; activation stopped")
+				        }
+                    } 
+          
+                    if (message.aaHappeneds!=Nil && 
+                        // check that node has been paused, 
+                        //  and is waiting for an AA to happen in a child after optionalBreak_secondLast (which may be -1)
+                        node.indexChild_optionalBreak_last == node.lastActivatedChild.index && // the "pausing" test; maybe not explicit enough
+                        message.aaHappeneds.exists{a => a.child.index > node.indexChild_optionalBreak_secondLast}) {
+                      
+                      traceAttributes(node, "AA Happened; optional children become mandatory; proceed activation")
+                      activateNextOrEnded = true
+                      node.activationMode = ActivationMode.Active
+                      node.resetNActivatedOptionalChildren
+                    }
+                    
+                    if (activateNextOrEnded) clarifyActivationProgress(node.lastActivatedChild)
+        }
+      }
     }
 
     private def sequential {
       val s = message.success
       val b = message.break
-
+      var nodeAfterWhichToActivate: CallGraphNode = null
+      
       if (b!=null) {
         activateNextOrEnded = true
-        childNode = b.child
+        nodeAfterWhichToActivate = b.child
         if (b.activationMode==ActivationMode.Optional)
           activationEndedOptionally = true
         else node.mustBreak
@@ -98,49 +241,14 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
 
       if (s!=null) {
         activateNextOrEnded = true
-        childNode = s.child
+        nodeAfterWhichToActivate = s.child
       }
+      if (activateNextOrEnded) clarifyActivationProgress(nodeAfterWhichToActivate)
     }
 
-    private def parallel: Unit =
-      if (node.activationMode!=ActivationMode.Inactive)
-        node.template.kind match {
-//          case "%" => parallelPercent
-
-          case "+" | "|+" | "|+|"
-          => parallelPlus
-
-          case kind if
-            T_n_ary_op.isLeftMerge(kind)
-          => parallelLeftMerge
-
-          case "/" | "|/"  | "|/|" if
-            node.indexChild_marksPause >= 0 &&
-            message.aaHappeneds!=Nil
-          => parallelInterrupt
-
-          case _ if
-            node.indexChild_marksPause >= 0 &&
-            message.aaHappeneds!=Nil        &&
-            message.aaHappeneds.exists
-              {a=>a.child.index > node.indexChild_marksOptionalPart}
-          => parallelBreakPause
-
-          case _ if
-            node.indexChild_marksOptionalPart >= 0 &&
-            message.aaHappeneds!=Nil               &&
-            message.aaHappeneds.exists
-             {a=>a.child.index > node.indexChild_marksOptionalPart}
-          => parallelBreakOptional
-
-          case _
-          => parallelOther
-      }
-
-    private def clarifyProgress  {
-      // old: childNode = if (T_n_ary.isLeftMerge(node.template.kind)) node.lastActivatedChild else message.childNode ; now done before
-      nextActivationTemplateIndex = childNode.template.indexAsChild+1
-      nextActivationPass = childNode.pass
+    private def clarifyActivationProgress(nodeAfterWhichToActivate: CallGraphNode)  {
+      nextActivationTemplateIndex = nodeAfterWhichToActivate.template.indexAsChild+1
+      nextActivationPass = nodeAfterWhichToActivate.pass
 
       message.node.activationMode = ActivationMode.Active
 
@@ -158,23 +266,9 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     }
 
     /**
-     * This is commented out.
-     */
-    private def parallelPercent {
-//      case "%" => val d = message.deactivations;
-//                  val b = message.break
-//                  if (d!=Nil) {
-//                    activateNextOrEnded = d.size>0 && !d.head.excluded
-//                    if (activateNextOrEnded) {
-//                      childNode = d.head.node
-//                    }
-//                  }
-    }
-
-    /**
      * "+" node activations may be broken by "." if no atomic actions had been activated
      */
-    private def parallelPlus {
+    private def plus {
       val a = message.aaActivated
       val c = message.caActivated
       val b = message.break
@@ -182,8 +276,6 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
       activateNextOrEnded = if (b==null) true
                        else if (b.activationMode==ActivationMode.Optional) a!=null || c!=null
                        else false
-
-      if (activateNextOrEnded) childNode = node.lastActivatedChild
     }
 
     private def parallelLeftMerge {
@@ -196,103 +288,70 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
        if (b!=null) {
          // ???
        }
-       if (activateNextOrEnded) childNode = node.lastActivatedChild
-    }
-
-    /**
-     *       . / a     => no pause; a is optional
-     * (-) / . / a     => no pause; a is optional
-     *  a  / . / b     => pause; after a happens / is done
-     */
-    private def parallelInterrupt =
-      if (
-        message.aaHappeneds.exists
-          {_.node.index > node.indexChild_marksOptionalPart} &&
-        message.deactivations==Nil
-      ) switchOptionalPart(false)
-
-    /**
-     *       . & a     => no pause; a is optional
-     * (+) & . & a     => no pause; a is optional
-     *  a  & . & b     => pause; after a happens b is activated as optional
-     *
-     */
-    private def parallelBreakPause {
-      traceAttributes(node, "A")
-      switchOptionalPart(false)
-    }
-
-    private def parallelBreakOptional {
-      traceAttributes(node, "B")
-      switchOptionalPart(false)
-    }
-
-    private def parallelOther {
-       val b = message.break
-       if (b==null) {
-         if (message.aaHappeneds != Nil || message.activation != null) {
-           traceAttributes(node, "C")
-           activateNextOrEnded = true
-           childNode = node.lastActivatedChild
-         }
-         else traceAttributes(node, "D")
-       }
-       else if (b.activationMode==ActivationMode.Optional) {
-         if (node.aaActivated_optional) {
-           traceAttributes(node, "E")
-           switchOptionalPart(false)
-         }
-         else if (message.aaActivated != null
-              ||  node.indexChild_marksOptionalPart < 0 && node.aaActivated){ // TBD: possibly wrong test;
-                                        // we should ask whether any AA had been activated in the part before "."
-           traceAttributes(node, "F")
-           node.activationMode = ActivationMode.Optional // TBD: may possibly be dropped???; check node.indexChild_marksPause >= 0
-           node.indexChild_marksPause = b.child.index
-         }
-         else {
-           traceAttributes(node, "G")
-           switchOptionalPart(true)
-         }
-       }
-    }
-
-    // TBD: come up with more meaningful names for the
-    // method and its argument
-    private def switchOptionalPart(toOptional: Boolean = false) {
-      activateNextOrEnded = true
-
-      if (!toOptional) {
-        node.activationMode = ActivationMode.Active
-        node.resetNActivatedOptionalChildren
-        node.indexChild_marksOptionalPart = node.indexChild_marksPause
-        node.aaActivated_optional         = false
-      } else {
-        node.activationMode = ActivationMode.Optional
-        node.resetNActivatedOptionalChildren
-        node.indexChild_marksOptionalPart = message.break.child.index
-      }
-
-      node.indexChild_marksPause        = -1
-      childNode = node.lastActivatedChild
     }
   }
 
   trait ExclusionDecisions extends Stateful {
 
+    // exclusions may be needed when
+    // - atomic actions happen
+    // - operands are deactivated
+    
     def decideExclusion = node.template.kind match {
-      case "/"  | "|/"  | "|/|"        => interrupt
-      case "&&" | "&&:" | "||" | "||:" => parallel
+      case "/"  | "|/"                  => disrupt
+      case "|/|"                        => disrupt; parallel // these 2 won't bite; one for aaHappened; other for deactivation
+      case "&&" | "&&:" | "||"  | "||:" => parallel
+      case ";"  | "|;"  | "+"   | "|+"  => sequenceOrChoice
+      case "||;"| "||+"                 => sequenceOrChoice; parallel // won't bite one another either
+      case _ if T_n_ary_op.isSuspending(node.template) => suspensions
       case _ =>
     }
-
-    private def interrupt {
+           
+    private def suspensions {
+      val aaHappenedChildren = message.aaHappeneds.map(_.child)
+      if (!aaHappenedChildren.isEmpty) {
+        val s = aaHappenedChildren.head // there will be only 1
+        if (s.aaHappenedCount==1) { // only done when an atomic action happens for the first time here
+            node.template.kind match {
+              case "%&" | "%;"   => nodesToBeSuspended = node.children diff List(s)
+              case "%"           => nodesToBeExcluded  = node.children.filter(_.index < s.index) 
+                                    nodesToBeSuspended = node.children.filter(_.index > s.index)
+              case "%/" | "%/%/" => nodesToBeSuspended = node.children.filter(_.index < s.index) 
+            }
+          }
+      }
+    }
+    
+    private def sequenceOrChoice {
+      val aaHappenedChildren = message.aaHappeneds.map(_.child)
+      if (!aaHappenedChildren.isEmpty) {
+        val indexes_aaHappenedChildren = aaHappenedChildren.map(_.index)
+        nodesToBeExcluded = node.children.filter(c => !indexes_aaHappenedChildren.contains(c.index))
+      }
+    }
+        
+    private def disrupt {
+      nodesToBeExcluded = Nil
+      
+      // deactivate to the left when an atomic action has happened somewhere in an operand
+      // Note: for |/ and |/| such a happening atomic action may be shared among multiple operands;
+      // Then deactivate to the left from the rightmost of such operands.
+      val aaHappenedChildren = message.aaHappeneds.map(_.child)
+      if (!aaHappenedChildren.isEmpty) {
+        val indexes_aaHappenedChildren = aaHappenedChildren.map(_.index)
+        val maxIndex = indexes_aaHappenedChildren.max
+        nodesToBeExcluded ++= node.children.filter{n => val index = n.index; index<maxIndex && !indexes_aaHappenedChildren.contains(index)}
+      }
+      
       // deactivate to the right when one has finished successfully
-      // TBD: something goes wrong here; LookupFrame2 does not "recover" from a Cancel search
-      message.deactivations match {
-        case d::tail if d.child.hasSuccess && !d.excluded =>
-          nodesToBeExcluded = node.children.filter(_.index>d.child.index)
-
-        case _ =>
+      // Note: more than 1 operand may do so; 
+      // then deactivate more to the right from the leftmost of these already deactivated operands
+      val deactivatedChildren = message.deactivations.filter(!_.excluded).map(_.child)
+      val indexes_deactivatedChildrenHavingSuccess = deactivatedChildren.filter(_.hasSuccess).map(_.index)
+      
+      if (!indexes_deactivatedChildrenHavingSuccess.isEmpty) {
+        val minIndexDeactivedChildHavingSuccess = indexes_deactivatedChildrenHavingSuccess.min
+        nodesToBeExcluded ++= node.children.filter(c => c.index>minIndexDeactivedChildHavingSuccess && !indexes_deactivatedChildrenHavingSuccess.contains(c.index))
       }
     }
 
@@ -305,12 +364,11 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
        * the result of an Or-parallel operator, and one single node that
        * ended with failure decides the result of an And-parallel operator.
        */
-      val resultDecisiveNodes = message.deactivations.
-        map(_.child).
-        filter(_.hasSuccess==isLogicalOr)
+      val deactivatedChildren = message.deactivations.map(_.child)
+      val resultDecisiveNodes = deactivatedChildren.filter(_.hasSuccess==isLogicalOr)
 
       if (!resultDecisiveNodes.isEmpty) {
-        nodesToBeExcluded = node.children diff resultDecisiveNodes
+        nodesToBeExcluded = node.children diff deactivatedChildren
         activateNext = false
       }
     }
@@ -321,7 +379,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
     def decideSuccess = if (!shouldSucceed && !node.hasSuccess)
       node.template.kind match {
         case ";" => sequential
-        case "/" => interrupt
+        case "/" => disrupt
 
         case _   => T_n_ary_op.getLogicalKind(node.template.kind) match {
           case LogicalKind.None =>
@@ -332,7 +390,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
 
     private def sequential = shouldSucceed = activationEnded || activationEndedOptionally
 
-    private def interrupt  = shouldSucceed = message.success != null ||
+    private def disrupt    = shouldSucceed = message.success != null ||
                                      message.aaHappeneds.exists(_.child.index<node.rightmostChildThatEndedInSuccess_index) ||
                                      node.nActivatedChildrenWithSuccess > 0
 
@@ -378,7 +436,7 @@ trait ContinuationHandler {this: ScriptExecutor[_] with Tracer =>
 
 
   class Decisions(val message: Continuation) extends
-      ProgressDecisions  with
+      ActivationProgressDecisions  with
       ExclusionDecisions with
       SuccessDecisions   with
       DecisionsExecution {

@@ -44,7 +44,21 @@ case class N_do_then_else(template: T_do_then_else)
   {type T = T_do_then_else}
 
 
-/** N-ary */
+/** N-ary 
+ *  
+ *  Exclusiveness
+ * 
+ * The ; and + operators are fully exclusive.
+ * That means that if an atomic action in one operand happens, all other operands are excluded.
+ * 
+ * The “/“ operator is semi-exclusive: if an atomic action in one operand happens,
+ * all other operands that are older (more to the left) are excluded; for the rest “/“ acts much like “|”.
+ * 
+ * “&&” and “||” exclude operands in special cases:
+ * for && if one operand fails (i.e. it is deactivated without having a recent success);
+ * for || when one operand is deactivated while having a recent success. 
+ * 
+ */
 case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
     extends CallGraphTreeNode
     with    OptionalChildrenState
@@ -57,7 +71,7 @@ case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
   var hadFullBreak               = false
   var activationMode             = ActivationMode.Active
   var continuation: Continuation = null
-  var lastActivatedChild: Child  = null
+  var lastActivatedChild: Child  = null // may be a small memory leak
 
   
   // Helper and state methods
@@ -68,7 +82,7 @@ case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
   // Overridden behavior
   override def addChild(c: Child) = {
     super.addChild(c); 
-    if (isOptionalChild(c)) _nActivatedOptionalChildren += 1
+    if (isOptionalChild(c)) nActivatedOptionalChildren += 1
     lastActivatedChild = c
   }
   
@@ -76,6 +90,13 @@ case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
     val delta = if (child.hasSuccess) 1 else -1
     nActivatedChildrenWithSuccess += delta
     if (isOptionalChild(child)) nActivatedOptionalChildrenWithSuccess += delta
+  }
+  
+  def isOptionalChild(c:Child) = {
+    nActivatedOptionalChildren > 0 &&
+    c.index > (if (indexChild_optionalBreak_last == lastActivatedChild.index) 
+                   indexChild_optionalBreak_secondLast
+              else indexChild_optionalBreak_last )     
   }
   
   
