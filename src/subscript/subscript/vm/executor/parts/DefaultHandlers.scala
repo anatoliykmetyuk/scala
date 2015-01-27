@@ -40,7 +40,8 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
            case n@N_code_threaded              (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
 
            case n@( N_code_eventhandling       (_) 
-                  | N_code_eventhandling_loop  (_)) => // ehNodesAwaitingExecution.append(n) not used; could be handy for debugging
+                  | N_code_eventhandling_loop  (_)) => insert(AAActivated(n,null)) 
+                                                       // ehNodesAwaitingExecution.append(n) not used; could be handy for debugging
               
            case n@N_break                      (t) =>                                    doNeutral(n); insert(Break(n, null, ActivationMode.Inactive)); insertDeactivation(n,null)
            case n@N_optional_break             (t) =>                                    doNeutral(n); insert(Break(n, null, ActivationMode.Optional)); insertDeactivation(n,null)

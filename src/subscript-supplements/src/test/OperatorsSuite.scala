@@ -522,7 +522,7 @@ class OperatorsSuite extends OperatorsSuiteBase {
    // optional break
    , [ a / .     ]             -> "->a a"
    , [ a / ..    ]             -> "->a a"
-   , [ a b / . / c ]           -> "->ac a->bc ab ac"
+   , [ a b / . / c ]           -> "->a a->bc ab ac"
    , [ a b / ..  ]             -> "->a  a->ab ab aa->ab"
    , [ a / . / b ]             -> "->a a"
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
@@ -619,6 +619,8 @@ class OperatorsSuite extends OperatorsSuiteBase {
   val scriptBehaviourList_for_debug = List(
      [a ~~> (i:Any)==>p(i)]       -> "a->v"
   )
-    
+
+  // unfortunately we cannot test event handling code fragments, for the time being, as in , [ {. .} / .. ]    -> "???"
+
   
 }
