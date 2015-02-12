@@ -274,7 +274,7 @@ abstract class TreeBrowsers {
       add(jmFile)
 
       val jmEdit = new JMenu("Edit")
-      val jmiCopyAll = new JMenuItem(
+      val jmiCopyCode = new JMenuItem(
         new AbstractAction("Copy Code") {
           putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_C, menuKey, false))
           override def actionPerformed(e: ActionEvent) {
@@ -282,7 +282,7 @@ abstract class TreeBrowsers {
           }
         }
       )
-      jmEdit add jmiCopyAll
+      jmEdit add jmiCopyCode
 
       val jmiCopyInfo = new JMenuItem(
         new AbstractAction("Copy Info") {
