@@ -93,7 +93,11 @@ object DSL {
   }
   def _execute[S<:X,X](_script: ScriptNode[S], debugger: MsgListener, executor: ScriptExecutor[X]): ScriptExecutor[X] = {
     if (debugger!=null) debugger.attach(executor)
-    executor.run(_script)
+    
+    try {
+      executor.run(_script)
+    }
+    catch {case t:Throwable => println(s"DSL._execute caught throwable: $t"); throw t}
   }
 
   implicit // these code fragment variations require the "here" parameter explicitly
@@ -224,12 +228,17 @@ object DSL {
   //     var s_node: N_call[Any] = null;
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
   
-  //def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): ScriptNode[T] = 
-  //  _script(this, 'dataflow_then) {
-  //       _node => 
-  //                {implicit val script= _node; var s_node: N_call[S] = null
-  //                 _do_then(_call("s", (_n:N_call[S]) => {println(" _dataflow_then >> _do_then S"); s_node = _n; s}), 
-  //                          _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}))}}
+
+  def NEW_dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_do_then = 
+    //_script(this, 'dataflow_then) {
+    //     implicit script => 
+    {
+       var s_node: N_call[S] = null
+       _do_then(_call("s", (_n:N_call[S]) => {println(" _dataflow_then >> _do_then do-part"); s_node = _n; s}), 
+                _call("t", (_n:N_call[T]) => {println(" _dataflow_then >> _do_then then-part: ${s_node.callee.$.get}"); t(s_node.callee.$.get)}))
+    }
+     //)}}
+  
   
   def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_call[T] = {
     val dataflowScript: ScriptNode[T] = _script(this, 'dataflow_then) {script =>
@@ -242,16 +251,24 @@ object DSL {
       }
 
       val tCall: N_call[T] => ScriptNode[T] = here => {
-        val res: S =
-          s_node                                   // Call node with the name "s"
-          .callee                                  // script    with the name "~~>"
-          .children.head.asInstanceOf[N_call[S]]   // Call node that calls the target script
-          .callee                                  // Finally, the actual lhs script itself
-          .$.get                                   // And its result value
+        
+println(s"_dataflow_then- tCall: s_node success=${s_node.hasSuccess}")   
+     
+        val callee = s_node                        // Call node with the name "s"
+                     .callee                       // script    with the name "~~>"
+        val firstChild = callee
+                         .children
+                         .head
+                         .asInstanceOf[N_call[S]]  // Call node that calls the target script
+        val lhsScript = firstChild.callee          // The actual lhs script itself
 
+println(s"_dataflow_then - tCall: lhsScript=${lhsScript}")   
+        
+        val resTry = lhsScript.$                   // its result (a try)
+        val res: S = resTry.get                    // and the result value
 
         val s = t(res)
-        here.calls(s.template, s.p: _*)
+        here.calls(s.template, s.p: _*)   // why is this? No idea at all, but it seems necessary...
         s
       }
 

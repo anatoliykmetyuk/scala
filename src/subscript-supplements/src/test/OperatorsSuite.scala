@@ -20,8 +20,8 @@ import subscript.vm.model.callgraph._
  *  - right-click the file in eclipse and chose "Run As" - "JUnit Test"
  *  - run from the command line, e.g.,
  *  
- *    qbin/scala -classpath build/quick/classes/subscript:build/deps/junit/junit-4.10.jar subscript.test.OperatorsSuiteApp 
- *    qbin/scala -classpath build/quick/classes/subscript:build/deps/junit/junit-4.10.jar subscript.test.OperatorsSuiteApp 45
+ *    qbin/scala -classpath build/quick/classes/subscript:build/quick/classes/subscript-supplements:build/deps/junit/junit-4.10.jar subscript.test.OperatorsSuiteApp 
+ *    qbin/scala -classpath build/quick/classes/subscript:build/quick/classes/subscript-supplements:build/deps/junit/junit-4.10.jar subscript.test.OperatorsSuiteApp 45
  *  
  *    The second command line example specifies an index of a test as a parameter. 
  *    The program will then only run this test, while logging debug messages about the internal ongoings of the SubScript VM. 
@@ -198,19 +198,19 @@ abstract class OperatorsSuiteBase {
     
     currentTestIndex += 1
     
-    lazy val afterInput    = if(input=="") "" else s"after input: $input"
-    lazy val failureString = /*if(expectTestFailure) "Fails as marked" else*/ "Fails"
-    var testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should expect: $expectedResult%4s"
-
     if (testIndexForDebugging > 0 && 
         testIndexForDebugging != currentTestIndex) return
  
-	val expectedResultFailure = expectedResult(0)=='0'
-	val expectedResultSuccess = expectedResult(0)=='1'
-	val expectedResultAtoms   = (if (expectedResultSuccess||expectedResultFailure) expectedResult.drop(1) else expectedResult)
-	                            .sortWith(_<_).mkString
+    lazy val afterInput    = if(input=="") "" else s"after input: $input"
+    lazy val failureString = /*if(expectTestFailure) "Fails as marked" else*/ "Fails"
+    var testInfo      = f"test $currentTestIndex%3d:   $scriptString%-21s   $afterInput%-18s should do: $expectedResult%4s"
 
-	if (expectedResultFailure && !expectedResultAtoms.isEmpty)                              
+		val expectedResultFailure = expectedResult(0)=='0'
+		val expectedResultSuccess = expectedResult(0)=='1'
+		val expectedResultAtoms   = (if (expectedResultSuccess||expectedResultFailure) expectedResult.drop(1) else expectedResult)
+		                            .sortWith(_<_).mkString
+
+    if (expectedResultFailure && !expectedResultAtoms.isEmpty)                              
        println(s"$testInfo - Error in test specification: no atoms should be expected in combination with 0") // very unlikely to occur
     else {
       if (debug)         println(testInfo)
@@ -249,7 +249,7 @@ abstract class OperatorsSuiteBase {
       ||  acceptedAtoms != input) 
       {
          hadTestFailure = true
-         val expectedItemsStr = f" expects: ${(if(executionSuccess) "1" else "")+expectedAtomsAtEndOfInputString}%4s"
+         val expectedItemsStr = f" does: ${(if(executionSuccess) "1" else "")+expectedAtomsAtEndOfInputString}%4s"
          val acceptedInputStr = if (acceptedAtoms == input) "" else s" accepted input: $acceptedAtoms"
 
          if (expectTestFailure) {
@@ -257,7 +257,7 @@ abstract class OperatorsSuiteBase {
              println(s"$testInfo - $failureString;$acceptedInputStr$expectedItemsStr; already marked as FAIL")
            }
          }
-         else if (doVerbose||debug) {
+         else {
            println(s"$testInfo - $failureString;$acceptedInputStr$expectedItemsStr")
          }
       }    
@@ -306,14 +306,14 @@ abstract class OperatorsSuiteBase {
 
   //  script expression structure for an atom. It essentially comes down to the following script:
   def script ..
-    atom(name: Char):Any = @{expect(there,name)}: {?tryAccept(here, name); $success_=('v':Any) ?}
+    atom(name: Char):Any = @{expect(there,name)}: {?tryAccept(here, name); $success_=(name:Any) ?}
     a = atom('a')
     b = atom('b')
     c = atom('c')
     d = atom('d')
     e = atom('e')
     v = atom('v')
-    p(i:Any) = atom(i.toString.charAt(0))
+    p(v:Any) = atom(v.toString.charAt(0))
 
   def scriptBehaviourList_for_debug: Seq[(Script[Any],String)]
   def scriptBehaviourList          : Seq[(Script[Any],String)]
@@ -443,7 +443,7 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [a||(+)]  -> "->1"
    , [(+)||a]  -> "->1"
    , [a/(+)]   -> "->1a a"
-   , [(+)/a]   -> "->1a a"
+   , [(+)/a]   -> "->1"
                                
    // 2 operand sequences with iterator or break or optional break, 
    , [break a] -> "->1"
@@ -528,10 +528,10 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
    , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
    , [ a b | . | c d ]         -> "->a a->bc  ab->1c ac->bd abc->1d abcd acb->1d acd->1b acbd acdb"
-   , [ . / a b ]               -> "FAIL:->1a a->b  ab"
+   , [ . / a b ]               -> "->1a a->b  ab"
    , [ . & a b ]               -> "->1a a->b  ab"
-   , [ . | a b ]               -> "FAIL:->1a a->b  ab"
-   , [ . / a b / . / c d ]     -> "FAIL:->1a a->bc ab ac->d acd"
+   , [ . | a b ]               -> "->1a a->b  ab"
+   , [ . / a b / . / c d ]     -> "->1a a->bc ab ac->d acd"
    , [ a b  | .  | (+) ]       -> "->a a->1b ab"
    , [ a b || . || (+) ]       -> "->a a"
    , [ a b  & .  & (-) ]       -> "->a a->b ab->0"
@@ -608,16 +608,17 @@ class OperatorsSuite extends OperatorsSuiteBase {
    // priorities
    , [      @{there.priority=  1}:{} + {}(-)] -> "->1"
    , [ {} + @{there.priority=  1}:     {}(-)] -> "->0"
-   , [      @{there.priority= -1}:{} + {}(-)] -> "->0"
-   , [ {} + @{there.priority= -1}:     {}(-)] -> "->1"
+   , [      @{there.priority= -1}:{} + {}(-)] -> "FAIL:->0"
+   , [ {} + @{there.priority= -1}:     {}(-)] -> "FAIL:->1"
    
    // Various
-   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac ca->bc ac->bc acc->bc acb->ac"
+   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc ac->bc acc->bc acb->ac"
   )
 
    
   val scriptBehaviourList_for_debug = List(
-     [a ~~> (i:Any)==>p(i)]       -> "a->v"
+     [a ~~(t:String)~~>p(t)]       -> "a->a"
+   , [b ~~(t:String)~~>p(t)]       -> "b->b"
   )
 
   // unfortunately we cannot test event handling code fragments, for the time being, as in , [ {. .} / .. ]    -> "???"

@@ -63,6 +63,8 @@ case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
     extends CallGraphTreeNode
     with    OptionalChildrenState
     with    VariablesContainer
+    
+    with subscript.vm.executor.parts.Tracer
 {
   type T = T_n_ary_op   
   
@@ -92,11 +94,20 @@ case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
     if (isOptionalChild(child)) nActivatedOptionalChildrenWithSuccess += delta
   }
   
-  def isOptionalChild(c:Child) = {
-    nActivatedOptionalChildren > 0 &&
+  def traceLevel = 2
+  def isOptionalChild(c:CallGraphNode.Child) = {
+    
+    val result =
+   !aaHappenedInOptionalChildren      && 
+    lastActivatedChild != null        &&
+    indexChild_optionalBreak_last > 0 &&
     c.index > (if (indexChild_optionalBreak_last == lastActivatedChild.index) 
                    indexChild_optionalBreak_secondLast
-              else indexChild_optionalBreak_last )     
+              else indexChild_optionalBreak_last )   
+              
+    //traceAttributes(this, s"???? isOptionalChild c.index=${c.index} result=$result   ????")
+     
+    result
   }
   
   

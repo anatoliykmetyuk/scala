@@ -50,9 +50,9 @@ object CodeExecutor {
     val template = n.template.asInstanceOf[TemplateCodeHolder[R,N]]
     executeCode(n, template.code(n))
   }
-  def executeCode[N <: CallGraphNode, R](n: N, c: => R): R =
+  def executeCode[N <: CallGraphNode, R](n: N, c: => R): R = {
     n.codeExecutor.doCodeExecution(c)
-
+  }
   def executeCodeIfDefined[N <: CallGraphNode, R](n: N, code: ()=>R): R =
     if (code!=null) executeCode(n, code()) else null.asInstanceOf[R]
 

@@ -68,8 +68,6 @@ object Tokens extends CommonTokens {
   final val LESS2                    = 334
   final val GREATER2                 = 335
   final val ARROW2                   = 336
-  final val CURLYARROW2              = 337
-  final val CURLYBROKENARROW2        = 338
   
   final val LBRACE_DOT               = 340
   final val LBRACE_DOT3              = 341
@@ -98,6 +96,28 @@ object Tokens extends CommonTokens {
   final val DO_THEN                  = 370 // only for generating code
   final val DO_ELSE                  = 371 // only for generating code
   final val DO_THEN_ELSE             = 372 // only for generating code
+
+  final val CURLY1                   = 380 // ~
+  final val CURLY2                   = 381 // ~~
+  final val CURLY3                   = 382 // ~~~
+  final val CURLYBROKEN1             = 383 // ~/
+  final val CURLYBROKEN2             = 384 // ~/~
+  final val CURLYBROKEN3             = 385 // ~/~~
+  final val CURLYARROW1              = 386 // ~>
+  final val CURLYARROW2              = 387 // ~~>
+  final val CURLYARROW3              = 388 // ~~>
+  final val CURLYBROKENARROW2        = 389 // ~/~>
+  final val CURLYBROKENARROW3        = 390 // ~/~~>
+  final val PLUS_CURLYARROW2         = 391 // +~~>
+  final val PLUS_CURLYBROKENARROW2   = 392 // +~/~>
+  final val PLUS_CURLYBROKENARROW3   = 393 // +~/~~>
+  final val PLUS_CURLY1              = 394 // +~
+  final val PLUS_CURLY2              = 395 // +~~
+  final val PLUS_CURLY3              = 396 // +~~
+  final val PLUS_CURLYBROKEN1        = 397 // +~/
+  final val PLUS_CURLYBROKEN2        = 398 // +~/~
+  final val PLUS_CURLYBROKEN3        = 399 // +~/~~
+  
   
   final val scriptBracePairs = Map (
     LBRACE          -> RBRACE         ,

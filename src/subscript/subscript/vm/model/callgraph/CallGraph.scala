@@ -33,8 +33,13 @@ trait ScriptResultHolder[R] {
   def $success:R = $.get; 
   def $success_=(v:R) = $ = Success(v); 
   def $failure:Throwable = if ($==null||$.isSuccess)null else $.asInstanceOf[Failure[R]].exception
-  def $failure_=(f:Throwable) = $ = Failure[R](f)
+  def $failure_=(f:Throwable) = {$ = Failure[R](f); _fail}
+  def _fail: Unit
   
+  def $capture(body: ()=>R) = {
+    try {$success = body()}
+    catch{case t:Throwable => $failure=t}
+  }
 }
 trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode /* TBD: `with Variables` to be moved to here*/
 trait CallGraphLeafNode extends CallGraphTreeNode with GraphLeafNode
@@ -48,6 +53,7 @@ trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] {
   private[this] var _isExecuting = false
   override def isExecuting = _isExecuting
   def isExecuting_=(value: Boolean) = _isExecuting = value
+  hasSuccess = true
 }
 
 object CallGraphNode {

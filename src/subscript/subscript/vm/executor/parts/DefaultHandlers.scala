@@ -109,6 +109,9 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
            case n@N_do_then_else(t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return} else if(!n.children.isEmpty) return
            case _ => 
       }
+      if(!message.excluded &&  message.child!=null) { 
+        message.node.hasSuccess = message.child.hasSuccess
+      }
       message.node.forEachParent(p => insertDeactivation(p,message.node))
       executeCodeIfDefined(message.node, message.node.onDeactivate)
       executeCodeIfDefined(message.node, message.node.onDeactivateOrSuspend)

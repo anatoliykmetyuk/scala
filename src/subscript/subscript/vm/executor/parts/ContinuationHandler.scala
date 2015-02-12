@@ -195,11 +195,11 @@ These effects do not hold when the operand is in an optional group.
 				          if (node.aaActivated_notBeforeLastOptionalBreak) { // so now pause
 	                        traceAttributes(node, "optional break encountered; pause activation")
 	                        node.aaActivated_notBeforeLastOptionalBreak = false
-				            node.indexChild_optionalBreak_last = b.child.index
+				                  node.indexChild_optionalBreak_last = b.child.index
 				          }
 				          else
 				          {
-	                        traceAttributes(node, "optional break encountered; proceed activation anyway since no atomic actions had been activated")
+	                  traceAttributes(node, "optional break encountered; proceed activation anyway since no atomic actions had been activated")
 				            node.indexChild_optionalBreak_last = b.child.index
 				            activateNextOrEnded = true
 				          }
@@ -213,12 +213,12 @@ These effects do not hold when the operand is in an optional group.
                         // check that node has been paused, 
                         //  and is waiting for an AA to happen in a child after optionalBreak_secondLast (which may be -1)
                         node.indexChild_optionalBreak_last == node.lastActivatedChild.index && // the "pausing" test; maybe not explicit enough
-                        message.aaHappeneds.exists{a => a.child.index > node.indexChild_optionalBreak_secondLast}) {
-                      
-                      traceAttributes(node, "AA Happened; optional children become mandatory; proceed activation")
-                      activateNextOrEnded = true
-                      node.activationMode = ActivationMode.Active
-                      node.resetNActivatedOptionalChildren
+                        message.aaHappeneds.exists{a => a.child.index > node.indexChild_optionalBreak_secondLast})
+                    {
+                          traceAttributes(node, "AA Happened; optional children become mandatory; proceed activation")
+                          activateNextOrEnded = true
+                          node.activationMode = ActivationMode.Active
+                          node.aaHappened_resetNActivatedOptionalChildren
                     }
                     
                     if (activateNextOrEnded) clarifyActivationProgress(node.lastActivatedChild)
@@ -276,6 +276,8 @@ These effects do not hold when the operand is in an optional group.
       activateNextOrEnded = if (b==null) true
                        else if (b.activationMode==ActivationMode.Optional) a!=null || c!=null
                        else false
+
+      if (activateNextOrEnded) clarifyActivationProgress(node.lastActivatedChild)
     }
 
     private def parallelLeftMerge {
@@ -352,6 +354,8 @@ These effects do not hold when the operand is in an optional group.
       if (!indexes_deactivatedChildrenHavingSuccess.isEmpty) {
         val minIndexDeactivedChildHavingSuccess = indexes_deactivatedChildrenHavingSuccess.min
         nodesToBeExcluded ++= node.children.filter(c => c.index>minIndexDeactivedChildHavingSuccess && !indexes_deactivatedChildrenHavingSuccess.contains(c.index))
+        activateNext = false // override possibly earlier decision; needed for a/./b after a happened.
+        activationEnded = true // possibly message.node.activationMode should be set to Inactive 
       }
     }
 
@@ -369,7 +373,8 @@ These effects do not hold when the operand is in an optional group.
 
       if (!resultDecisiveNodes.isEmpty) {
         nodesToBeExcluded = node.children diff deactivatedChildren
-        activateNext = false
+        activateNext = false // override possibly earlier decision; needed for a/./b after a happened.
+        activationEnded = true // possibly message.node.activationMode should be set to Inactive 
       }
     }
   }

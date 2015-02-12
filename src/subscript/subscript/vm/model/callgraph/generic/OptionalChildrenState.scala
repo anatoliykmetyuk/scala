@@ -13,6 +13,7 @@ trait OptionalChildrenState extends ChildrenState {this: CallGraphNode =>
    * x & . & y
    * x & . & y & . & z
    */
+  var aaHappenedInOptionalChildren              = false
   var nActivatedOptionalChildren                = 0
   var nActivatedOptionalChildrenWithSuccess     = 0
   def nActivatedOptionalChildrenWithoutSuccess  = nActivatedOptionalChildren       - nActivatedOptionalChildrenWithSuccess
@@ -42,12 +43,14 @@ trait OptionalChildrenState extends ChildrenState {this: CallGraphNode =>
       _indexChild_optionalBreak_secondLast = _indexChild_optionalBreak_last
       _indexChild_optionalBreak_last = v
       aaActivated_notBeforeLastOptionalBreak = false // reset for next time
+      aaHappenedInOptionalChildren = false
   }
   
   var aaActivated_notBeforeLastOptionalBreak = false
   //var aaActivated_optional = false
   
-  def resetNActivatedOptionalChildren = {
+  def aaHappened_resetNActivatedOptionalChildren = {
+    aaHappenedInOptionalChildren = true
     nActivatedOptionalChildren = 0
     nActivatedOptionalChildrenWithSuccess = 0
   }

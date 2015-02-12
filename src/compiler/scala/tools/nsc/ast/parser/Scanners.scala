@@ -432,6 +432,12 @@ trait Scanners extends ScannersCommon {
     /** read next token, filling TokenData fields of Scanner.
      */
     protected final def fetchToken() {
+      def nextChar2() = {nextChar(); nextChar()}    
+      def nextChar3() = {nextChar(); nextChar2()}    
+      def nextChar4() = {nextChar(); nextChar3()}    
+      def nextChar5() = {nextChar(); nextChar4()}    
+      def nextChar6() = {nextChar(); nextChar5()}    
+      
       offset = charOffset - 1
       (ch: @switch) match {
 
@@ -453,17 +459,27 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-       case '~' => if (isInSubScript_expression || isInSubScript_val_var_init) {
-                      val lookahead = lookaheadReader; lookahead.nextChar()
-                      if (lookahead.ch == '~') {lookahead.nextChar()
-                       if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); token = CURLYARROW2; return} 
+       case '~' => if (isInSubScript_expression && !isInSubScript_val_var_init) {
+                      val  lookahead = lookaheadReader; lookahead.nextChar()
+                      if  (lookahead.ch == '>') {nextChar2(); token = CURLYARROW1; return} // ~>
+                      if  (lookahead.ch == '~') {lookahead.nextChar()
+                       if (lookahead.ch == '>') {nextChar3(); token = CURLYARROW2; return} // ~~> 
+                       if (lookahead.ch == '~') {lookahead.nextChar()
+                        if(lookahead.ch == '>') {nextChar4(); token = CURLYARROW3; return} // ~~~> 
+                        nextChar3(); token = CURLY3; return
+                       }
+                       nextChar2(); token = CURLY2; return
                       }
                       else 
-                       if (lookahead.ch == '/') {lookahead.nextChar()
-                        if (lookahead.ch == '~') {lookahead.nextChar()
-                         if(lookahead.ch == '>') {nextChar(); nextChar(); nextChar(); nextChar(); token = CURLYBROKENARROW2; return} 
-                        }
+                       if   (lookahead.ch == '/') {lookahead.nextChar()
+                        if  (lookahead.ch == '~') {lookahead.nextChar()
+                         if (lookahead.ch == '>') {nextChar4(); token = CURLYBROKENARROW2; return} // ~/~>
+                         if (lookahead.ch == '~') {lookahead.nextChar()
+                          if(lookahead.ch == '>') {nextChar5(); token = CURLYBROKENARROW3; return} // ~/~~>
+                          else                    {nextChar4(); token = CURLYBROKEN3     ; return} // ~/~~
+                        }}
                       }
+                      nextChar(); token = CURLY1; return
                    }
                    getOperatorRest()
        case '=' => if (isInSubScript_expression || isInSubScript_partialScript) {
@@ -522,8 +538,33 @@ trait Scanners extends ScannersCommon {
             putChar(chOld)
             getOperatorRest()
           }
+        case '+' => if (isInSubScript_expression && !isInSubScript_val_var_init) {
+                      val lookahead = lookaheadReader; lookahead.nextChar()
+                      if  (lookahead.ch == '~') {lookahead.nextChar()
+                       if (lookahead.ch == '~') {lookahead.nextChar()
+                        if(lookahead.ch == '~') {nextChar4(); token = PLUS_CURLY3     ; return} // +~~~
+                   else if(lookahead.ch == '>') {nextChar4(); token = PLUS_CURLYARROW2; return} // +~~>
+                        else                    {nextChar3(); token = PLUS_CURLY2     ; return} // +~~
+                       }
+                       if (lookahead.ch == '/') {lookahead.nextChar() 
+                        if  (lookahead.ch == '~') {lookahead.nextChar()
+                         if (lookahead.ch == '>') {nextChar5(); token = PLUS_CURLYBROKENARROW2; return} // +~/~>
+                         if (lookahead.ch == '~') {lookahead.nextChar()
+                          if(lookahead.ch == '>') {nextChar6(); token = PLUS_CURLYBROKENARROW3; return} // +~/~~>
+                          else                    {nextChar5(); token = PLUS_CURLYBROKEN3     ; return} // +~/~~
+                         }
+                         else                     {nextChar4(); token = PLUS_CURLYBROKEN2     ; return} // +~/~
+                        }
+                        else                      {nextChar3(); token = PLUS_CURLYBROKEN1     ; return} // +~/
+                       }
+                       else                       {nextChar2(); token = PLUS_CURLY1     ; return} // +~
+                      }
+                    }
+					          putChar(ch)
+					          nextChar()
+					          getOperatorRest()
         case '@' | '#' | '%' |
-             '+' | '-' | 
+             '-' | 
              // '~' |  '>' | '<' | '=' |  
              ':'| '&' |
              '|' | '\\' =>
@@ -1281,16 +1322,35 @@ trait Scanners extends ScannersCommon {
     case EOF           => "eof"
     case ERROR         => "something"
     case SEMI          => "';'"
-    case NEWLINE       => "';'"
-    case NEWLINES      => "';'"
+    case NEWLINE       => "'\\n'"
+    case NEWLINES      => "'\\n\\n'"
     case COMMA         => "','"
     case CASECLASS     => "case class"
     case CASEOBJECT    => "case object"
     case XMLSTART      => "$XMLSTART$<"
       
     // SubScript tokens:  
+    case CURLY1                   => "'~'"   
+    case CURLY2                   => "'~~'"   
+    case CURLY3                   => "'~~~'"   
+    case CURLYBROKEN1             => "~/"
+    case CURLYBROKEN2             => "~/~"
+    case CURLYBROKEN3             => "~/~~"
+    case CURLYARROW1              => "'~>'"   
     case CURLYARROW2              => "'~~>'"   
+    case CURLYARROW3              => "'~~~>'"   
     case CURLYBROKENARROW2        => "'~/~>'"   
+    case CURLYBROKENARROW3        => "'~/~~>'"   
+    case PLUS_CURLYARROW2         => "'+~~>'"   
+    case PLUS_CURLYBROKENARROW2   => "'+~/~>'"   
+    case PLUS_CURLYBROKENARROW3   => "'+~/~~>'"   
+    case PLUS_CURLY1              => "'+~'"   
+    case PLUS_CURLY2              => "'+~~'"   
+    case PLUS_CURLY3              => "'+~~~'"   
+    case PLUS_CURLYBROKEN1        => "'+~/'"   
+    case PLUS_CURLYBROKEN2        => "'+~/~'"  
+    case PLUS_CURLYBROKEN3        => "'+~/~~'"  
+      
     case IF_QMARK                 => "'?if'"   
     case LBRACE_DOT               => "'{.'"   
     case LBRACE_DOT3              => "'{...'"

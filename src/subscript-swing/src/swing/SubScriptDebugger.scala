@@ -19,10 +19,10 @@ class SubScriptDebuggerApp extends SimpleSubscriptApplication with GraphicalDebu
   def script..
      live       = (
                     {*awaitMessageBeingHandled(true)*}
-                    ( if shouldStep then (
+                    if shouldStep then (
                         @{gui(there)}: {!updateDisplay!}
-                        stepCommand || if autoCheckBox.selected then {*waitForStepTimeout*}
-                    ) )
+                        stepCommand || (if autoCheckBox.selected then {*waitForStepTimeout*})
+                    )
                     {messageBeingHandled(false)}
                     ... // TBD: parsing goes wrong without this comment; lineStartOffset was incremented unexpectedly
                   )

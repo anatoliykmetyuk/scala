@@ -21,13 +21,15 @@ trait Tracer {
     traceAttribute_internal("hadFullBreak"  , n.hadFullBreak)
     traceAttribute_internal("nActivatedMandatoryChildren"              , n.nActivatedMandatoryChildren)
     traceAttribute_internal("nActivatedMandatoryChildrenWithSuccess"   , n.nActivatedMandatoryChildrenWithSuccess)
-    traceAttribute_internal("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
+  //traceAttribute_internal("nActivatedMandatoryChildrenWithoutSuccess", n.nActivatedMandatoryChildrenWithoutSuccess)
     traceAttribute_internal("nActivatedOptionalChildren"               , n.nActivatedOptionalChildren)
     traceAttribute_internal("nActivatedOptionalChildrenWithSuccess"    , n.nActivatedOptionalChildrenWithSuccess)
-    traceAttribute_internal("nActivatedOptionalChildrenWithoutSuccess" , n.nActivatedOptionalChildrenWithoutSuccess)
+  //traceAttribute_internal("nActivatedOptionalChildrenWithoutSuccess" , n.nActivatedOptionalChildrenWithoutSuccess)
     traceAttribute_internal("indexChild_optionalBreak_last"            , n.indexChild_optionalBreak_last)
     traceAttribute_internal("indexChild_optionalBreak_secondLast"      , n.indexChild_optionalBreak_secondLast)
+    traceAttribute_internal("indexChild_lastActivated"                 , if(n.lastActivatedChild==null)"" else n.lastActivatedChild.index)
     traceAttribute_internal("aaActivated_notBeforeLastOptionalBreak"   , n.aaActivated_notBeforeLastOptionalBreak)
+    traceAttribute_internal("aaHappenedInOptionalChildren"             , n.aaHappenedInOptionalChildren)
     }
   }  
 }

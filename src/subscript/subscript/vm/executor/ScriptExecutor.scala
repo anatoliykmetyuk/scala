@@ -134,6 +134,8 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
   msgHandlers sInsert communicationHandler
   msgHandlers sInsert continuationHandler
   
+  def _fail = () // needed because this is a ResultHolder; probably a different place for _fail would be better
+  
   def run[R<:S](s: ScriptNode[R]) = {
     initializeExecution(s)
     while (hasActiveProcesses) {

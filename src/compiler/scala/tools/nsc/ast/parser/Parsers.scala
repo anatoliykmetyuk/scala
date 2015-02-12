@@ -175,8 +175,8 @@ self =>
       var se: Tree = null
       
       if (simpleTermOnly)    se = simpleScriptTerm(allowParameterList = false)
-      else if (doInBrackets) inBrackets{se = scriptExpr()}
-           else                         se = scriptExpr() 
+      else if (doInBrackets) inBrackets{se = scriptExpression()}
+           else                         se = scriptExpression() 
       
       val result = makeScriptHeaderAndLocalsAndBody("<lambda>", se, Nil, TypeTree())
       in.isInSubScript_script     = wasInSubScript_script
@@ -563,7 +563,7 @@ self =>
     def incompleteInputError(msg: String): Unit
     private def syntaxError(pos:  Position, msg: String, skipIt: Boolean) {syntaxError(pos pointOrElse in.offset, msg, skipIt)}
     def         syntaxError(offset: Offset, msg: String                 ): Unit
-    def         syntaxError(                msg: String, skipIt: Boolean) {syntaxError(in.offset, msg, skipIt)}
+    def         syntaxError(                msg: String, skipIt: Boolean) {syntaxError(in.offset, msg, skipIt) /*; Thread.dumpStack*/}
 
     def syntaxError(offset: Offset, msg: String, skipIt: Boolean) {
       if (offset > lastErrorOffset) {
@@ -1432,7 +1432,7 @@ self =>
     final val raw_slash = "/"
     final val raw_mathDot = "\u00B7"
     final val subScriptInfixOperators_Set: Set[Name] = Set( raw.PLUS, 
-                                                        SEMI_Name, 
+                                                      //SEMI_Name,  gets special treatment, like in Scala
                                                       newTermName(raw_bar), 
                                                       newTermName(raw_bar2), 
                                                       newTermName(raw_amp),  
@@ -1447,20 +1447,21 @@ self =>
 
     def isSubScriptUnaryPrefixOp (name     : Name     ): Boolean =                      setSubScriptUnaryPrefixOp (name)
     def isSubScriptPostfixOp     (name     : Name     ): Boolean =                      setSubScriptPostfixOp(name)
+    def isSubScriptInfixOpName   (name     : Name     ): Boolean =                subScriptInfixOperators_Set(name)
+    
     def isSubScriptUnaryPrefixOp (tokenData: TokenData): Boolean = isIdent(tokenData) && isSubScriptUnaryPrefixOp (tokenData.name)
     def isSubScriptPostfixOp     (tokenData: TokenData): Boolean = isIdent(tokenData) && isSubScriptPostfixOp(tokenData.name)
 
-    def isSubScriptInfixOpName(name: Name, semicolonOrNewLineAllowed: Boolean = true): Boolean = if (name.equals(SEMI_Name)) semicolonOrNewLineAllowed
-                                                                                        else subScriptInfixOperators_Set(name)
+    
     // for uniformity: a SEMI becomes a name, like other script expression operators                                                                                   
-    def isSubScriptInfixOp(tokenData: TokenData, semicolonOrNewLineAllowed: Boolean): Boolean = {
+    def isSubScriptInfixOp(tokenData: TokenData): Boolean = {
       val result = tokenData.token match {
-      case IDENTIFIER         => isSubScriptInfixOpName (tokenData.name, semicolonOrNewLineAllowed)
-      case SEMI               => semicolonOrNewLineAllowed
-      case NEWLINE | NEWLINES => semicolonOrNewLineAllowed && isSubScriptTermStarter(in.next)
+      case IDENTIFIER         => isSubScriptInfixOpName(tokenData.name)
+      case SEMI               => false
+      case NEWLINE | NEWLINES => false // isSubScriptTermStarter(in.next)    TBD: remove these two lines
       case _                  => false
       }
-//println(s"isSubScriptInfixOp($tokenData, $semicolonOrNewLineAllowed): $result") 
+//println(s"isSubScriptInfixOp($tokenData): $result") 
       result
     }
     def isSubScriptOperator(name: Name): Boolean = isSubScriptUnaryPrefixOp(name) ||
@@ -1468,7 +1469,7 @@ self =>
                                                    isSubScriptInfixOpName  (name)
     def isSubScriptOperator(tree: Tree): Boolean = {val result = tree match {
       case NEWLINE_Ident | SPACE_Ident => true
-      case Ident(NEWLINE_Name) => true // TBD: cleanup (the problem is: NEWLINE handling may follow 2 paths, in scriptExpr()
+      case Ident(NEWLINE_Name) => true // TBD: cleanup (the problem is: NEWLINE handling may follow 2 paths, in scriptExpression()
       case Ident(name: Name) => isSubScriptOperator(name)
       case _ => false
       }
@@ -1581,6 +1582,7 @@ self =>
 
       Select(sSubScriptDSL, operatorDSLFunName)
     }
+    
     val mapOperatorStringToDSLFunString = Map[String,String](
         ";"  -> "seq",
         "+"  -> "alt",
@@ -1659,7 +1661,8 @@ self =>
     
     def vmNodeForCall_Any = AppliedTypeTree(Select(sSubScriptVM , newTypeName("N_call")), List(Ident(any_TypeName)))
     
-    val any_TypeName  = newTypeName("Any")
+    val      any_TypeName = newTypeName("Any")
+    val function_TypeName = newTypeName("Function")
 
     // for @ nodes; these need to know the node type of their operand; very messy...
     def vmNodeOf (tree: Tree): Tree   = tree match { 
@@ -1687,6 +1690,11 @@ self =>
       tokenData.offset-lineOffset >= linePosOfScriptEqualsSym
     }
     
+    def isIF_or_DO(tokenData: TokenData): Boolean = {tokenData.token match {
+      case IF | DO => true case _ => false
+      }
+    }                   
+
     def isSubScriptTermStarter(tokenData: TokenData): Boolean = {val result = tokenData.token match {
       case VAL                      
          | VAR                      
@@ -1696,8 +1704,6 @@ self =>
          | SUPER 
          | NEW
          | AT                       
-         | IF                       
-         | DO                       
          | WHILE                    
          | DOT                      
          | DOT2                     
@@ -1717,12 +1723,11 @@ self =>
          | LBRACE_EMARK             
          | LBRACE_ASTERISK          
          | LBRACE_CARET                                   => scriptExpressionParenthesesNestingLevel>0 || !in.afterLineEnd || isNotLeftOfEqualsSym(tokenData)
-      case IDENTIFIER if (!isSubScriptInfixOp(tokenData, 
-                                  semicolonOrNewLineAllowed=true)) => scriptExpressionParenthesesNestingLevel>0 || !in.afterLineEnd || isNotLeftOfEqualsSym(tokenData)
+      case IDENTIFIER if (!isSubScriptInfixOp(tokenData)) => scriptExpressionParenthesesNestingLevel>0 || !in.afterLineEnd || isNotLeftOfEqualsSym(tokenData)
       case _                                              => isSubScriptUnaryPrefixOp(tokenData)  ||  // MINUS is allways OK, also for -1 etc
                                                              isLiteralToken(tokenData.token)
       }
-      //println(s"isSubScriptTermStarter(${tokenData.token}): $result")
+      //println(s"isSubScriptTermStarter(${tokenData.token}:${tokenData.name}): $result")
       result
     }
 
@@ -1934,19 +1939,19 @@ self =>
       var mustExit = false
       while (!mustExit)
       {
-          while (in.token==NEWLINE||in.token==NEWLINES) {
-            in.nextToken()
-          }
-	      if (doMultipleScripts && in.afterLineEnd) {
-            val linePos = in.offset - in.lineStartOffset
-	        if (linePos <= linePosOfScriptsSection) mustExit = true
-	      }
+        while (in.token==NEWLINE||in.token==NEWLINES) {
+          in.nextToken()
+        }
+        if (doMultipleScripts && in.afterLineEnd) {
+          val linePos = in.offset - in.lineStartOffset
+          if (linePos <= linePosOfScriptsSection) mustExit = true
+        }
 	      
 	      var name: Name = null
-		  var nameOffset = -1
+        var nameOffset = -1
 		  
 	      if (!mustExit) {
-              in.isInSubScript_header = true
+          in.isInSubScript_header = true
 		      nameOffset = in.offset
 		      name = ident()
 		      if (name.toTermName == nme.ERROR) mustExit = true
@@ -1978,7 +1983,7 @@ self =>
 		            in.isInSubScript_header = false
 		            linePosOfScriptEqualsSym = in.offset - in.lineStartOffset
 		            in.nextToken()
-		            scriptExpr()
+		            scriptExpression()
 		          }
 		        
 		        
@@ -2058,17 +2063,19 @@ self =>
     }
     
     /*
-  scriptExpression        = operatorModifiers scriptExpression_9
+  scriptExpression        = operatorModifiers scriptExpr_dataflow_lowPriority
  
   operatorModifiers       = . ("," + naryOperatorDesignator) . naryOperatorDesignator
  
-  scriptExpression_9      = scriptExpression_8 .. if newLineSignificant newLine else (-)
-  scriptExpression_8      = scriptExpression_7 .. (+ ";"  ";-;")
-  scriptExpression_7      = "if" valueExpression      "then" scriptExpression_8
-                                                    . "else" scriptExpression_8
-                          + "do" scriptExpression_7 ( "then" scriptExpression_8
-                                                   %; "else" scriptExpression_8 )
-                          + scriptExpression_6
+  scriptExpr_dataflow_lowPriority = scriptExpr_lines (..; "~~>" scriptLambda . "~/~>" scriptLambda + "~/~>" scriptLambda)  
+  
+  scriptExpr_lines        = scriptExpr_semicolons .. if newLineSignificant newLine else (-)
+  scriptExpr_semicolons   = scriptExpr_if_do .. (+ ";"  ";-;"   ";+;")
+  scriptExpr_if_do        = "if" valueExpression       "then" scriptExpr_if_do
+                                                     . "else" scriptExpr_if_do
+                          + "do" scriptExpr_dataflow ( "then" scriptExpr_if_do
+                                                    %; "else" scriptExpr_if_do )
+                          + scriptExpr_dataflow
   scriptExpression_6      = scriptExpression_5 .. (+ "||"  "|"
                                                      orParArrow
                                                      "|+"  "|;"  "|/"
@@ -2079,121 +2086,305 @@ self =>
   scriptExpression_3      = scriptExpression_2 ..    "+"
   scriptExpression_2      = scriptExpression_1 .. (+ "/"  "%"  "%/"  "%/%/"  "%&"  "%;")
   scriptExpression_1      = scriptSpaceExpression      ..    "·"
-  scriptSpaceExpression   = scriptDataFlow     .. if commasOmittable (-) else (+)
-  scriptDataFlow          = scriptTerm        (..; "~~>" scriptLambda %; "~/~>" scriptLambda) 
+  scriptSpaceExpression   = scriptExpr_dataflow_highPriority     .. if commasOmittable (-) else (+)
+  scriptExpr_dataflow_highPriority = scriptTerm        (..; "~~>" scriptLambda %; "~/~>" scriptLambda) 
   
   scriptLambda            = . parameter "==>"; scriptTerm
   
+  
+  Note: FTTB ;-; and ;+; are not parsed (sequence operators ;-; for failure and ;+; for either success or failure
+    Parsing these would require recognize these in the scanner, and treat them similarly to ; in several places
       */
     
-    // semicolonOrNewLineAllowed: ; and NEWLINE are not allowed in "then" and "else" parts (without parentheses enclosure)
-    def scriptExpr(allowParameterList: Boolean = false, semicolonOrNewLineAllowed: Boolean = true): Tree = scriptExpr(Local, allowParameterList, semicolonOrNewLineAllowed)
-
-    private class TokenData1 extends TokenData
- 
-    case class ScriptOpInfo(operand: Tree, operatorName: Name, offset: Offset, length: Int)
-    
-    var areSpacesCommas              = false
-    
-    def scriptExpr(location: Int, allowParameterList: Boolean, semicolonOrNewLineAllowed: Boolean): Tree = {
- 
-      var scriptOperatorStack: List[ScriptOpInfo] = Nil
-      val base = scriptOperatorStack
-      var top: Tree = null
+    // TBD: clarify allowParameterList
+    // TBD: alter dataflow expressions
+    def scriptExpression(allowParameterList: Boolean = false): Tree = {
       
-      def operatorName(operator: TokenData): Name = operator.token match {
-        case  NEWLINE | NEWLINES => NEWLINE_Name
-        case SEMI       =>     SEMI_Name
-        case IDENTIFIER => operator.name
-      }
-      def operatorLength(operator: TokenData): Int = operator.token match {
-        case  NEWLINE | NEWLINES => 1
-        case SEMI       =>     SEMI_Name.length
-        case IDENTIFIER => operator.name.length
-      }
       var polishOp1: Name = SEMI_Name  //  first operator in prefix position, e.g. in (+ a b c) instead of (a+b+c)
       var polishOp2: Name = SEMI_Name  // second operator in prefix position, e.g. in (;+ a b c <NEWLINE> d e) instead of   (a; b; c) + (d; e)
+	    var areSpacesCommas = false
 
-      def reduceScriptOperatorStack(prec: Int): Unit = {
-        while (scriptOperatorStack != base && prec <= subScriptInfixOpPrecedence(scriptOperatorStack.head.operatorName)) {
-          val opinfo          = scriptOperatorStack.head
-          scriptOperatorStack = scriptOperatorStack.tail
-          
-          //val start  = opinfo.operand.pos.startOrPoint
-          //val end    =            top.pos.  endOrPoint
-          val opPos = r2p(opinfo.offset, opinfo.offset, opinfo.offset+opinfo.operatorName.length); 
-          val lPos  = opinfo.operand.pos
-          val rPos  = top.pos
-          val start = if (lPos.isDefined) lPos.startOrPoint else opPos.startOrPoint;               
-          val end   = if (rPos.isDefined) rPos.  endOrPoint else opPos.endOrPoint
-          
-          val newArgsBut1 = opinfo.operand match {
-            case apply @ Apply(Ident(n), args: List[Tree]) 
-                                 if n==opinfo.operatorName => args // ??? also affect start and end ???
-            case _                                         => List(opinfo.operand)
-          }
-          
-          val OP_Ident = Ident(opinfo.operatorName)
-          top = atPos(start, opinfo.offset, end) {Apply(OP_Ident, newArgsBut1:::List(top))} // TBD: set positions better
-        }
+      if (in.token == COMMA ) {areSpacesCommas = true; in.nextToken()}
+      else {
+        if (isSubScriptInfixOp(in)) {polishOp1 = in.name; in.nextToken()}
+        else if (in.token==SEMI) {in.nextToken()}
       }
+      if (isSubScriptInfixOp(in)) {polishOp2 = in.name; in.nextToken()}
+      else if (in.token==SEMI) {in.nextToken()}
+      else {polishOp2 = polishOp1}
 
-      var savedAreSpacesCommas = areSpacesCommas
-
-      areSpacesCommas          = false
-      // prefix ops, e.g. "(;+ a b \n c d \n e f)" is shorthand for "a b + c d + e f"
-      if      (in.token == COMMA ) {areSpacesCommas = true; in.nextToken()}
-      else if (isSubScriptInfixOp(in, semicolonOrNewLineAllowed)&&in.token!=SEMI) {polishOp1 = in.name; in.nextToken()}
-      if      (isSubScriptInfixOp(in, semicolonOrNewLineAllowed)&&in.token!=SEMI) {polishOp2 = in.name; in.nextToken()}
-      
-      var moreTerms = true
-      var isFirst = true
-      do {
-        top = scriptSpaceExpression(allowParameterList && isFirst)
-        isFirst = false
-        if (isDefinitelyAFormalParameterList(top)) {
-          moreTerms = false
-        }
-        else if (isSubScriptInfixOp(in, semicolonOrNewLineAllowed)) {
-           val opName = operatorName(in)
-           reduceScriptOperatorStack(subScriptInfixOpPrecedence(opName))
-           scriptOperatorStack = ScriptOpInfo(top, opName, in.offset, operatorLength(in)) :: scriptOperatorStack // TBD: new line
-           in.nextToken() // eat the operator
-        }
-        else if (isSubScriptTermStarter(in) && in.afterLineEnd()) {
-           // TBD: probably this should be removed, but then more NEWLINEs should be recognized by the scanner, for subScript expressions
-           reduceScriptOperatorStack(subScriptInfixOpPrecedence(NEWLINE_Name))
-           scriptOperatorStack = ScriptOpInfo(top, NEWLINE_Name, in.offset, 1 /*operatorLength*/) :: scriptOperatorStack // TBD: new line
-        }
-        else moreTerms = false
-      } while (moreTerms)
-	  reduceScriptOperatorStack(0)
-
-	  val result = replaceOperatorsByFunctions(top, spaceOp=polishOp1, newlineOp=polishOp2)
-
-//println("Result tree")
-//println("-------------------")
-//println(result)
-//println("===================")
-	  
-      areSpacesCommas              = savedAreSpacesCommas
-      
-      result
-    }
+      // note: the main call of scriptExpression, to scriptExpr_dataflow, 
+      // is at the bottom of this method, after several local methods
     
-    def replaceOperatorsByFunctions(top: Tree, spaceOp: Name, newlineOp: Name): Tree = {
-      top match {
+      // scriptExpr_dataflow has two sets of operator priorities: 
+      //
+      // high priority - small arrow
+      // x ~~> y
+      // x ~~> y +~/~>z
+      // x ~/~> y
+      //
+      // x ~(p)~> y
+      // x ~(p1)~> y1 +~(p2)~> y2 +~/(e1)~>z1
+      // x ~/(e)~> y1 +~/(e2)~>y2
+      //
+      // low priority - large arrows
+      // x ~~~> y
+      // x ~~~> y +~/~~>z
+      // x ~/~~> y
+      //
+      // x ~~(p)~~> y
+      // x ~~(p1)~~> y1 +~~(p2)~~> y2 +~/~(e1)~~>z1
+      // x ~/~(e)~~> y1 +~/~(e2)~~>y2
+      
+	    def scriptExpr_dataflow(highPriority: Boolean, allowParameterList: Boolean = true): Tree = {
+	      val TOKEN_BEGIN_NORMAL = if (highPriority) CURLYARROW2            else CURLYARROW3
+	      val TOKEN_BEGIN_BROKEN = if (highPriority) CURLYBROKENARROW2      else CURLYBROKENARROW3
+	      val TOKEN_PLUS_BROKEN  = if (highPriority) PLUS_CURLYBROKENARROW2 else PLUS_CURLYBROKENARROW3
+	      
+	      val TOKEN_BEGIN_NORMAL_PARAM = if (highPriority) CURLY2            else CURLY3
+	      val TOKEN_BEGIN_BROKEN_PARAM = if (highPriority) CURLYBROKEN2      else CURLYBROKEN3
+	      val TOKEN_PLUS_BROKEN_PARAM  = if (highPriority) PLUS_CURLYBROKEN2 else PLUS_CURLYBROKENARROW3
+	      val TOKEN_PLUS_NORMAL_PARAM  = if (highPriority) PLUS_CURLY2       else PLUS_CURLY3
+	      val TOKEN_END_PARAM          = if (highPriority) CURLYARROW2       else CURLYARROW3
+	      
+	      // parse expressions such as 
+	      // ~~(p1 if g1)~~> y1 +~~(p2 ig g2)~~> y2 +~~(p3 if g3)~~> y3
+	      // continue as long as the tokenToRepeat is available (e.g. "+~~")
+	      // return a list of caseDefs pi,gi,yi 
+	      // as always the guards gi are optional
+	      //
+	      // eat the first token; assuming it is an appropriate arrow.
+	      // this may be the tokenToRepeat (starting with the plus), but it may also
+	      // be first token of the compound arrow operator (e.g., "~~")
+	      def parseArrowWithScriptLiteral_asMatch(tokenToRepeat: Int): Tree = {
+	        def parseArrowWithScriptLiteral(): List[CaseDef] = {
+						in.nextToken()
+						val pos = accept(LPAREN) 
+						//in.start_SubScript_partialScript 
+						val p = pattern()
+						val g = guard()
+						accept(RPAREN)
+						accept(TOKEN_END_PARAM)
+						//in.start_SubScript_partialScript_caseScript 
+						val sl = scriptLiteral(doInBrackets=false, simpleTermOnly=highPriority)
+						//in.end_SubScript_partialScript_caseScript
+						//in.end_SubScript_partialScript 
+						val currentCase = atPos(pos){
+						  makeCaseDef(p, g, sl)
+						}
+            currentCase :: (if (in.token==tokenToRepeat) parseArrowWithScriptLiteral() else Nil) 
+	        }
+	        val type_Script_Any              = AppliedTypeTree(s_scriptNodeType        , List(Ident(any_TypeName)))
+	        val type_Function_Any_Script_Any = AppliedTypeTree(Ident(function_TypeName), List(Ident(any_TypeName), type_Script_Any))
+          atPos(in.offset) {
+	          Typed(Match(EmptyTree, parseArrowWithScriptLiteral()), type_Function_Any_Script_Any)
+	        }
+	      }
+	      
+	      var result = if (highPriority) scriptTerm(allowParameterList=allowParameterList) 
+	                   else              scriptExpr_lines()
+	                   
+	      if (!isDefinitelyAFormalParameterList(result)) {
+			    val pos = in.offset
+		      in.token match {
+		      	case TOKEN_BEGIN_NORMAL =>
+			        val sourcePart = makeScriptHeaderAndLocalsAndBody("~~>", result, Nil, TypeTree())
+			        in.nextToken()
+			        val thenPart=scriptLambdaTerm(highPriority) 
+			        if (in.token==TOKEN_PLUS_BROKEN) {
+			          in.nextToken(); 
+			          val elsePart=scriptLambdaTerm(highPriority)
+			          result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(sourcePart, thenPart, elsePart))}
+			        }
+			        else result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then     , List(sourcePart, thenPart))}
+			        
+		      	case TOKEN_BEGIN_BROKEN =>
+			        val sourcePart = makeScriptHeaderAndLocalsAndBody("~/~>", result, Nil, TypeTree())
+	            in.nextToken(); 
+			        val elsePart=scriptLambdaTerm(highPriority)
+	            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_else, List(sourcePart, elsePart))}
+			        
+		      	case TOKEN_BEGIN_NORMAL_PARAM => 
+			        val sourcePart = makeScriptHeaderAndLocalsAndBody("~~>", result, Nil, TypeTree())
+		      	  val normalScriptCaseDefs = parseArrowWithScriptLiteral_asMatch(TOKEN_PLUS_NORMAL_PARAM)
+		      	  if (in.token==TOKEN_PLUS_BROKEN_PARAM) {
+		      	    val brokenScriptCaseDefs = parseArrowWithScriptLiteral_asMatch(TOKEN_PLUS_BROKEN_PARAM)
+			          result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(sourcePart, normalScriptCaseDefs, brokenScriptCaseDefs))}
+		      	  }
+		      	  else {
+			          result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then, List(sourcePart, normalScriptCaseDefs))}
+		      	  }
 
-        case Apply(fun: Tree, args: List[Tree])  => 
-          val f = if (isSubScriptOperator(fun)) subScriptDSLFunForOperator(fun, spaceOp, newlineOp) else fun
-          Apply(f, args.map(replaceOperatorsByFunctions(_, spaceOp, newlineOp)))
-          
-        case _            => stripParens(top)
+		      	case TOKEN_BEGIN_BROKEN_PARAM => 
+			        val sourcePart = makeScriptHeaderAndLocalsAndBody("~/~>", result, Nil, TypeTree())
+              val brokenScriptCaseDefs = parseArrowWithScriptLiteral_asMatch(TOKEN_PLUS_BROKEN_PARAM)
+			        result = atPos(pos) {Apply(subScriptDSLFunForDataflow_else, List(sourcePart, brokenScriptCaseDefs))}
+              
+		      	case _ =>
+		      }
+	      }
+	      result
+	    }
+	    
+      def scriptExpr_lines(): Tree = {
+        def hasMoreOperands = isSubScriptTermStarter(in) || isIF_or_DO(in) && in.afterLineEnd()
+        val operand = scriptExpr_semicolons()
+        if (!hasMoreOperands) return operand
+        
+        val pos = in.offset        
+        var operands = List[Tree](operand)
+        do {
+          operands = operands:::List(scriptExpr_semicolons())
+        } while (hasMoreOperands)
+
+        atPos(pos) {
+	        Apply(subScriptDSLFunForOperator(Ident(polishOp2), spaceOp=null, newlineOp=null), operands)
+	      }
       }
+      def scriptExpr_semicolons(): Tree = {
+        def hasMoreOperands = in.token==SEMI
+        val operand = scriptExpr_if_do()
+        if (!hasMoreOperands) return operand
+        
+        val pos = in.offset        
+        var operands = List[Tree](operand)
+        do {
+          in.nextToken()
+          operands = operands:::List(scriptExpr_if_do())
+        } while (hasMoreOperands)
+
+        atPos(pos) {
+	        Apply(subScriptDSLFunForOperator(Ident(SEMI_Name), spaceOp=null, newlineOp=null), operands)
+	      }
+      }
+      def scriptExpr_if_do(): Tree = {
+        val currentToken = in.token
+        currentToken match {
+	        case IF => 
+            def parseIf = { 
+		          in.isInSubScript_nativeCode=true
+		          atPos(in.skipToken()) {
+		            val startPos = r2p(in.offset, in.offset, in.lastOffset max in.offset)
+		            val cond  = expr()
+		            in.isInSubScript_nativeCode=false
+		            accept(THEN)
+		            val thenp = scriptExpr_if_do()
+		            if (in.token == ELSE) {
+		                 in.nextToken()
+		                 val elsep = scriptExpr_if_do()
+		                 Apply(Apply(dslFunFor(ELSE), List(blockToFunction_here(cond, vmNodeFor(ELSE), startPos))),List(thenp, elsep))
+		            }
+		            else Apply(Apply(dslFunFor(  IF), List(blockToFunction_here(cond, vmNodeFor(  IF), startPos))),List(thenp))
+		          }
+		        }
+		        parseIf
+		      case DO => 
+		        def parseDo = atPos(in.skipToken()) {
+		          val startPos = r2p(in.offset, in.offset, in.lastOffset max in.offset)
+		          val doPart  = scriptExpr_if_do()
+		          if (in.token==THEN) {
+		            accept(THEN)
+		            val thenp = scriptExpr_if_do()
+		            if (in.token == ELSE) {accept(ELSE); val elsep = scriptExpr_if_do()
+		                 Apply(dslFunFor(DO_THEN_ELSE), List(doPart, thenp, elsep))
+		            }
+		            else Apply(dslFunFor(DO_THEN),List(doPart, thenp))
+		          }
+		          else {                   accept(ELSE); val elsep = scriptExpr_if_do()
+		                 Apply(dslFunFor(DO_ELSE), List(doPart, elsep))
+		          }
+		        }
+		        parseDo
+		      case _ => scriptExpression_6()	        
+	      }
+	    }
       
-    }
+	    // expressions with operators such as + & && | || /
+	    def scriptExpression_6(): Tree = {
+	 
+	      case class ScriptOpInfo(operand: Tree, operatorName: Name, offset: Offset, length: Int)
+	    
+	      var scriptOperatorStack: List[ScriptOpInfo] = Nil
+	      val base = scriptOperatorStack
+	      var top: Tree = null
+	      
+		    def replaceOperatorsByFunctions(top: Tree, spaceOp: Name, newlineOp: Name): Tree = {
+		      top match {
+		
+		        case Apply(fun: Tree, args: List[Tree])  => 
+		          val f = if (isSubScriptOperator(fun)) subScriptDSLFunForOperator(fun, spaceOp, newlineOp) else fun
+		          Apply(f, args.map(replaceOperatorsByFunctions(_, spaceOp, newlineOp)))
+		          
+		        case _            => stripParens(top)
+		      }
+		      
+		    }
+	      def reduceScriptOperatorStack(prec: Int): Unit = {
+	        while (scriptOperatorStack != base && prec <= subScriptInfixOpPrecedence(scriptOperatorStack.head.operatorName)) {
+	          val opinfo          = scriptOperatorStack.head
+	          scriptOperatorStack = scriptOperatorStack.tail
+	          
+	          //val start  = opinfo.operand.pos.startOrPoint
+	          //val end    =            top.pos.  endOrPoint
+	          val opPos = r2p(opinfo.offset, opinfo.offset, opinfo.offset+opinfo.operatorName.length); 
+	          val lPos  = opinfo.operand.pos
+	          val rPos  = top.pos
+	          val start = if (lPos.isDefined) lPos.startOrPoint else opPos.startOrPoint;               
+	          val end   = if (rPos.isDefined) rPos.  endOrPoint else opPos.endOrPoint
+	          
+	          val newArgsBut1 = opinfo.operand match {
+	            case apply @ Apply(Ident(n), args: List[Tree]) 
+	                                 if n==opinfo.operatorName => args // ??? also affect start and end ???
+	            case _                                         => List(opinfo.operand)
+	          }
+	          
+	          val OP_Ident = Ident(opinfo.operatorName)
+	          top = atPos(start, opinfo.offset, end) {Apply(OP_Ident, newArgsBut1:::List(top))} // TBD: set positions better
+	        }
+	      }
+	
+	      var savedAreSpacesCommas = areSpacesCommas
+	
+	      areSpacesCommas = false
+	      // prefix ops, e.g. "(;+ a b \n c d \n e f)" is shorthand for "a b + c d + e f"
+	      
+	      var moreTerms = true
+	      var isFirst = true
+	      do {
+	        top = scriptSpaceExpression(allowParameterList && isFirst)
+	        isFirst = false
+	        if (isDefinitelyAFormalParameterList(top)) {
+	          moreTerms = false
+	        }
+	        else if (isSubScriptInfixOp(in)) {
+	           val opName = in.name
+	           reduceScriptOperatorStack(subScriptInfixOpPrecedence(opName))
+	           scriptOperatorStack = ScriptOpInfo(top, opName, in.offset, in.name.length) :: scriptOperatorStack // TBD: new line
+	           in.nextToken() // eat the operator
+	        }
+	        else if (isSubScriptTermStarter(in) && in.afterLineEnd()) {
+	           // TBD: probably this should be removed, but then more NEWLINEs should be recognized by the scanner, for subScript expressions
+	           reduceScriptOperatorStack(subScriptInfixOpPrecedence(NEWLINE_Name))
+	           scriptOperatorStack = ScriptOpInfo(top, NEWLINE_Name, in.offset, 1 /*in.name.length*/) :: scriptOperatorStack // TBD: new line
+	        }
+	        else moreTerms = false
+	      } while (moreTerms)
+		  reduceScriptOperatorStack(0)
+	
+		  val result = replaceOperatorsByFunctions(top, spaceOp=polishOp1, newlineOp=polishOp2)
+	
+	//println("Result tree")
+	//println("-------------------")
+	//println(result)
+	//println("===================")
+		  
+	      areSpacesCommas              = savedAreSpacesCommas
+	      
+	      result
+	    }
+	    
     
-    def scriptLambdaTerm(): Tree = {
+    def scriptLambdaTerm(highPriority: Boolean): Tree = {
       // TBD: support USCORE?
       var result = simpleScriptTerm(allowParameterList=true) // TBD: allow that this returns a single-parameter list, e.g. (i:Int)
       val parameterList = result match {
@@ -2203,32 +2394,9 @@ self =>
       }
       if (parameterList!=null) {
         val pos = accept(ARROW2)
-        val lambda = scriptLiteral(doInBrackets=false, simpleTermOnly=true)
+        //val lambda = scriptExpr_dataflow(highPriority)
+        val lambda = scriptLiteral(doInBrackets=false, simpleTermOnly=highPriority)
         result = atPos(pos) {Function(parameterList, lambda)}
-      }
-      result
-    }
-    def isDefinitelyAFormalParameterList(p: Tree) = p match {
-      case Typed(_,_) => true 
-      case Ident(name) if name.toString() startsWith "x$" => true // result of USCORE after freshTermName
-      case _ => false
-    }
-    def scriptDataFlow(allowParameterList: Boolean): Tree = {
-      var result = scriptTerm(allowParameterList)
-      if (!isDefinitelyAFormalParameterList(result)) {
-	      while (in.token==CURLYARROW2 
-	          || in.token==CURLYBROKENARROW2) {
-	        val pos = in.offset
-	        val sourcePart = makeScriptHeaderAndLocalsAndBody("~~>", result, Nil, TypeTree())
-	        if (in.token==      CURLYARROW2) {  in.nextToken(); val thenPart=scriptLambdaTerm() 
-	          if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
-	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then_else, List(sourcePart, thenPart, elsePart))}}
-	          else                              result = atPos(pos) {Apply(subScriptDSLFunForDataflow_then     , List(sourcePart, thenPart))}
-	        }
-	        else if (in.token==CURLYBROKENARROW2) {in.nextToken(); val elsePart=scriptLambdaTerm()
-	                                            result = atPos(pos) {Apply(subScriptDSLFunForDataflow_else, List(sourcePart, elsePart))}
-	        }
-	      }
       }
       result
     }
@@ -2237,7 +2405,8 @@ self =>
       var isFirst = true
       var moreTerms = true
       do  {
-        val p = scriptDataFlow(allowParameterList && isFirst)
+        val p = scriptExpr_dataflow(highPriority=true, allowParameterList = allowParameterList && isFirst)
+        //val p = scriptTerm(allowParameterList && isFirst)
         
         ts += p
         if (areSpacesCommas 
@@ -2252,42 +2421,6 @@ self =>
       if (ts.length == 1)  ts.head
       else Apply(SPACE_Ident, ts.toList)
     }
-
-    def simpleNativeValueExpr(allowBraces: Boolean = false): Tree = {
-      
-      val ret = in.token match {
-        case LBRACE if  allowBraces => in.isInSubScript_nativeCode=true; in.nextToken(); val r=block(); in.isInSubScript_nativeCode=false; accept(RBRACE); r
-        case LPAREN if !allowBraces => in.isInSubScript_nativeCode=true; in.nextToken(); val r=expr (); in.isInSubScript_nativeCode=false; accept(RPAREN); r
-        case IDENTIFIER 
-        |    BACKQUOTED_IDENT 
-        |    THIS 
-        |    SUPER            => path(thisOK = true, typeOK = false)
-        case _ if (isLiteral) => atPos(in.offset)(literal())
-        case _ => {syntaxError(in.offset, "native value expresion expected"); EmptyTree}
-      }
-      in.isInSubScript_nativeCode = false
-      newLinesOpt() // NEWLINEs may have remained from the "native code mode" scanning
-      ret
-    }
-
-/*
-  scriptTerm              =+ postfixScriptTerm
-                             variableDeclaration 
-                                valueDeclaration 
-                              privateDeclaration 
- 
-  valueDeclaration        = "val" identifier; . ":" typer ;   "=" simpleValueExpression
-  variableDeclaration     = "var" identifier (  ":" typer ;%; "=" simpleValueExpression)
-   privateDeclaration     = "private" identifiers
-
-  postfixScriptTerm       = ..(unaryPrefixOperator + directive); scriptCommaExpression; . "^" . variableDesignator
-                            
-  scriptCommaExpression   = simpleScriptTerm .. ","
- 
-  directive               = "@" scalaCode ":"
- 
-  unaryPrefixOperator     =+ "!"  "-"  "~"
- */
 
     def scriptCommaExpression(allowParameterList: Boolean, isNegated: Boolean): Tree = {
       val oldOffset = in.offset
@@ -2322,116 +2455,13 @@ self =>
       else {syntaxError(oldOffset, "terms in comma expression should be path or literal"); ts.head}
     }
 
-
     def scriptTerm(allowParameterList: Boolean): Tree = (in.token: @scala.annotation.switch) match {
       case VAL     => scriptLocalValOrVar((NoMods                ) withPosition(VAL , tokenRange(in)))
       case VAR     => scriptLocalValOrVar((NoMods | Flags.MUTABLE) withPosition(VAR , tokenRange(in)))
       case PRIVATE => ??? // TBD
       case _       => postfixScriptTerm(allowParameterList)
     }
-    def scriptLocalValOrVar(mods: Modifiers): Tree = {
-      val pos = in.offset
-      var newmods = mods
-      in.nextToken()
-      val tok  = in.token
-      val name = ident()
-      val lhs  = atPos(pos) {
-          if (tok == BACKQUOTED_IDENT) Ident(name) updateAttachment BackquotedIdentifierAttachment
-          else Ident(name)
-      }
-      
-      // A pattern function that captures the tree that will be constructed
-      // Also, it captures the fact of passing rhs or tp out of the scope
-      // in order to generate definitions at the beginning of the script
-      //
-      // isTypeTaransmittable variable indicates whether `tp` type can be
-      // transfered out of current scope (true) or not (false)
-      def operationPattern(rhs: Tree, tp: Tree, isTypeTransmittable: Boolean) = {
-        import TypeOperations._
-        
-        val vIdent          = Ident(newTermName(underscore_prefix(name.toString)))
-        val  sFunValOrVar   = dslFunFor(if (mods.isMutable) VAR else VAL)
-        val sNodeValOrVar   = vmNodeFor(if (mods.isMutable) VAR else VAL)
-     
-        val typer           = AppliedTypeTree(sNodeValOrVar, List(tp))
-       
-        // If the type is transmittable (already known), enforce it
-        // If it is just an unknown identifier, infer it
-        val initializerCode =
-          if (isTypeTransmittable) blockToFunction_here (enforcingType(tp)(rhs), typer, rhs.pos)
-          else withTypeOf(rhs, tp.asInstanceOf[Ident]){_ =>
-            blockToFunction_here(rhs, typer, rhs.pos)  // Typer is already influenced by `tp` type parameter
-          }
-        
-        // If tp is just a local identifier, it will be useless out of this scope
-        // Hence, we'll need to pass the actual value `rhs` instead of `tp`
-        // in order to infer the type from it on later stages of compilation
-        // (see TypeOperations.withTypeOf transformation)
-        //
-        // Also, we'll need to set a proper Boolean flag in order to distinguish
-        // between values and types trees
-        
-        val pairToAdd = name->(if (isTypeTransmittable) tp else rhs, isTypeTransmittable)
-        if (mods.isMutable) scriptLocalVariables += pairToAdd
-        else                scriptLocalValues    += pairToAdd
-        
-        atPos(pos) {
-          if (rhs.isEmpty) {dslFunFor(LPAREN_PLUS_MINUS_RPAREN)} // neutral; there is no value to provide
-          else  Apply(sFunValOrVar, List(vIdent, initializerCode))
-        }
-      }
-      
-      in.token match {
-        // Type is present
-        case COLON =>
-          accept(COLON)
-          val tp  = exprSimpleType()
-          val rhs =
-            if (tp.isEmpty || in.token == EQUALS || !newmods.isMutable || true /*FTTB enforce initialisation*/) {
-              accept(EQUALS)
-               
-              val annotation = if (in.token==AT) parseAnnotation else null
-              val ex = if (!tp.isEmpty && newmods.isMutable &&
-                           lhs.isInstanceOf[Ident] && in.token == USCORE) {
-                           in.nextToken()
-                           newmods = newmods | Flags.DEFAULTINIT; EmptyTree}
-                       else {in.start_SubScript_val_var_init; try expr() finally in.end_SubScript_val_var_init}
-              if (annotation==null) ex else ex // TBD: make something using annotation
-            }
-            else {newmods = newmods | Flags.DEFERRED; EmptyTree}
-          
-          operationPattern(rhs, tp, true)
-          
-          // TBD: val result = ScriptValDef(newmods, name.toTermName, tp, rhs)    FTTB a quick solution:
-          // val c = initializer ===> subscript.DSL._val(_c, here: subscript.DSL.N_localvar[Char] => initializer)   likewise for var
-      
-        // Type is absent
-        // Copy pasting is not good - further abstractin will be required
-        // for `rhs` computation
-        case _ =>
-          if (true) {
-            syntaxError(in.offset, "For the time being local script vars and vals must be explicitly typed"); EmptyTree
-          }
-          else {
-            val rhs = {
-              accept(EQUALS)
-              val annotation = if (in.token==AT) parseAnnotation else null
-                
-              val ex = if (newmods.isMutable &&
-                           lhs.isInstanceOf[Ident] && in.token == USCORE) {
-                           in.nextToken()
-                           newmods = newmods | Flags.DEFAULTINIT; EmptyTree}
-                       else {in.start_SubScript_val_var_init; try expr() finally in.end_SubScript_val_var_init}
-              if (annotation==null) ex else ex // TBD: make something using annotation
-            }
-            operationPattern(rhs, Ident(newTypeName("T")), false)
-          }
-      }
-
-      
-    }
-
-
+    
     def postfixScriptTerm (allowParameterList: Boolean): Tree = {
       var result = unaryPrefixScriptTerm(allowParameterList)
       if (!isDefinitelyAFormalParameterList(result)) {
@@ -2446,11 +2476,24 @@ self =>
       result
     }
 
-    def parseAnnotation: Tree = {
-      atPos(in.skipToken()) {
-        val annotationCode = simpleNativeValueExpr(allowBraces = true); accept(COLON)
-        annotationCode
+    def unaryPrefixScriptTerm (allowParameterList: Boolean): Tree = 
+      if (isSubScriptUnaryPrefixOp(in)) {
+        val oldOffset = in.offset
+        val name = in.name
+        //val name = nme.toUnaryName(rawIdent().toTermName)    ????
+        in.nextToken
+        atPos(in.offset) {
+          if (name == nme.UNARY_- && isNumericLit && in.offset==oldOffset+1) {
+            scriptCommaExpression(allowParameterList = false, isNegated = true)
+          }
+          else {
+            Select(stripParens(unaryPrefixScriptTerm(allowParameterList = false)), name)
+          }
+        }
       }
+      else (in.token: @scala.annotation.switch) match {
+      case AT => parseAnnotationScriptTerm
+      case _ => scriptCommaExpression(allowParameterList, isNegated = false)
     }
     
     // for input: @{annotationCode}: body     
@@ -2518,24 +2561,171 @@ self =>
       }
     }
     
-    def unaryPrefixScriptTerm (allowParameterList: Boolean): Tree = 
-      if (isSubScriptUnaryPrefixOp(in)) {
-        val oldOffset = in.offset
-        val name = in.name
-        //val name = nme.toUnaryName(rawIdent().toTermName)    ????
-        in.nextToken
-        atPos(in.offset) {
-          if (name == nme.UNARY_- && isNumericLit && in.offset==oldOffset+1) {
-            scriptCommaExpression(allowParameterList = false, isNegated = true)
+    
+    // at last, the body and end of method scriptExpression:
+    
+    scriptExpr_dataflow(highPriority=false)
+      
+  }
+
+  def isDefinitelyAFormalParameterList(p: Tree) = p match {
+    case Typed(_,_) => true 
+    case Ident(name) if name.toString() startsWith "x$" => true // result of USCORE after freshTermName
+    case _ => false
+  }
+
+  def simpleNativeValueExpr(allowBraces: Boolean = false): Tree = {
+    
+    val ret = in.token match {
+      case LBRACE if  allowBraces => in.isInSubScript_nativeCode=true; in.nextToken(); val r=block(); in.isInSubScript_nativeCode=false; accept(RBRACE); r
+      case LPAREN if !allowBraces => in.isInSubScript_nativeCode=true; in.nextToken(); val r=expr (); in.isInSubScript_nativeCode=false; accept(RPAREN); r
+      case IDENTIFIER 
+      |    BACKQUOTED_IDENT 
+      |    THIS 
+      |    SUPER            => path(thisOK = true, typeOK = false)
+      case _ if (isLiteral) => atPos(in.offset)(literal())
+      case _ => {syntaxError(in.offset, "native value expresion expected"); EmptyTree}
+    }
+    in.isInSubScript_nativeCode = false
+    newLinesOpt() // NEWLINEs may have remained from the "native code mode" scanning
+    ret
+  }
+
+    
+/*
+  scriptTerm              =+ postfixScriptTerm
+                             variableDeclaration 
+                                valueDeclaration 
+                              privateDeclaration 
+ 
+  valueDeclaration        = "val" identifier; . ":" typer ;   "=" simpleValueExpression
+  variableDeclaration     = "var" identifier (  ":" typer ;%; "=" simpleValueExpression)
+   privateDeclaration     = "private" identifiers
+
+  postfixScriptTerm       = ..(unaryPrefixOperator + directive); scriptCommaExpression; . "^" . variableDesignator
+                            
+  scriptCommaExpression   = simpleScriptTerm .. ","
+ 
+  directive               = "@" scalaCode ":"
+ 
+  unaryPrefixOperator     =+ "!"  "-"  "~"
+ */
+
+
+    def scriptLocalValOrVar(mods: Modifiers): Tree = {
+      val pos = in.offset
+      var newmods = mods
+      in.nextToken()
+      val tok  = in.token
+      val name = ident()
+      val lhs  = atPos(pos) {
+          if (tok == BACKQUOTED_IDENT) Ident(name) updateAttachment BackquotedIdentifierAttachment
+          else Ident(name)
+      }
+      
+      // A pattern function that captures the tree that will be constructed
+      // Also, it captures the fact of passing rhs or tp out of the scope
+      // in order to generate definitions at the beginning of the script
+      //
+      // isTypeTaransmittable variable indicates whether `tp` type can be
+      // transfered out of current scope (true) or not (false)
+      def operationPattern(rhs: Tree, tp: Tree, isTypeTransmittable: Boolean) = {
+        import TypeOperations._
+        
+        val vIdent          = Ident(newTermName(underscore_prefix(name.toString)))
+        val  sFunValOrVar   = dslFunFor(if (mods.isMutable) VAR else VAL)
+        val sNodeValOrVar   = vmNodeFor(if (mods.isMutable) VAR else VAL)
+     
+        val typer           = AppliedTypeTree(sNodeValOrVar, List(tp))
+       
+        // If the type is transmittable (already known), enforce it
+        // If it is just an unknown identifier, infer it
+        val initializerCode =
+          if (isTypeTransmittable) blockToFunction_here (enforcingType(tp)(rhs), typer, rhs.pos)
+          else withTypeOf(rhs, tp.asInstanceOf[Ident]){_ =>
+            blockToFunction_here(rhs, typer, rhs.pos)  // Typer is already influenced by `tp` type parameter
           }
-          else {
-            Select(stripParens(unaryPrefixScriptTerm(allowParameterList = false)), name)
-          }
+        
+        // If tp is just a local identifier, it will be useless out of this scope
+        // Hence, we'll need to pass the actual value `rhs` instead of `tp`
+        // in order to infer the type from it on later stages of compilation
+        // (see TypeOperations.withTypeOf transformation)
+        //
+        // Also, we'll need to set a proper Boolean flag in order to distinguish
+        // between values and types trees
+        
+        val pairToAdd = name->(if (isTypeTransmittable) tp else rhs, isTypeTransmittable)
+        if (mods.isMutable) scriptLocalVariables += pairToAdd
+        else                scriptLocalValues    += pairToAdd
+        
+        atPos(pos) {
+          if (rhs.isEmpty) {dslFunFor(LPAREN_PLUS_MINUS_RPAREN)} // neutral; there is no value to provide
+          else  Apply(sFunValOrVar, List(vIdent, initializerCode))
         }
       }
-      else (in.token: @scala.annotation.switch) match {
-      case AT => parseAnnotationScriptTerm
-      case _ => scriptCommaExpression(allowParameterList, isNegated = false)
+      
+      in.token match {
+        // Type is present
+        case COLON =>
+          accept(COLON)
+          val tp  = exprSimpleType()
+          val rhs =
+            if (tp.isEmpty || in.token == EQUALS || !newmods.isMutable || true /*FTTB enforce initialisation*/) {
+              accept(EQUALS)
+               
+              val annotation = if (in.token==AT) parseAnnotation else null
+              val ex = if (!tp.isEmpty && newmods.isMutable &&
+                           lhs.isInstanceOf[Ident] && in.token == USCORE) {
+                           in.nextToken()
+                           newmods = newmods | Flags.DEFAULTINIT; EmptyTree}
+                       else {
+                         in.start_SubScript_val_var_init; 
+                         try expr() 
+                         finally {in.end_SubScript_val_var_init; 
+                              if (in.token == NEWLINE) in.nextToken // quick hack
+                           }
+                       }
+              if (annotation==null) ex else ex // TBD: make something using annotation
+            }
+            else {newmods = newmods | Flags.DEFERRED; EmptyTree}
+          
+          operationPattern(rhs, tp, true)
+          
+          // TBD: val result = ScriptValDef(newmods, name.toTermName, tp, rhs)    FTTB a quick solution:
+          // val c = initializer ===> subscript.DSL._val(_c, here: subscript.DSL.N_localvar[Char] => initializer)   likewise for var
+      
+        // Type is absent
+        // Copy pasting is not good - further abstractin will be required
+        // for `rhs` computation
+        case _ =>
+          if (true) {
+            syntaxError(in.offset, "For the time being local script vars and vals must be explicitly typed"); EmptyTree
+          }
+          else {
+            val rhs = {
+              accept(EQUALS)
+              val annotation = if (in.token==AT) parseAnnotation else null
+                
+              val ex = if (newmods.isMutable &&
+                           lhs.isInstanceOf[Ident] && in.token == USCORE) {
+                           in.nextToken()
+                           newmods = newmods | Flags.DEFAULTINIT; EmptyTree}
+                       else {in.start_SubScript_val_var_init; try expr() finally in.end_SubScript_val_var_init}
+              if (annotation==null) ex else ex // TBD: make something using annotation
+            }
+            operationPattern(rhs, Ident(newTypeName("T")), false)
+          }
+      }
+
+      
+    }
+
+
+    def parseAnnotation: Tree = {
+      atPos(in.skipToken()) {
+        val annotationCode = simpleNativeValueExpr(allowBraces = true); accept(COLON)
+        annotationCode
+      }
     }
     
     /*
@@ -2567,8 +2757,6 @@ self =>
                             whileTerm
                             forTerm
                             tryTerm
-                            ifTerm
-                            doTerm
                             specialTerm 
                             "("   scriptExpression   ")"
                             "(*"  scriptExpression  "*)"
@@ -2606,12 +2794,6 @@ self =>
   tryTerm                 = "try" unary (scriptCatchClause %; scriptFinallyClause)
   matchTerm               = simpleValueExpression "match" "(" scriptCaseClauses ")"
  
-  ifTerm                  = "if" valueExpression "then" scriptExpr
-                                               . "else" scriptExpr 
- 
-  doTerm                  = "if" scriptExpr ( "then" scriptExpr
-                                           %; "else" scriptExpr)
- 
   scriptCatchClause       = "catch" "(" (scriptCaseClause..) ")"
  
   scriptCaseClause        = "case" pattern (. "if" valueExpression)
@@ -2627,41 +2809,6 @@ self =>
     def simpleScriptTerm (allowParameterList: Boolean, isNegated: Boolean = false): Tree = atPos(in.offset) {
       val currentToken = in.token
       currentToken match {
-      case IF => 
-        def parseIf = { 
-          in.isInSubScript_nativeCode=true
-          atPos(in.skipToken()) {
-            val startPos = r2p(in.offset, in.offset, in.lastOffset max in.offset)
-            val cond  = expr()
-            in.isInSubScript_nativeCode=false
-            accept(THEN)
-            val thenp = scriptExpr(semicolonOrNewLineAllowed=false)
-            if (in.token == ELSE) {
-                 in.nextToken(); 
-                 val elsep = scriptExpr(semicolonOrNewLineAllowed=false)
-                 Apply(Apply(dslFunFor(ELSE), List(blockToFunction_here(cond, vmNodeFor(ELSE), startPos))),List(thenp, elsep))
-            }
-            else Apply(Apply(dslFunFor(  IF), List(blockToFunction_here(cond, vmNodeFor(  IF), startPos))),List(thenp))
-          }
-        }
-        parseIf
-      case DO => 
-        def parseDo = atPos(in.skipToken()) {
-          val startPos = r2p(in.offset, in.offset, in.lastOffset max in.offset)
-          val doPart  = scriptExpr(semicolonOrNewLineAllowed=false)
-          if (in.token==THEN) {
-            accept(THEN)
-            val thenp = scriptExpr(semicolonOrNewLineAllowed=false)
-            if (in.token == ELSE) {accept(ELSE); val elsep = scriptExpr(semicolonOrNewLineAllowed=false)
-                 Apply(dslFunFor(DO_THEN_ELSE), List(doPart, thenp, elsep))
-            }
-            else Apply(dslFunFor(DO_THEN),List(doPart, thenp))
-          }
-          else {                   accept(ELSE); val elsep = scriptExpr(semicolonOrNewLineAllowed=false)
-                 Apply(dslFunFor(DO_ELSE), List(doPart, elsep))
-          }
-        }
-        parseDo
       case WHILE =>
         def parseWhile    = atPos(in.skipToken()) {
           val startPos    = r2p(in.offset, in.offset, in.lastOffset max in.offset)
@@ -2679,11 +2826,9 @@ self =>
          | DOT3                         => atPos(in.offset){in.nextToken(); dslFunFor(currentToken)} // TBD: transform in later phase
       case IDENTIFIER if (isBreakIdent) => atPos(in.offset){in.nextToken(); dslFunForBreak         }
       
-      case LPAREN if allowParameterList => atPos(in.offset){inScriptParens(currentToken, scriptExpr(allowParameterList=allowParameterList))}
-        
-      case LPAREN 
-         | LPAREN_ASTERISK
-         | LPAREN_ASTERISK2             => atPos(in.offset){inScriptParens(currentToken, scriptExpr())}
+      case LPAREN                       => atPos(in.offset){inScriptParens(currentToken, scriptExpression(allowParameterList))}
+      case LPAREN_ASTERISK
+         | LPAREN_ASTERISK2             => atPos(in.offset){inScriptParens(currentToken, scriptExpression())}
       case LBRACE           
          | LBRACE_DOT              
          | LBRACE_DOT3         

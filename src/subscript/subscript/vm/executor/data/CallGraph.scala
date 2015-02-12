@@ -51,8 +51,8 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
 }
 object CallGraph {
   def connect(parentNode: CallGraphNode.Parent, childNode: CallGraphNode.Child) {
-    childNode addParent parentNode
-    childNode.scriptExecutor = parentNode.scriptExecutor
+    childNode.scriptExecutor = parentNode.scriptExecutor // this sets childNode.index
+    childNode addParent parentNode // uses childNode.index, so do this after setting scriptExecutor
     parentNode.nActivatedChildren += 1
   }  
   

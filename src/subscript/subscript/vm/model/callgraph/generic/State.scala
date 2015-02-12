@@ -11,6 +11,7 @@ trait State {this: CallGraphNode =>
     _hasSuccess = value
     forEachParent(p => p childChangesSuccess this)
   }
+  def _fail = hasSuccess = false
   
   /** Exclusion flag */
   var isExcluded = false
