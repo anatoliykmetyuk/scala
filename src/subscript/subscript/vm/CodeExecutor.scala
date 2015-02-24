@@ -335,6 +335,40 @@ case class EventHandlingCodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptE
     //}
     }
   }
+  
+  /*
+   * Experimental convenience method:
+   * execute as an Atomic Action if the given Try is a Success;
+   * else the Try should be a Failure, and fail with that.
+   * Make sure the code is executed with "$" in place as the given Try; 
+   * afterwards set $ again because it will probably have been overridden.
+   */
+  def executeForTry(tryResult: Try[R]): Unit = {  // not to be called by scriptExecutor, but by application code
+    if (busy) return
+    busy = true
+    _n.result = if (tryResult.isSuccess) ExecutionResult.Success else ExecutionResult.Failure
+    _n.hasSuccess = false
+    _n.isExecuting = true
+
+     try {//println(s"executeAA before executeCode; _n: ${_n}")
+           //_n.result = ExecutionResult.Success
+           _n.$ = tryResult
+           println(s"executeForTry n.$$: ${_n.$}")
+           val r:R = CodeExecutor executeCode _n
+     }
+     catch {case f : Throwable => f.printStackTrace()} //; println(s"captured: $f") }
+     finally {
+        _n.isExecuting = false
+        busy = false
+        _n.$ = tryResult
+        _n.result = if (tryResult.isSuccess) ExecutionResult.Success else ExecutionResult.Failure
+        _n.hasSuccess = tryResult.isSuccess
+        println(s"executeForTry n.$$: ${_n.$} _n.hasSuccess = ${_n.hasSuccess}")
+     }
+     executionFinished // will probably imply a call back to afterExecute from the ScriptExecutor thread
+                        // TBD: maybe a provision should be taken here to prevent handling a second event here, in case this is a N_code_eh
+  }
+
   override def afterExecuteAA_internal: Unit = {
 //println(s"afterExecuteAA_internal hasSuccess: ${_n.hasSuccess}")
       if (_n.isExcluded || !n.hasSuccess) return

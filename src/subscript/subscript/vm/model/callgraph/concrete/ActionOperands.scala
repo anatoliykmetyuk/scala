@@ -1,6 +1,7 @@
 // package subscript.vm.model.callgraph.concrete
 package subscript.vm
 
+import scala.util.Try
 import subscript.vm.executor._
 import subscript.vm.model.callgraph._
 import subscript.vm.model.callgraph.generic._
@@ -18,6 +19,8 @@ case class N_code_unsure   [R](template: T_code_unsure  [R]) extends N_code_frag
 case class N_code_eventhandling     [R](template: T_code_eventhandling     [R]) extends N_code_fragment[R] 
                                                                                 with UnsureExecutionResult {type T = T_code_eventhandling[R]
   def eventHappened = codeExecutor.executeAA
+  // experimental
+  def executeForTry(tryResult: Try[R]): Unit = codeExecutor.asInstanceOf[EventHandlingCodeFragmentExecutor[R]].executeForTry(tryResult)
 }
 case class N_code_eventhandling_loop[R](template: T_code_eventhandling_loop[R]) extends N_code_fragment[R]
                                                                                 with    LoopExecutionResult{type T = T_code_eventhandling_loop[R]}

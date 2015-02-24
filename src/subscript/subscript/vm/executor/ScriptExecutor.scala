@@ -168,7 +168,7 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
    * This must be done in a synchronized way, and it may need to cause the call to wait()
    * in awaitMessages to end. Therefore this method does notify as well.
    */
-  def doCodeThatInsertsMsgs_synchronized(code: =>Unit): Unit = synchronized{ code; notify }
+  def doCodeThatInsertsMsgs_synchronized(code: =>Unit): Unit = synchronized{ code; trace(s"$this notify"); notify }
 }
 
 /**
