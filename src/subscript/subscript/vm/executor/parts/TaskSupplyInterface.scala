@@ -15,8 +15,8 @@ trait TaskSupplyInterface {this: ScriptExecutor[_] =>
     val launchAnchor       = CallGraphNode.getLowestLaunchAnchorAncestor(n) // could be rootNode
     val callAnchorTemplate =     T_call[R]("<launched>", null)
     val callAnchorNode     =     N_call(callAnchorTemplate)
-    CallGraph.connect(parentNode = launchAnchor, childNode = callAnchorNode)
-    CallGraph.connect(parentNode = callAnchorNode, childNode = aScript) // code duplicated from Callgraph.activateFrom
+    CallGraph.connect(parentNode = launchAnchor, childNode = callAnchorNode, scriptNode = launchAnchor.scriptNode)
+    CallGraph.connect(parentNode = callAnchorNode, childNode = aScript, scriptNode = launchAnchor.scriptNode) // code duplicated from Callgraph.activateFrom
     msgQueue insert Activation(aScript)                                 // idem
   }
   

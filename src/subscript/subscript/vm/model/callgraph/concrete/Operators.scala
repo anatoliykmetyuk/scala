@@ -89,9 +89,11 @@ case class N_n_ary_op(template: T_n_ary_op, isLeftMerge: Boolean)
   }
   
   override def childChangesSuccess(child: Child) = {
+//val old_nActivatedChildrenWithSuccess = nActivatedChildrenWithSuccess
     val delta = if (child.hasSuccess) 1 else -1
     nActivatedChildrenWithSuccess += delta
     if (isOptionalChild(child)) nActivatedOptionalChildrenWithSuccess += delta
+//println(f"$this%-14s child $child%-14s  changesSuccess to ${child.hasSuccess} nActivatedChildrenWithSuccess: $old_nActivatedChildrenWithSuccess => $nActivatedChildrenWithSuccess")
   }
   
   def traceLevel = 2

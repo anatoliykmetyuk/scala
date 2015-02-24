@@ -1624,20 +1624,26 @@ trait Trees { self: Universe =>
    *  @group Trees
    *  @template
    */
-  type ScriptApply >: Null <: GenericApply with ScriptApplyApi
+  type ScriptApply        >: Null <: GenericApply with ScriptApplyApi
+  type ScriptCodeFragment >: Null <: Tree with ScriptCodeFragmentApi
+  type ScriptUserElement  >: Null <: Tree with ScriptUserElementApi
 
   /** A tag that preserves the identity of the `ScriptApply` abstract type from erasure.
    *  Can be used for pattern matching, instance tests, serialization and likes.
    *  @group Tags
    */
-  implicit val ScriptApplyTag: ClassTag[ScriptApply]
+  implicit val ScriptApplyTag       : ClassTag[ScriptApply]
+  implicit val ScriptCodeFragmentTag: ClassTag[ScriptCodeFragment]
+  implicit val ScriptUserElementTag : ClassTag[ScriptUserElement]
 
   /** The constructor/extractor for `ScriptApply` instances.
    *  @group Extractors
    */
-  val ScriptApply: ScriptApplyExtractor
+  val ScriptApply       : ScriptApplyExtractor
+  val ScriptCodeFragment: ScriptCodeFragmentExtractor
+  val ScriptUserElement : ScriptUserElementExtractor
 
-  /** An extractor class to create and pattern match with syntax `ScriptApply(fun, args)`.
+  /** An extractor class to create and pattern match with syntax `ScriptApply(fun, args, mustPropagateResultValue)`.
    *  This AST node corresponds to the following SubScript code:
    *
    *    script(args)
@@ -1652,15 +1658,28 @@ trait Trees { self: Universe =>
    *  @group Extractors
    */
   abstract class ScriptApplyExtractor {
-    def apply(fun: Tree, args: List[Tree]): ScriptApply
-    def unapply(apply: ScriptApply): Option[(Tree, List[Tree])]
+    def apply(fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean): ScriptApply
+    def unapply(apply: ScriptApply): Option[(Tree, List[Tree], Boolean)]
   }
-
+  abstract class ScriptCodeFragmentExtractor {
+    def apply(token: Int, code: Tree): ScriptCodeFragment
+    def unapply(apply: ScriptCodeFragment): Option[(Int, Tree)]
+  }
+  abstract class ScriptUserElementExtractor {
+    def apply(kind: Name, main: Tree, others: List[Tree], info: Any): ScriptUserElement
+    def unapply(apply: ScriptUserElement): Option[(Name, Tree, List[Tree], Any)]
+  }
+  
   /** The API that all script applies support
    *  @group API
    */
-  trait ScriptApplyApi extends GenericApplyApi { this: ScriptApply =>
-  }
+  trait ScriptApplyApi extends GenericApplyApi { this: ScriptApply => }
+
+  /** The API that all script code fragments support
+   *  @group API
+   */
+  trait ScriptCodeFragmentApi extends TreeApi { this: ScriptCodeFragment => }
+  trait ScriptUserElementApi  extends TreeApi { this: ScriptUserElement => }
 
   /** Super reference, where `qual` is the corresponding `this` reference.
    *  A super reference `C.super[M]` is represented as `Super(This(C), M)`.
@@ -2506,8 +2525,11 @@ trait Trees { self: Universe =>
     /** Creates a `ScriptApply` node from the given components, having a given `tree` as a prototype.
      *  Having a tree as a prototype means that the tree's attachments, type and symbol will be copied into the result.
      */
-    def ScriptApply(tree: Tree, fun: Tree, args: List[Tree]): ScriptApply
+    def ScriptApply(tree: Tree, fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean): ScriptApply
 
+    def ScriptCodeFragment(tree: Tree, token: Int, code: Tree): ScriptCodeFragment
+    def ScriptUserElement (tree: Tree, kind: Name, main: Tree, others: List[Tree], info: Any): ScriptUserElement
+    
     /** Creates a `Super` node from the given components, having a given `tree` as a prototype.
      *  Having a tree as a prototype means that the tree's attachments, type and symbol will be copied into the result.
      */

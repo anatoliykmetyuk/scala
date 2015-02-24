@@ -10,10 +10,11 @@ import subscript.vm.model.template.concrete._
 object TemplateNode {
   // Defined statically in the object. Now we can
   // use these types everywhere.
-  type Root   =     RootNode with TemplateNode
-  type Parent = TemplateNode
-  type Child  =    ChildNode with TemplateNode
+  type Root   =  RootNode with TemplateNode
+  type Parent =                TemplateNode
+  type Child  = ChildNode with TemplateNode
   
+  private def caretIf(b:Boolean): String = if (b) "^" else ""
   def kindAsString(t: TemplateNode): String = 
     t match {
       // matching on T_n_ary_op (and T_1_ary_op) does not work;
@@ -21,12 +22,12 @@ object TemplateNode {
       case T_1_ary_op               (kind: String, _) => kind
       case T_n_ary_op               (kind: String, _) => kind
       
-      case T_code_normal            (_)               => "{}"
-      case T_code_tiny              (_)               => "{!!}"
-      case T_code_threaded          (_)               => "{**}"
-      case T_code_unsure            (_)               => "{??}"
-      case T_code_eventhandling     (_)               => "{.}"
-      case T_code_eventhandling_loop(_)               => "{...}"
+      case T_code_normal            (_,doPropagate)   =>    s"{}${caretIf(doPropagate)}"
+      case T_code_tiny              (_,doPropagate)   =>  s"{!!}${caretIf(doPropagate)}"
+      case T_code_threaded          (_,doPropagate)   =>  s"{**}${caretIf(doPropagate)}"
+      case T_code_unsure            (_,doPropagate)   =>  s"{??}${caretIf(doPropagate)}"
+      case T_code_eventhandling     (_,doPropagate)   =>   s"{.}${caretIf(doPropagate)}"
+      case T_code_eventhandling_loop(_,doPropagate)   => s"{...}${caretIf(doPropagate)}"
       case T_localvar               (isVal: Boolean, 
                                     isLoop: Boolean, 
                                       localVariable,
@@ -49,7 +50,7 @@ object TemplateNode {
       case T_do_then_else           (_,_,_)           => "do-then-else"
       case T_annotation             (_,_)             => "@:"
       case T_local_valueCode        (_, _, _)         => "T_local_valueCode???"
-      case T_call                   (calleeName,_)    => calleeName
+      case T_call                   (calleeName,_,doPropagate)      => calleeName+caretIf(doPropagate)
       case T_script                 (_, kind: String, name: Symbol) => name.toString
     //case T_commscript             [S](_, kind: String, _)                     => "cscript"
     //case T_communication          [S](_, kind: String, names: Seq[Symbol]) => "comm"
@@ -138,7 +139,7 @@ trait TemplateNode extends TreeNode with TemplateNodeHelpers {
  * Node that can hold code.
  */
 trait TemplateCodeHolder[R,N] extends TemplateNode {val code: N => R}
-
+trait ResultPropagator {def mustPropagateResultValue: Boolean}
 
 // Differentiation by arity.
 trait T_0_ary extends TemplateNode with TreeNode_0 with ChildNode
@@ -150,4 +151,4 @@ trait T_n_ary extends TemplateNode                 with ChildNode
 /**
  * Code fragments.
  */
-trait T_code_fragment[R,N<:subscript.vm.model.callgraph.N_code_fragment[R]] extends T_0_ary with TemplateCodeHolder[R,N]
+trait T_code_fragment[R,N<:subscript.vm.model.callgraph.N_code_fragment[R]] extends T_0_ary with TemplateCodeHolder[R,N] with ResultPropagator

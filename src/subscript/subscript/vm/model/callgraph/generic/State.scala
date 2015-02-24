@@ -9,9 +9,10 @@ trait State {this: CallGraphNode =>
   def hasSuccess_=(value: Boolean) {
     if (_hasSuccess == value) return
     _hasSuccess = value
+//println(s"$this changesSuccess to ${hasSuccess} parent: ${if (parents.isEmpty) "-" else parents(0)}")
+    
     forEachParent(p => p childChangesSuccess this)
   }
-  def _fail = hasSuccess = false
   
   /** Exclusion flag */
   var isExcluded = false

@@ -31,16 +31,16 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
       executeCodeIfDefined(message.node, message.node.onActivateOrResume)
       message.node match {
            //case n@N_root            (t: T_1_ary     ) => activateFrom(n, t.child0)
-           case n@N_code_tiny                  (t)  => n.hasSuccess = true; executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
-           case n@N_localvar                   (t)  => if (t.isLoop) setIteration_n_ary_op_ancestor(n);
+           case n@N_code_tiny                  (t) => n.hasSuccess = true; executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
+           case n@N_localvar                   (t) => if (t.isLoop) setIteration_n_ary_op_ancestor(n);
             n.n_ary_op_ancestor.initLocalVariable(t.localVariable.name, n.pass, executeCode(n));doNeutral(n);insertDeactivation(n,null)
            case n@N_privatevar                 (t) => n.n_ary_op_ancestor.initLocalVariable(t.name, n.pass, n.getLocalVariableHolder(t.name).value)
            case n@N_code_normal                (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
            case n@N_code_unsure                (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
            case n@N_code_threaded              (_) => insert(AAActivated(n,null)); insert(AAToBeExecuted(n))
 
-           case n@( N_code_eventhandling       (_) 
-                  | N_code_eventhandling_loop  (_)) => insert(AAActivated(n,null)) 
+           case n@( N_code_eventhandling      (_) 
+                  | N_code_eventhandling_loop (_)) => insert(AAActivated(n,null)) 
                                                        // ehNodesAwaitingExecution.append(n) not used; could be handy for debugging
               
            case n@N_break                      (t) =>                                    doNeutral(n); insert(Break(n, null, ActivationMode.Inactive)); insertDeactivation(n,null)
@@ -70,7 +70,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
            case n@N_do_then_else               (t) => activateFrom(n, t.child0)
            case n@N_n_ary_op                   (t, isLeftMerge) => val cn = activateFrom(n, t.children.head); if (!isLeftMerge) insertContinuation(message, cn)
            case n@N_call                       (t) => val s: ScriptNode[_] = executeCode(n)
-                                                      if (n.t_callee!=null) linkNode(n, s, None)
+                                                      if (n.t_callee!=null) linkNode(n, s, s, None)
                                                       else {
                                                         insert(CAActivated   (n,null))
                                                         insert(CAActivatedTBD(n))
@@ -79,45 +79,23 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
       }      
   }
   
-  /*
-   * Handle a deactivation message. 
-   * If the receiving node is a n_ary operator and there is a sending child node,
-   * then postpone further processing by inserting a continuation message.
-   * TBD: add a case for a 1_ary operator
-   * 
-   * Insert deactivation messages for all parent nodes
-   * Execute code for deactivation, if defined
-   * Unlink the node from the call graph
-   */
-  def handleDeactivation(message: Deactivation): Unit = {
-       message.node match {
-           case n@N_n_ary_op (_: T_n_ary, _)  => if(!message.excluded
-                                                 &&  message.child!=null) {
-                                                   if (message.child.hasSuccess) {
-                                                      n.childThatEndedInSuccess_index(message.child.index)
-                                                   }
-                                                   else {
-                                                      n.aChildEndedInFailure = true
-                                                   }
-                                                   insertContinuation(message); 
-                                                   return}
-           case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
-           case n@N_do_then     (t)  => if (!message.excluded && message.child!=null
-                                                              && message.child.template==t.child0 && !message.child.hasSuccess) {doNeutral(n); 
-                                                                                                                                insertDeactivation(n,null); return} else if(!n.children.isEmpty) return
-           case n@N_do_else     (t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return} else if(!n.children.isEmpty) return
-           case n@N_do_then_else(t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return} else if(!n.children.isEmpty) return
-           case _ => 
-      }
-      if(!message.excluded &&  message.child!=null) { 
-        message.node.hasSuccess = message.child.hasSuccess
-      }
-      message.node.forEachParent(p => insertDeactivation(p,message.node))
-      executeCodeIfDefined(message.node, message.node.onDeactivate)
-      executeCodeIfDefined(message.node, message.node.onDeactivateOrSuspend)
-      disconnect(childNode = message.node)
+  def propagateResult(child: CallGraphNode, node:CallGraphNode, forSuccess: Boolean) = {
+    //println(s"propagateResult child: $child node: $node hasSuccess: ${node.hasSuccess} forSuccess: $forSuccess")
+    (child,node) match {
+           case (_,    ncf:N_code_tiny    [_]) => if (ncf.mustPropagateResultValue && forSuccess != ncf.failed    ) ncf.propagateResult
+           case (_,    ncf:N_code_fragment[_]) => if (ncf.mustPropagateResultValue && forSuccess == ncf.hasSuccess) ncf.propagateResult
+           case (scr:Script[_], cal:N_call[_]) => cal.setResult(scr.$)
+                                                  if (cal.mustPropagateResultValue && forSuccess == scr.hasSuccess) {
+																			               //println(s"src: $scr")
+																			               //println(s"node: ${node}")
+																			               //println(s"node.scriptNode: ${node.scriptNode}")
+																			               
+																			               cal.propagateResult
+																			             }
+           case _ =>
+    } 
   }
-
+  
   /*
    * Handle a success message
    * 
@@ -136,24 +114,79 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
          //if (message.node.hasSuccess) {
          //  return // should not occur?
          //}
-         
+    
          message.node match {
-               case n@  N_annotation   (_  ) => {} // onSuccess?
                                            // Note: message.child!=null is needed because of doNeutral(n) in handleDeactivation()
                case n@  N_do_then      (t  ) => if (message.child!=null && message.child.template==t.child0) {activateFrom(n, t.child1); return}
                case n@  N_do_then_else (t  ) => if (                       message.child.template==t.child0) {activateFrom(n, t.child1); return}
                case n@  N_do_else      (t  ) => if (                       message.child.template==t.child0) {if (n.getLogicalKind_n_ary_op_ancestor==LogicalKind.Or) return}
+               case n@  N_annotation   (_  ) => {} // onSuccess?
+                                           // Note:            message.child.template==t.child0) {if (n.getLogicalKind_n_ary_op_ancestor==LogicalKind.Or) return}
                case n@  N_1_ary_op     (t  ) => if (message.child         != null) {insertContinuation1(message); return}
                case n@  N_n_ary_op     (_,_) => if (message.child         != null) {insertContinuation (message); return}
                case n@  N_launch_anchor(_  ) => if(n.nActivatedChildrenWithoutSuccess > 0) {return}
-               case n@  N_call         (_  ) => if (!n.allActualParametersMatch) {return}
+               case n@  N_call           (_) => if (!n.allActualParametersMatch) {return}
                                                 n.transferParameters
                case _ =>
           }
          message.node.hasSuccess = true
+         propagateResult(message.child, message.node, forSuccess=true) // note: N_call may do a return, a few lines higher
+
          executeCodeIfDefined(message.node, message.node.onSuccess)
          message.node.forEachParent(p => insert(SuccessMsg(p, message.node)))
   }
+  
+  /*
+   * Handle a deactivation message. 
+   * If the receiving node is a n_ary operator and there is a sending child node,
+   * then postpone further processing by inserting a continuation message.
+   * TBD: add a case for a 1_ary operator
+   * 
+   * Insert deactivation messages for all parent nodes
+   * Execute code for deactivation, if defined
+   * Unlink the node from the call graph
+   */
+  def handleDeactivation(message: Deactivation): Unit = {
+       val node = message.node
+
+       node match {
+           case n@N_n_ary_op (_: T_n_ary, _) => if(!message.excluded
+                                                &&  message.child!=null) {
+                                                  if (message.child.hasSuccess) {
+                                                     n.childThatEndedInSuccess_index(message.child.index)
+                                                  }
+                                                  else {
+                                                     n.aChildEndedInFailure = true
+                                                  }
+                                                  insertContinuation(message); 
+                                                  return}
+           case n@N_launch_anchor(_) => if (!n.children.isEmpty) return
+           case _ =>
+       }
+       
+       // this should possibly not be here:
+       if(message.child!=null) { 
+         node.hasSuccess = message.child.hasSuccess
+       }
+       else if(message.excluded) { 
+         node.hasSuccess = false // code fragments
+       }
+       if(!message.excluded) propagateResult(message.child, node, forSuccess=false)
+       
+       node match {
+           case n@N_do_then     (t)  => if (!message.excluded && message.child!=null
+                                                              && message.child.template==t.child0 && !message.child.hasSuccess) {doNeutral(n); 
+                                                                                                                                insertDeactivation(n,null); return} else if(!n.children.isEmpty) return
+           case n@N_do_else     (t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child1); return} else if(!n.children.isEmpty) return
+           case n@N_do_then_else(t)  => if (!message.excluded && message.child.template==t.child0 && !message.child.hasSuccess) {activateFrom(n, t.child2); return} else if(!n.children.isEmpty) return
+           case _ => 
+      }
+      node.forEachParent(p => insertDeactivation(p,node))
+      executeCodeIfDefined(node, node.onDeactivate)
+      executeCodeIfDefined(node, node.onDeactivateOrSuspend)
+      disconnect(childNode = node)
+  }
+
   /*
    * Handle an AAActivated message: activated atomic actions 
    * for n_ary and 1_ary nodes if the message comes from a child node:
@@ -303,7 +336,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
    * after an AA started in a communication reachable from multiple child nodes (*)
    */
   def handleAAHappened(message: AAHappened): Unit = {
-    message.node.hasSuccess = false
+    if (message.child!=null) message.node.hasSuccess = false // if null then node is a code fragment
     message.node.numberOfBusyActions += (message.mode match {
       case     AtomicCodeFragmentExecuted =>  0
       case DurationalCodeFragmentStarted  =>  1

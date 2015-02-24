@@ -22,10 +22,12 @@ case class N_launch_anchor(template: T_launch_anchor)
   override def removeParent(p: Parent) {if (p!=null) super.removeParent(p)}
 }
 
-case class N_call[R](template: T_call[R]) extends CallGraphTreeNode {
+case class N_call[R](template: T_call[R]) extends CallGraphTreeNode with ScriptResultHolder[R] {
   type T = T_call[R]
   var t_callee: T_script  = null
   def callee = children.head.asInstanceOf[ScriptNode[R]]
+  def mustPropagateResultValue = template.mustPropagateResultValue
+  def fail: Unit = {} // Required by ScriptResultHolder. TBD: cleanup
   
 //var t_commcallee: T_commscript = null
 
@@ -52,8 +54,10 @@ trait Script[R] extends ScriptResultHolder[R]
  * There is quite some code that assumes all nodes have such a unique parent, so this change would not be easy
  */
 case class ScriptNode[R](template: T_script, p: FormalParameter[_]*)
-  extends CallGraphTreeNode with Script[R]
-  {type T = T_script}
+  extends CallGraphTreeNode with Script[R] {
+  type T = T_script
+  def fail: Unit = {} // Required by ScriptResultHolder. TBD: cleanup
+}
 
 //case class N_communication(var template: T_communication) extends CallGraphNode {
 //  type T = T_communication

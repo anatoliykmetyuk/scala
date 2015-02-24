@@ -8,7 +8,7 @@ import subscript.DSL._
 import subscript.vm.model.template.concrete.LogicalKind
 
 trait GraphNavigation {this: CallGraphNode =>
-  
+
   def n_ary_op_else_ancestor: N_n_ary_op = {
     this match {
       case n:N_n_ary_op => n

@@ -43,7 +43,9 @@ trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Trace
   def hasActiveProcesses = !graph.rootNode.children.isEmpty || !msgQueue.isEmpty
 
   def doCodeThatInsertsMsgs_synchronized(code: =>Unit): Unit
- 
+
+  def resultPropagationDestination[R]: ScriptResultHolder[R] = null // required by  ScriptResultHolder[R]; TBD: cleanup
+  
   // Initialization
   graph.init()
   
@@ -102,7 +104,7 @@ abstract class AbstractScriptExecutor[S] extends ScriptExecutor[S] {
    */
   def initializeExecution[R<:S](s: ScriptNode[R]) {
     val anchorNode = graph.anchorNode
-    CallGraph.connect(parentNode = anchorNode, childNode = s) // code duplicated from Callgraph.activateFrom
+    CallGraph.connect(parentNode = anchorNode, childNode = s, scriptNode = null) // code duplicated from Callgraph.activateFrom
     msgQueue insert Activation(s)                             // idem
   }
   
@@ -134,7 +136,7 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
   msgHandlers sInsert communicationHandler
   msgHandlers sInsert continuationHandler
   
-  def _fail = () // needed because this is a ResultHolder; probably a different place for _fail would be better
+  def fail = () // needed because this is a ResultHolder; probably a different place for _fail would be better
   
   def run[R<:S](s: ScriptNode[R]) = {
     initializeExecution(s)

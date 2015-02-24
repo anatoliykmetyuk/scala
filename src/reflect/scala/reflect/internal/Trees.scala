@@ -461,11 +461,16 @@ trait Trees extends api.Trees {
   }
   object Apply extends ApplyExtractor
 
-  case class     ScriptApply(fun: Tree, args: List[Tree])       extends GenericApply with ScriptApplyApi {
+  case class     ScriptApply(fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean)  extends GenericApply with ScriptApplyApi {
     override def symbol: Symbol = fun.symbol
     override def symbol_=(sym: Symbol) { fun.symbol = sym }
   }
-  object ScriptApply extends ScriptApplyExtractor
+  case class ScriptCodeFragment(token: Int, code: Tree)  extends Tree with ScriptCodeFragmentApi 
+  case class ScriptUserElement (kind: Name, main: Tree, others: List[Tree], info: Any)  extends Tree with ScriptUserElementApi
+  
+  object ScriptApply        extends ScriptApplyExtractor
+  object ScriptCodeFragment extends ScriptCodeFragmentExtractor
+  object ScriptUserElement  extends ScriptUserElementExtractor
 
   // TODO remove this class, add a tree attachment to Apply to track whether implicits were involved
   // copying trees will all too easily forget to distinguish subclasses
@@ -477,14 +482,13 @@ trait Trees extends api.Trees {
 
   // TODO remove this class, add a tree attachment to ScriptApply to track whether implicits were involved
   // copying trees will all too easily forget to distinguish subclasses
-  class ScriptApplyToImplicitArgs(fun: Tree, args: List[Tree]) extends ScriptApply(fun, args)
+  class ScriptApplyToImplicitArgs(fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean) extends ScriptApply(fun, args, mustPropagateResultValue)
 
   // TODO remove this class, add a tree attachment to ScriptApply to track whether implicits were involved
   // copying trees will all too easily forget to distinguish subclasses
-  class ScriptApplyImplicitView(fun: Tree, args: List[Tree]) extends ScriptApply(fun, args)
+  class ScriptApplyImplicitView(fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean) extends ScriptApply(fun, args, mustPropagateResultValue)
 
   def ApplyConstructor(tpt: Tree, args: List[Tree]) = Apply(Select(New(tpt), nme.CONSTRUCTOR), args)
-  def ScriptApplyConstructor(tpt: Tree, args: List[Tree]) = ScriptApply(Select(New(tpt), nme.CONSTRUCTOR), args)
 
   // Creates a constructor call from the constructor symbol.  This is
   // to avoid winding up with an OverloadedType for the constructor call.
@@ -674,13 +678,15 @@ trait Trees extends api.Trees {
         case self.pendingSuperCall  => self.pendingSuperCall
         case _                      => new Apply(fun, args)
       }).copyAttrs(tree)
-    def ScriptApply    (tree: Tree,    fun  : Tree, args: List[Tree]                              ) =
+    def ScriptApply    (tree: Tree,    fun  : Tree, args: List[Tree], mustPropagateResultValue: Boolean) =
       (tree match { // TODO: the same as for Apply
-        case _: ScriptApplyToImplicitArgs => new ScriptApplyToImplicitArgs(fun, args)
-        case _: ScriptApplyImplicitView   => new ScriptApplyImplicitView  (fun, args)
+        case _: ScriptApplyToImplicitArgs => new ScriptApplyToImplicitArgs(fun, args, mustPropagateResultValue)
+        case _: ScriptApplyImplicitView   => new ScriptApplyImplicitView  (fun, args, mustPropagateResultValue)
       //case self.pendingSuperCall  => self.pendingSuperCall
-        case _                      => new ScriptApply(fun, args)
+        case _                      => new ScriptApply(fun, args, mustPropagateResultValue)
       }).copyAttrs(tree)
+    def ScriptCodeFragment (tree: Tree, token    : Int , code: Tree                                ) = new ScriptCodeFragment (token, code                                    ).copyAttrs(tree)
+    def ScriptUserElement  (tree: Tree, kind     : Name, main: Tree, others: List[Tree], info: Any ) = new ScriptUserElement  (kind, main, others, info                       ).copyAttrs(tree)
     def ApplyDynamic       (tree: Tree, qual     : Tree, args: List[Tree]                          ) = new ApplyDynamic       (qual, args                                     ).copyAttrs(tree)
     def Super              (tree: Tree, qual     : Tree, mix: TypeName                             ) = new Super              (qual, mix                                      ).copyAttrs(tree)
     def This               (tree: Tree, qual     : Name                                            ) = new This               (qual.toTypeName                                ).copyAttrs(tree)
@@ -697,7 +703,7 @@ trait Trees extends api.Trees {
     def    CompoundTypeTree(tree: Tree,     templ: Template                                        ) = new    CompoundTypeTree(templ                                          ).copyAttrs(tree)
     def     AppliedTypeTree(tree: Tree,       tpt: Tree,         args: List[Tree]                  ) = new     AppliedTypeTree(tpt      , args                                ).copyAttrs(tree)
     def      TypeBoundsTree(tree: Tree,        lo: Tree,           hi:      Tree                   ) = new      TypeBoundsTree(lo       , hi                                  ).copyAttrs(tree)
-    def ExistentialTypeTree(tree: Tree,       tpt: Tree, whereClauses: List[MemberDef]                  ) = new ExistentialTypeTree(tpt      , whereClauses                        ).copyAttrs(tree)
+    def ExistentialTypeTree(tree: Tree,       tpt: Tree, whereClauses: List[MemberDef]             ) = new ExistentialTypeTree(tpt      , whereClauses                        ).copyAttrs(tree)
   }
 
   class LazyTreeCopier extends InternalTreeCopierOps {
@@ -842,10 +848,20 @@ trait Trees extends api.Trees {
       if (fun0 == fun) && (args0 == args) => t
       case _ => treeCopy.Apply(tree, fun, args)
     }
-    def ScriptApply(tree: Tree, fun: Tree, args: List[Tree]) = tree match {
-      case t @ ScriptApply(fun0, args0)
+    def ScriptApply(tree: Tree, fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean) = tree match {
+      case t @ ScriptApply(fun0, args0, mustPropagateResultValue)
       if (fun0 == fun) && (args0 == args) => t
-      case _ => treeCopy.ScriptApply(tree, fun, args)
+      case _ => treeCopy.ScriptApply(tree, fun, args, mustPropagateResultValue)
+    }
+    def ScriptCodeFragment(tree: Tree, token: Int, code: Tree) = tree match {
+      case t @ ScriptCodeFragment(token0, code0)
+      if (token0 == token) && (code0 == code) => t
+      case _ => treeCopy.ScriptCodeFragment(tree, token, code)
+    }
+    def ScriptUserElement(tree: Tree, kind: Name, main: Tree, others: List[Tree], info: Any) = tree match {
+      case t @ ScriptUserElement(kind0, main0, others0, info0)
+      if (kind0 == kind) && (main0 == main) && (others0 == others) && (info0 == info) => t
+      case _ => treeCopy.ScriptUserElement(tree, kind, main, others, info)
     }
     def ApplyDynamic(tree: Tree, qual: Tree, args: List[Tree]) = tree match {
       case t @ ApplyDynamic(qual0, args0)
@@ -1152,7 +1168,9 @@ trait Trees extends api.Trees {
       case Typed (expr, tpt ) => traverse(expr ); traverseTypeAscription(tpt)
       case TypeApply (fun, args ) => traverse(fun ); traverseTypeArgs(args)
       case Apply (fun, args ) => traverse(fun ); traverseTrees(args)
-      case ScriptApply (fun, args ) => traverse(fun ); traverseTrees(args)
+      case ScriptApply (fun, args, mustPropagateResultValue ) => traverse(fun ); traverseTrees(args)
+      case ScriptCodeFragment (token, code) => traverse(code)
+      case ScriptUserElement (kind, main, others, info) => if (main!=null) traverse(main); if (others!=null) traverseTrees(others)
       case ApplyDynamic (qual, args ) => traverse(qual ); traverseTrees(args)
       case Super (qual, mix ) => traverse(qual ); traverseName(mix)
       case This (qual ) => traverseName(qual)
@@ -1193,7 +1211,9 @@ trait Trees extends api.Trees {
       case ScriptVal(name)                                 =>                       treeCopy.ScriptVal          (tree, name)
       case Select  (qualifier, selector)                   =>                       treeCopy.Select             (tree, transform(qualifier), selector)
       case Apply   (fun, args)                             =>                       treeCopy.Apply              (tree, transform(fun), transformTrees(args))
-      case ScriptApply(fun, args)                          =>                       treeCopy.ScriptApply        (tree, transform(fun), transformTrees(args))
+      case ScriptApply(fun, args, mustPropagateResultValue)=>                       treeCopy.ScriptApply        (tree, transform(fun), transformTrees(args), mustPropagateResultValue)
+      case ScriptCodeFragment(token, code)                 =>                       treeCopy.ScriptCodeFragment (tree, token, transform(code).asInstanceOf[Block])
+      case ScriptUserElement (kind, main, others, info)    =>                       treeCopy.ScriptUserElement  (tree, kind, if (main!=null) transform(main) else null, if (others!=null) transformTrees(others) else null, info)
       case TypeTree()                                      =>                       treeCopy.TypeTree           (tree)
       case Literal (value)                                 =>                       treeCopy.Literal            (tree, value)
       case This    (qual)                                  =>                       treeCopy.This               (tree, qual)
@@ -1663,6 +1683,8 @@ trait Trees extends api.Trees {
   implicit val         ValOrDefDefTag = ClassTag[ValOrDefDef        ](classOf[ValOrDefDef        ])
 
   implicit val         ScriptApplyTag = ClassTag[ScriptApply        ](classOf[ScriptApply        ])
+  implicit val  ScriptCodeFragmentTag = ClassTag[ScriptCodeFragment ](classOf[ScriptCodeFragment ])
+  implicit val   ScriptUserElementTag = ClassTag[ScriptUserElement  ](classOf[ScriptUserElement  ])
 
   val treeNodeCount = Statistics.newView("#created tree nodes")(nodeCount)
 }

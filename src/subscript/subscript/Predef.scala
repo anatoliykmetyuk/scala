@@ -42,9 +42,9 @@ object Predef {
   def `$`         [R]               (implicit s: Script[R]): Try[R]    = s.$
   def `$success`  [R]               (implicit s: Script[R]): R         = s.$.asInstanceOf[Success[R]].value
   def `$failure`  [R]               (implicit s: Script[R]): Throwable = {val f=s.$.asInstanceOf[Failure[R]]; if(f==null)null else f.exception}
-  def `$_=`       [R] (v: Try[R]   )(implicit s: Script[R])            = s.$=v
-  def `$success_=`[R] (v: R        )(implicit s: Script[R])            = s.$=Success(v)
-  def `$failure_=`[R] (v: Throwable)(implicit s: Script[R])            = s.$=Failure(v)  
+  def `$_=`       [R] (v: Try[R]   )(implicit s: Script[R])            = {s.$=v; v match {case Failure(_) => s.fail /*; println("$=Failure(_)")*/ case _ => }}
+  def `$success_=`[R] (v: R        )(implicit s: Script[R])            = {s.$=Success(v)}
+  def `$failure_=`[R] (v: Throwable)(implicit s: Script[R])            = {s.$=Failure(v); s.fail /*; println("$failure_=")*/}
 
   def pass    (implicit node: CallGraphTreeNode): Int = node.pass
   def pass_up1(implicit node: CallGraphTreeNode): Int = node.n_ary_op_ancestor.pass

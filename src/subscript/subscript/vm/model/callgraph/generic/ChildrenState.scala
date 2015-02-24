@@ -12,7 +12,9 @@ trait ChildrenState {this: CallGraphNode =>
   def nDeactivatedChildren = nActivatedChildren - nActiveChildren
   
   def childChangesSuccess(child: Child) = {
+//val old_nActivatedChildrenWithSuccess = nActivatedChildrenWithSuccess
     nActivatedChildrenWithSuccess += (if (child.hasSuccess) 1 else -1)
+//println(f"$this%-14s child $child%-14s changesSuccess to ${child.hasSuccess} nActivatedChildrenWithSuccess: $old_nActivatedChildrenWithSuccess => $nActivatedChildrenWithSuccess")
   }
   
   def extendedInfoString = f"$basicInfoString%.10s S=${hasSuccess} nActivated=${nActivatedChildren} (=${nActivatedChildrenWithSuccess}S+${nActivatedChildrenWithoutSuccess}N)"

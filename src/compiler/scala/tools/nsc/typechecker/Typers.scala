@@ -4526,7 +4526,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         }
       }
 
-      def normalTypedScriptApply(tree: Tree, fun: Tree, args: List[Tree]) = {
+      def normalTypedScriptApply(tree: ScriptApply, fun: Tree, args: List[Tree], mustPropagateResultValue: Boolean) = {
+
           val funpt     = if (mode.inPatternMode) pt else WildcardType
           val appStart  = if (Statistics.canEnable) Statistics.startTimer(failedApplyNanos) else null
           val opeqStart = if (Statistics.canEnable) Statistics.startTimer(failedOpEqNanos ) else null
@@ -4583,6 +4584,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
             case Literal(constant) => constant.escapedStringValue
             case _ => fun.toString // "<call>"
           }))
+          def newLiteral(const: Any) = Literal(Constant(const)) // copied from Parser
 
           // Below is a function to quickly build _call(here => ...) from bare script trees.
           /* Given a script tree `script`, it will build the following:
@@ -4599,7 +4601,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
            * its parameters.
            * And we return the script.
            */
-          def scriptApplicationTree(script: Tree): Tree = {
+          def scriptApplicationTree(script: Tree, mustPropagateResultValue: Boolean): Tree = {
 
               val nodeType     = sSubScriptVM_N_call_default
               val fun_template = sSubScriptDSL_call_default
@@ -4669,7 +4671,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
               val function_here_to_code = blockToFunction(scriptIntegrationBlock, nodeType, tree.pos)
 
               // _call(here => {scriptIntegrationBlock})
-              Apply(fun_template, List(funName, function_here_to_code))
+              Apply(fun_template, List(funName, function_here_to_code, newLiteral(mustPropagateResultValue)))
           }
 
           /*
@@ -4677,7 +4679,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
            */
           def normalNode(code: Tree): Tree = {
             val hereToCode = blockToFunction(code, sSubScriptVM_N_code_normal_default, tree.pos)
-            atPos(tree.pos) {Apply(sSubScriptDSL_code_normal_default, List(hereToCode))}
+            atPos(tree.pos) {Apply(sSubScriptDSL_code_normal_default, List(hereToCode, newLiteral(mustPropagateResultValue)))}
           }
 
           // 1st try: an explicit script call
@@ -4687,13 +4689,13 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
             case SilentTypeError  (err)  => err_scriptResolution = err
             case SilentResultValue(fun1) =>
               val script            = Apply(fun1, args)             // _f(3)
-              val wrappedScript     = scriptApplicationTree(script)  // _call(here => ......) (see typedScriptApplicationTree)
+              val wrappedScript     = scriptApplicationTree(script, mustPropagateResultValue)  // _call(here => ......) (see typedScriptApplicationTree)
               tree_scriptResolution = typed(wrappedScript)
           }
 
           // 2nd try: a call to a script that is in a local variable
           if (isLocalValScript) {
-              val wrappedScript     = scriptApplicationTree(fun)    // _call(here => ... ScriptVal(x) ...)
+              val wrappedScript     = scriptApplicationTree(fun, mustPropagateResultValue)    // _call(here => ... ScriptVal(x) ...)
               tree_scriptResolution = typed(wrappedScript)          // here ScriptVal will be desugared to _x.at(here).value - with "here" in scope
           }
 
@@ -4703,7 +4705,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           // (multiple parameters would need to be wrapped in a tuple first)
           //
           if (args.isEmpty && !isLocalValScript) {
-              silent(op => op.typed(scriptApplicationTree(copied_fun1)),
+              silent(op => op.typed(scriptApplicationTree(copied_fun1, mustPropagateResultValue)),
               if (mode.inExprMode) false else context.ambiguousErrors,
               if (mode.inExprMode) tree  else context.tree) match {
                 case SilentTypeError  (err)   => err_conversion_scriptResolution1 = err
@@ -4715,7 +4717,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 case _ =>
 		               silent(op => {
 		                  val tree1 = op.typed(Apply(sSubScriptVM_ActualValueParameter, List(copied_fun2))) // _b(ActualValueParameter(a))
-		                  val tree2 = scriptApplicationTree(tree1)
+		                  val tree2 = scriptApplicationTree(tree1, mustPropagateResultValue)
 		                  op.typed(tree2)
 		              },
 		              if (mode.inExprMode) false else context.ambiguousErrors,
@@ -4740,7 +4742,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 case SilentResultValue(typedFunc) =>
                   // Check whether it returns a Script and therefore can be
                   // wrapped in the scriptApplicationTree
-                  val wrappedScript: Tree   = scriptApplicationTree(appliedFunction)
+                  val wrappedScript: Tree   = scriptApplicationTree(appliedFunction, mustPropagateResultValue)
                   silent(op => op.typed(wrappedScript)) match {
                     case SilentTypeError  (err)   => tree_methodResolution = typed(normalNode(appliedFunction))  // if not, fall back to a simple function application
                     case SilentResultValue(tree2) => tree_methodResolution = tree2  // if yes - ok.
@@ -4797,8 +4799,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           }
       }
       def typedScriptApply(tree: ScriptApply): Tree = tree match {
-        case ScriptApply(EmptyTree, fun::args) => typedScriptApply(atPos(tree.pos){ScriptApply(fun, args)})
-        case ScriptApply(fun, args) => normalTypedScriptApply(tree, fun, args)
+        case ScriptApply(EmptyTree, fun::args, mustPropagateResultValue) => typedScriptApply(atPos(tree.pos){ScriptApply(fun, args, mustPropagateResultValue)}) // recurse
+        case ScriptApply(fun, args, mustPropagateResultValue) => normalTypedScriptApply(tree, fun, args, mustPropagateResultValue)
       }
 
       def typedScriptVal(tree: ScriptVal): Tree = {
@@ -4806,6 +4808,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         val apply_at_here = Apply(select_at, List(here_Ident))
         typed(atPos(tree.pos){Select(apply_at_here, "value")})
       }
+      def typedScriptUserElement(tree: ScriptUserElement): Tree = typed(tree.main)
 
       def convertToAssignment(fun: Tree, qual: Tree, name: Name, args: List[Tree]): Tree = {
         val prefix = name.toTermName stripSuffix nme.EQL
@@ -5551,6 +5554,9 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         case tree: ReferenceToBoxed => typedReferenceToBoxed(tree)
         case tree: LabelDef         => labelTyper(tree).typedLabelDef(tree)
         case tree: DocDef           => typedDocDef(tree, mode, pt)
+        case tree: ScriptApply      => typedScriptApply(tree)
+        case tree: ScriptVal        => typedScriptVal(tree)
+        case tree: ScriptUserElement=> typedScriptUserElement(tree)
         case _                      => abort(s"unexpected tree: ${tree.getClass}\n$tree")
       }
 
@@ -5559,9 +5565,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         case tree: Ident   => typedIdentOrWildcard(tree)
         case tree: Bind    => typedBind(tree)
         case tree: Apply   => typedApply(tree)
-        case tree: ScriptApply => typedScriptApply(tree)
-        case tree: Select    => typedSelectOrSuperCall(tree)
-        case tree: ScriptVal => typedScriptVal(tree)
+        case tree: Select  => typedSelectOrSuperCall(tree)
         case tree: Literal => typedLiteral(tree)
         case tree: Typed   => typedTyped(tree)
         case tree: This    => typedThis(tree)  // SI-6104

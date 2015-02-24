@@ -68,6 +68,8 @@ object Tokens extends CommonTokens {
   final val LESS2                    = 334
   final val GREATER2                 = 335
   final val ARROW2                   = 336
+  final val CARET                    = 337
+  final val CARET2                   = 338
   
   final val LBRACE_DOT               = 340
   final val LBRACE_DOT3              = 341

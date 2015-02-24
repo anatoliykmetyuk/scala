@@ -1445,6 +1445,8 @@ self =>
     final val setSubScriptUnaryPrefixOp : Set[Name] = Set(raw.MINUS, raw.TILDE, raw.BANG)
     final val setSubScriptPostfixOp     : Set[Name] = Set(nme.XOR)
 
+    val Caret_Name = newTermName("^")
+    
     def isSubScriptUnaryPrefixOp (name     : Name     ): Boolean =                      setSubScriptUnaryPrefixOp (name)
     def isSubScriptPostfixOp     (name     : Name     ): Boolean =                      setSubScriptPostfixOp(name)
     def isSubScriptInfixOpName   (name     : Name     ): Boolean =                subScriptInfixOperators_Set(name)
@@ -1664,14 +1666,6 @@ self =>
     val      any_TypeName = newTypeName("Any")
     val function_TypeName = newTypeName("Function")
 
-    // for @ nodes; these need to know the node type of their operand; very messy...
-    def vmNodeOf (tree: Tree): Tree   = tree match { 
-      case Apply(fun, Function(List(ValDef(_,_, nodeType,_)),block)::_) => nodeType
-      case Apply(Select(_, fun_name), _) => vmNodeFor(LPAREN_ASTERISK2) // brutally assuming that fun_name is _launch_anchor
-      case ScriptApply(_,_) => vmNodeForCall_Any
-      case _ => Ident(any_TypeName) // TBD
-    }
-      
     def eatNewlines(): Boolean = {
       if (in.token==NEWLINE || in.token==NEWLINES) {
         in.nextToken()
@@ -1756,7 +1750,7 @@ self =>
 /* 
  * FTTB: no communication, channels, try, catch, throw, match, for, resultHandler
  
- naryOperatorDesignator  =+ ";"   "-;"
+ naryOperatorDesignator  =++ ";"   "-;"
                              "||"  "|"
                              orParArrow
                              "|+"  "|;"   "|/"
@@ -1776,10 +1770,10 @@ self =>
   orParArrow              =  "|~~>" +  "|~~{" scalaCode "}~>" +  "|~~(" scalaTupel ")~~>"
                           + "||~~>" + "||~~{" scalaCode "}~>" + "||~~(" scalaTupel ")~~>"
  
-  channelName_dots        =+ "<-->"   "<~~>"
-                             "<-.->"  "<~.~>"
-                             "<-..->" "<~..~>"
-                             "<-->.." "<~~>.."
+  channelName_dots        =++ "<-->"   "<~~>"
+                              "<-.->"  "<~.~>"
+                              "<-..->" "<~..~>"
+                              "<-->.." "<~~>.."
   
   simpleArrow             =+ "<-" "<~" "->" "~>"
  
@@ -1879,7 +1873,51 @@ self =>
 		            }
 		          }
 		        }
-		        val rhs_withAdjustedScriptLocalDataTransformed = scriptLocalDataTransformer.transform(scriptBody)
+		        
+		        // check whether the script has a single code fragment or script apply
+		        // then the 
+		        
+		        object CounterCodeFragmentsAndScriptApplies extends Transformer {
+		          var count = 0
+		          override def transform(tree: Tree): Tree = {
+		            tree match {
+		            case ScriptApply(_,_,_) | ScriptCodeFragment(_,_) => count += 1; tree
+		            case _ => super.transform(tree)
+		            }
+		          }
+		          def doCount(tree: Tree): Int = {transform(tree); count}
+		        }
+		        object MarkerResultPropagations extends Transformer {
+		          var doPropagate = false
+		          override def transform(tree: Tree): Tree = {
+		            //println(s"MarkerResultPropagations doPropagate: $doPropagate tree: $tree")
+		            tree match {
+		              case Apply(Apply(TypeApply(Select(_,_dataflow_then), _),_),_) => tree // a script lambda; has already been processed
+		              case ScriptUserElement(Caret_Name, body,_,_) => val   oldDoPropagate = doPropagate
+		                                                              try     {doPropagate = true; transform(body)}
+		                                                              finally {doPropagate = oldDoPropagate}
+		              case ScriptApply(fun, args, _) => 
+		                 //if (doPropagate) println(s"MarkerResultPropagations doPropagate=true; tree: $tree")
+		                 //println(s"MarkerResultPropagations s@ScriptApply: $s s.mustPropagateResultValue: ${s.mustPropagateResultValue}")
+		                 atPos(tree.pos) {ScriptApply(fun, args, doPropagate)}
+		              case ScriptCodeFragment(token, code) => 
+                    val parameterizedType = AppliedTypeTree(vmNodeFor(token), List(Ident(any_TypeName)))
+                    Apply(dslFunFor(token), List(blockToFunction_here(code, parameterizedType, tree.pos), newLiteral(doPropagate))) // TBD: transform here?
+
+		              case _ => super.transform(tree)
+		            }
+		          }
+		          def mark(tree:Tree): Tree = {val count = CounterCodeFragmentsAndScriptApplies.doCount(scriptBody)
+		                                       doPropagate = count==1
+		                                       //println(s"MarkerResultPropagations script: $name count=$count doPropagate=$doPropagate")
+		                                       transform(tree)
+		                                      }
+		        }
+            //println(s"Before MarkerResultPropagations: $scriptBody")
+		        val scriptBody_markedResultPropagations        = MarkerResultPropagations.mark(scriptBody)
+            //println(s"After MarkerResultPropagations: $scriptBody_markedResultPropagations")
+
+		        val rhs_withAdjustedScriptLocalDataTransformed = scriptLocalDataTransformer.transform(scriptBody_markedResultPropagations)
 		        
 		        // Make rhsMethod: (script: Script[resultType]) => rhs_withAdjustedScriptLocalDataTransformed
 		        val rhsMethod   = blockToFunction_script(rhs_withAdjustedScriptLocalDataTransformed, resultType, scriptBody.pos)
@@ -1894,8 +1932,8 @@ self =>
 		        // in current scope
 		        def localValBody(vn: Name, vt: Tree): Tree = {
 		          val vSym               = Apply(scalaDot(nme.Symbol), List(Literal(Constant(vn.toString))))
-                  val declare_typed      = TypeApply      (dslFunFor(DEF), List(vt))
-                  val rhs                = Apply(declare_typed, List(vSym))
+                  val declare_typed  = TypeApply      (dslFunFor(DEF), List(vt))
+                  val rhs            = Apply(declare_typed, List(vSym))
                   rhs
 		        }
 		        
@@ -1916,13 +1954,15 @@ self =>
 		          resultElems += valDef
 		        }
 		        
+		        // the final part...
+		        
 		        val scriptNameAsSym         = Apply(scalaDot(nme.Symbol), List(Literal(Constant(name.toString))))
 		        val dslScriptTyped          = TypeApply(s__script, List(resultType))
-	            val scriptHeader            = Apply(dslScriptTyped, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
-	            val scriptHeaderAndBody     = Apply(scriptHeader, List(rhsMethod))
+	          val scriptHeader            = Apply(dslScriptTyped, This(tpnme.EMPTY)::scriptNameAsSym::paramBindings)   // _script(this, `name, _p~`p...)
+	          val scriptHeaderAndBody     = Apply(scriptHeader, List(rhsMethod))
 	            
-	            resultElems += scriptHeaderAndBody
-	            makeBlock(resultElems.toList)
+	          resultElems += scriptHeaderAndBody
+	          makeBlock(resultElems.toList)
     }
     
     def scriptDefsOrDcls(start : Int, mods: Modifiers): List[Tree] = {
@@ -2067,7 +2107,7 @@ self =>
  
   operatorModifiers       = . ("," + naryOperatorDesignator) . naryOperatorDesignator
  
-  scriptExpr_dataflow_lowPriority = scriptExpr_lines (..; "~~>" scriptLambda . "~/~>" scriptLambda + "~/~>" scriptLambda)  
+  scriptExpr_dataflow_lowPriority = scriptExpr_lines (..; "~~>" scriptLambda . "+~/~>" scriptLambda + "~/~>" scriptLambda)  
   
   scriptExpr_lines        = scriptExpr_semicolons .. if newLineSignificant newLine else (-)
   scriptExpr_semicolons   = scriptExpr_if_do .. (+ ";"  ";-;"   ";+;")
@@ -2087,7 +2127,7 @@ self =>
   scriptExpression_2      = scriptExpression_1 .. (+ "/"  "%"  "%/"  "%/%/"  "%&"  "%;")
   scriptExpression_1      = scriptSpaceExpression      ..    "·"
   scriptSpaceExpression   = scriptExpr_dataflow_highPriority     .. if commasOmittable (-) else (+)
-  scriptExpr_dataflow_highPriority = scriptTerm        (..; "~~>" scriptLambda %; "~/~>" scriptLambda) 
+  scriptExpr_dataflow_highPriority = scriptTerm (..; "~~>" scriptLambda . "+~/~>" scriptLambda + "~/~>" scriptLambda) . "^"
   
   scriptLambda            = . parameter "==>"; scriptTerm
   
@@ -2405,8 +2445,13 @@ self =>
       var isFirst = true
       var moreTerms = true
       do  {
-        val p = scriptExpr_dataflow(highPriority=true, allowParameterList = allowParameterList && isFirst)
+        var p = scriptExpr_dataflow(highPriority=true, allowParameterList = allowParameterList && isFirst)
         //val p = scriptTerm(allowParameterList && isFirst)
+        
+        if (in.token==CARET) {
+            p = atPos(in.offset) {ScriptUserElement(Caret_Name, p, null, null)}
+            in.nextToken()
+        }
         
         ts += p
         if (areSpacesCommas 
@@ -2450,7 +2495,7 @@ self =>
               case _ => false}
           )
       }
-      if (allTermsArePathsOrLiterals) atPos(ts.head.pos.startOrPoint) {ScriptApply(EmptyTree, ts.toList)}
+      if (allTermsArePathsOrLiterals) atPos(ts.head.pos.startOrPoint) {ScriptApply(EmptyTree, ts.toList, false)}
       else if (ts.length == 1)  ts.head
       else {syntaxError(oldOffset, "terms in comma expression should be path or literal"); ts.head}
     }
@@ -2495,6 +2540,21 @@ self =>
       case AT => parseAnnotationScriptTerm
       case _ => scriptCommaExpression(allowParameterList, isNegated = false)
     }
+
+    // apply wildcard parameter to given type, 
+    // i.e. for T return T[_]
+    // much copied from def placeholderTypeBoundary
+    def applyWildcardParameterToType(tree: Tree, startPos: Int): Tree = {
+      val savedPlaceholderTypes = placeholderTypes
+      placeholderTypes = List()
+      val wct = wildcardType(startPos) // adds to placeholderTypes
+      val at = atPos(tree.pos){AppliedTypeTree(tree, List(wct))}
+      val et = atPos(tree.pos) { ExistentialTypeTree(at, placeholderTypes.reverse) }
+      placeholderTypes = savedPlaceholderTypes
+      et
+    }
+    
+    
     
     // for input: @{annotationCode}: body     
     // generate : DSL._at( (here:N_annotation[CN,CT])=>{implicit val there=here.there; annotationCode}) {body}
@@ -2514,12 +2574,20 @@ self =>
         val annotationCode = parseAnnotation
         val body           = stripParens(unaryPrefixScriptTerm(allowParameterList = false))
 
-        val vmNodeTypeOfBody = vmNodeOf(body)
+        
+        val vmNodeTypeOfBody = body match { 
+          case ScriptCodeFragment(token, code) => atPos(startPos){AppliedTypeTree(vmNodeFor(token), List(Ident(any_TypeName)))}
+          case Apply(fun, Function(List(ValDef(_,_, nodeType,_)),block)::_) => nodeType
+          case Apply(Select(_, fun_name), _) => vmNodeFor(LPAREN_ASTERISK2) // brutally assuming that fun_name is _launch_anchor
+          case ScriptApply(_,_,_) => vmNodeForCall_Any
+          case _ => Ident(any_TypeName) // TBD
+        }
+      
         
         // OLD:
         // val applyAnnotationCode = Apply(dslFunFor(AT), List(blockToFunction_there(annotationCode, vmNodeTypeOfBody, startPos)))
         // Apply(applyAnnotationCode, List(body))
-//*
+
         val termName_N_annotation = newTermName("N_annotation") // must be term name! 
         val typeName_N_annotation = newTypeName("N_annotation")  
                                  // see case class TypeApply(fun: Tree, args: List[Tree])... assert(fun.isTerm, fun)
@@ -2527,20 +2595,25 @@ self =>
 
         // Generate: DSL._at{here: N_annotation[N_..., T_...] => implicit val there = here.there; annotationCode}{body}
         
-        // N_annotation has two parameters; the first one is the node type of the child; the second one is the template type thereof.
-        // This is redundant, but FTTB there is no alternative and we have to provide this second parameter.
-        // A wildcard type ("_") would be possible, but it seems hard to generate the appropriate code 
-        // (with a fresh type name, an ExistentialTypeTree etc.)
-        // So here we create a new type from the node type, replacing N_ by T_, and substituting the package path
-        //
+        // very messy: conversion util node type into template type
         def templateTypeNameForNodeTypeName(tn: Name) = newTypeName("T"+tn.toString.substring(1))
-        def templateTypePathForNodeTypeName(tn: Name) = Select(sSubScriptVMModelTemplateConcrete, templateTypeNameForNodeTypeName(tn))
-        val templateOfBodyType = vmNodeTypeOfBody match {
-          case                 Select(_ , vmNodeClassName)                 =>                 templateTypePathForNodeTypeName(vmNodeClassName)
-          case AppliedTypeTree(Select(_ , vmNodeClassName), typeParamList) => AppliedTypeTree(templateTypePathForNodeTypeName(vmNodeClassName), typeParamList)
+        def templateTypeNameForNodeType(n: Tree) = n match {case Select(_,name) => templateTypeNameForNodeTypeName(name)}
+        def templateTypePathForNodeType(n: Tree) = Select(sSubScriptVMModelTemplateConcrete, templateTypeNameForNodeType(n))
+        
+        def templateTypePathForToken(token: Int) = Select(sSubScriptVMModelTemplateConcrete, mapTokenToVMTemplateTypeName(token))
+
+        val templateOfBodyType = body match {
+          case Apply(fun, Function(List(ValDef(_,_, nodeType,_)),block)::_) => templateTypePathForNodeType(nodeType)
+          case Apply(Select(_, fun_name), _) => templateTypePathForToken(LPAREN_ASTERISK2) // brutally assuming that fun_name is _launch_anchor
+          case ScriptCodeFragment(token, code) => atPos(startPos){AppliedTypeTree(templateTypePathForToken(token), List(Ident(any_TypeName)))}
+                                // applyWildcardParameterToType(templateTypePathForCodeFragmentToken(token), offset)
+                                //val str = s"T_${mapTokenToVMNodeString(token)}"
+                                //q"subscript.vm.template.concrete.$str"
           case anything => anything // println(s"templateOfBodyType unmatched: $vmNodeTypeOfBody")
-                     
         }
+        
+        
+        
         val typeTree = AppliedTypeTree(vmnodeType_N_annotation, List(vmNodeTypeOfBody, templateOfBodyType))
         
         val lambda_here_annotationCode = { // elsewhere similar things are done in "blockToFunction"
@@ -2561,11 +2634,14 @@ self =>
       }
     }
     
-    
     // at last, the body and end of method scriptExpression:
     
-    scriptExpr_dataflow(highPriority=false)
-      
+    var result = scriptExpr_dataflow(highPriority=false)
+    if (in.token==CARET2) {
+        result = atPos(in.offset) {ScriptUserElement(Caret_Name, result, null, null)}
+        in.nextToken()
+    }
+    result
   }
 
   def isDefinitelyAFormalParameterList(p: Tree) = p match {
@@ -2876,7 +2952,7 @@ self =>
             in.nextToken
             callConstraint = simpleNativeValueExpr()
           }
-	      atPos(p.pos.startOrPoint, in.offset) {ScriptApply(p, arguments)} // TBD: use callConstraint
+	      atPos(p.pos.startOrPoint, in.offset) {ScriptApply(p, arguments, false)} // TBD: use callConstraint
         }
         else p
       case _ if (isLiteral) => atPos(in.offset)(literal(isNegated))
@@ -2909,7 +2985,7 @@ self =>
       val caseClauses   = scriptMsgCases.map(makeMsgScriptCaseDef(_)) 
       val m             = Match(EmptyTree, caseClauses)
       
-      atPos(offset) {ScriptApply(Ident(MsgSCRIPT_Name), List(m))} // r$(m)   
+      atPos(offset) {ScriptApply(Ident(MsgSCRIPT_Name), List(m), false)} // r$(m)   
     }
         
     def makeMsgScriptCaseDef(smct:ScriptMsgCase): CaseDef = { 
@@ -2964,9 +3040,8 @@ self =>
       val   endBrace = scriptBracePairs(startBrace);
       val startPos   = r2p(in.offset, in.offset, in.lastOffset max in.offset)
       accept(startBrace)
-      val b = block()
-      val parameterizedType = AppliedTypeTree(vmNodeFor(startBrace), List(Ident(any_TypeName)))
-      val ret = Apply(dslFunFor(startBrace), List(blockToFunction_here(b, parameterizedType, startPos))) // TBD: transform here?
+      val code = block()
+      val ret = atPos(startPos){ScriptCodeFragment(startBrace, code)}
       in.isInSubScript_nativeCode = false
       accept(endBrace)
       ret

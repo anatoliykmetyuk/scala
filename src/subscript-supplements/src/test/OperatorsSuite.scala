@@ -613,12 +613,20 @@ class OperatorsSuite extends OperatorsSuiteBase {
    
    // Various
    , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc ac->bc acc->bc acb->ac"
-  )
+   
+   // problem in LookupFrame2: after 2 iterations an optional success of the guard  (a . b . c)
+   // caused a "bypass" of the searchcommand (d) so that the search (e) was activated
+   //, [(a;.;b;.;c) d; e ] -> "->a a->bd ab->cd abc->d ad->e abd->e abcd->e ade abde abcde"
+   //, [(a..) b; c ] -> "->a a->ab aa->ab aaa->ab ab->c aab->c aaab->c abc aabc aaabc"
+ 
+ )
 
    
   val scriptBehaviourList_for_debug = List(
-     [a ~~(t:String)~~>p(t)]       -> "a->a"
-   , [b ~~(t:String)~~>p(t)]       -> "b->b"
+   //  [ {Hello} ~~(msg:String)~~> {println(msg)} ]  -> "a->1"
+ //, [{println("starting...");"hello"} ~~~(msg:String)~~~> {println(msg)} ]  -> "->1"
+ //, [a ~~(t:String)~~>p(t)]       -> "a->a"
+ //, [b ~~(t:String)~~>p(t)]       -> "b->b"
   )
 
   // unfortunately we cannot test event handling code fragments, for the time being, as in , [ {. .} / .. ]    -> "???"

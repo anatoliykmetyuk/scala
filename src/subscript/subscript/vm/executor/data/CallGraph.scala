@@ -20,7 +20,7 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
    */
   def init() {
     rootNode.scriptExecutor = executor
-    connect(parentNode = rootNode, childNode = anchorNode)
+    connect(parentNode = rootNode, childNode = anchorNode, scriptNode = null)
   }
   
   private var nNodes = 0
@@ -28,21 +28,27 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
   
   // Graph
   def activateFrom(parent: CallGraphNode.Parent, template: TemplateNode, pass: Option[Int] = None): CallGraphNode = {
-    val n = parent match {
-      case n @ N_call(t) => CodeExecutor.executeCode(n)
+      val n = parent match {
+      case p @ N_call(t) => CodeExecutor.executeCode(p)
       case _             => createNode(template, executor)
     }
-    linkNode(parent, n, pass)
+    
+    val scriptNode:ScriptNode[_] = parent match {
+      case s:ScriptNode[_]        => s
+      case cgtn:CallGraphTreeNode => cgtn.scriptNode
+      case _                      =>  null // should not happen
+    }
+    linkNode(parent, n, scriptNode, pass)
   }
   
   /**
    * Links and activates a node that already exists.
    */
-  def linkNode(parent: CallGraphNode.Parent, n: CallGraphNode.Child, pass: Option[Int]): CallGraphNode = {
+  def linkNode(parent: CallGraphNode.Parent, n: CallGraphNode.Child, scriptNode: ScriptNode[_], pass: Option[Int]): CallGraphNode = {
     import CallGraph._
     n.codeExecutor = CodeExecutor.defaultCodeFragmentExecutorFor(n, executor)
     n.pass = pass.getOrElse(if(parent.isInstanceOf[N_n_ary_op]) 0 else parent.pass)
-    connect(parentNode = parent, childNode = n)
+    connect(parentNode = parent, childNode = n, scriptNode)
     // ?? probably delete the following line
     //n match {case ns: N_script => val pc = ns.parent.asInstanceOf[N_call]; what to do with this}
     executor.msgQueue insert Activation(n)
@@ -50,9 +56,10 @@ class CallGraph[S](val executor: ScriptExecutor[S]) {
   }
 }
 object CallGraph {
-  def connect(parentNode: CallGraphNode.Parent, childNode: CallGraphNode.Child) {
+  def connect(parentNode: CallGraphNode.Parent, childNode: CallGraphNode.Child, scriptNode: ScriptNode[_]) {
     childNode.scriptExecutor = parentNode.scriptExecutor // this sets childNode.index
     childNode addParent parentNode // uses childNode.index, so do this after setting scriptExecutor
+    childNode.scriptNode = scriptNode
     parentNode.nActivatedChildren += 1
   }  
   
@@ -78,15 +85,15 @@ object CallGraph {
       case t @ T_delta                  (                          ) => N_delta         (t)
       case t @ T_epsilon                (                          ) => N_epsilon       (t)
       case t @ T_nu                     (                          ) => N_nu            (t)
-      case t @ T_call                   (        _,    _           ) => N_call          (t)
+      case t @ T_call                   (      _,  _, mustPropagate) => N_call          (t)
       case t @ T_privatevar             (              name        ) => N_privatevar    (t)
       case t @ T_localvar               (_,_,lv:LocalVariable[_],_ ) => N_localvar      (t)
-      case t @ T_code_normal            (              _           ) => N_code_normal   (t)
-      case t @ T_code_unsure            (              _           ) => N_code_unsure   (t)
-      case t @ T_code_tiny              (              _           ) => N_code_tiny     (t)
-      case t @ T_code_threaded          (              _           ) => N_code_threaded (t)
-      case t @ T_code_eventhandling     (              _           ) => N_code_eventhandling     (t)
-      case t @ T_code_eventhandling_loop(              _           ) => N_code_eventhandling_loop(t)
+      case t @ T_code_normal            (          _, mustPropagate) => N_code_normal   (t)
+      case t @ T_code_unsure            (          _, mustPropagate) => N_code_unsure   (t)
+      case t @ T_code_tiny              (          _, mustPropagate) => N_code_tiny     (t)
+      case t @ T_code_threaded          (          _, mustPropagate) => N_code_threaded (t)
+      case t @ T_code_eventhandling     (          _, mustPropagate) => N_code_eventhandling     (t)
+      case t @ T_code_eventhandling_loop(          _, mustPropagate) => N_code_eventhandling_loop(t)
       case t @ T_while                  (              _           ) => N_while         (t)
       case t @ T_launch                 (              _           ) => N_launch        (t)
       case t @ T_launch_anchor          (              _           ) => N_launch_anchor (t)

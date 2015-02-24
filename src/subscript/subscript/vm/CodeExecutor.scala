@@ -32,6 +32,57 @@ import subscript.vm.executor._
 import subscript.vm.model.callgraph._
 import subscript.vm.model.template.TemplateCodeHolder
 
+import scala.language.existentials
+
+/*
+ * CodeExecutors are quite complex.
+ * Part of the hierarchy:
+
+CodeExecutorTrait
+  CodeExecutorAdapter
+  AACodeFragmentExecutor
+    NormalCodeFragmentExecutor
+      ThreadedCodeFragmentExecutor
+
+Suppose the ScriptExecutor wants to execute a threaded code fragment.
+It calls ThreadedCodeFragmentExecutor.executeAA, but that is defined in a super class.
+From there other methods are called (more indentation=call; other newlines=sequence):
+
+AACodeFragmentExecutor.executeAA
+  NormalCodeFragmentExecutor.executeAA(this)
+    AACodeFragmentExecutor.executeAA(this)
+    if (regardStartAndEndAsSeparateAtomicActions) aaHappened(DurationalCodeFragmentStarted)
+    ThreadedCodeFragmentExecutor.doCodeExecutionIn(this)
+      {*AACodeFragmentExecutor.doCodeExecutionIn(this)
+          set $ etc
+          CodeExecutor executeCodeDirectly n
+             n.template.code ////////////
+          if (n.result = ExecutionResult.Success) {n.hasSuccess = true; n.$ = scala.util.Success(r)}
+          executionFinished
+            insert(AAExecutionFinished)
+     *}build.gradle
+
+Then the AAExecutionFinished message is handled by the ScriptExecutor in its main message loop.
+There ScriptExecutor calls: 
+
+CodeExecutorTrait.afterExecuteAA
+  scriptExecutor.doCodeThatInsertsMsgs_synchronized {afterExecuteAA_internal}
+    NormalCodeFragmentExecutor.afterExecuteAA_internal
+    if (!n.isExcluded) {
+       aaHappened( if (regardStartAndEndAsSeparateAtomicActions) DurationalCodeFragmentEnded else AtomicCodeFragmentExecuted)
+       if (n.hasSuccess) {
+         succeeded
+       }
+       deactivate
+    }
+
+ Note: the first AAHappened message may arrive at ||; if this sees a child with hasSuccess then 
+ it may decide to succeed itself. That should only be done after the second AAHappened.
+ So hasSuccess should be done outside AACodeFragmentExecutor.doCodeExecutionIn.
+ 
+ hasSuccess should be set after execution, using node.result.
+ */
+
 object CodeExecutor {
   def defaultCodeFragmentExecutorFor(node: CallGraphNode, scriptExecutor: ScriptExecutor[_]): CodeExecutorTrait = {
     node match {
@@ -39,8 +90,8 @@ object CodeExecutor {
       case n@N_code_unsure       (_) => new        UnsureCodeFragmentExecutor(n, scriptExecutor)
       case n@N_code_threaded     (_) => new      ThreadedCodeFragmentExecutor(n, scriptExecutor)
       case n@N_code_eventhandling(_) => new EventHandlingCodeFragmentExecutor(n, scriptExecutor)
-      case _                    => new          TinyCodeExecutor(node, scriptExecutor)
-    }
+      case _                         => new          TinyCodeExecutor(node, scriptExecutor)
+    } 
   }
 
   def executeCodeDirectly[N <: CallGraphNode, R](n: N): R =
@@ -50,11 +101,12 @@ object CodeExecutor {
     val template = n.template.asInstanceOf[TemplateCodeHolder[R,N]]
     executeCode(n, template.code(n))
   }
+  def executeCodeIfDefined[N <: CallGraphNode, R](n: N, code: ()=>R): R =
+    if (code!=null) executeCode(n, code()) else null.asInstanceOf[R]
+
   def executeCode[N <: CallGraphNode, R](n: N, c: => R): R = {
     n.codeExecutor.doCodeExecution(c)
   }
-  def executeCodeIfDefined[N <: CallGraphNode, R](n: N, code: ()=>R): R =
-    if (code!=null) executeCode(n, code()) else null.asInstanceOf[R]
 
 }
 
@@ -103,14 +155,20 @@ abstract class AACodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor
   override def cancelAA = super.cancelAA; interruptAA
   def naa = n.asInstanceOf[N_code_fragment[R]]
   def doCodeExecutionIn(lowLevelCodeExecutor: CodeExecutorTrait): Unit = lowLevelCodeExecutor.doCodeExecution{
-      //n.hasSuccess  = true
+      n.result      = ExecutionResult.Success
       n.isExecuting = true
       n.$           = null
-
-      try   {val r = CodeExecutor executeCodeDirectly n
-             if (n.hasSuccess) {n.$ = scala.util.Success(r)}
-            }
-      catch {case f : Throwable => n.$ = Failure(f) }
+      n.hasSuccess  = false
+      try   {
+        //println(s"doCodeExecutionIn n: $n")
+        val r:R = CodeExecutor executeCodeDirectly n
+        if (n.result == ExecutionResult.Success) {
+            //println(s"doCodeExecutionIn n: $n Success")
+            n.hasSuccess = true
+            n.$ = scala.util.Success(r)
+        }
+      }
+      catch {case f : Throwable => n.fail; n.$ = Failure(f)} //; println(s"captured: $f;");  f.printStackTrace }
       finally n.isExecuting = false
 
       executionFinished
@@ -120,7 +178,7 @@ abstract class AACodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor
 
   override def executeAA: Unit = executeAA(this) // for Atomic Action execution...should ensure that executionFinished is called
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = {
-    n.hasSuccess = true
+    //n.hasSuccess = true
   } // for Atomic Action execution...should ensure that executionFinished is called
 
   // afterExecuteAA: to be called asynchronously by executor, 
@@ -155,17 +213,22 @@ class NormalCodeFragmentExecutor[R](n: N_code_fragment[R], scriptExecutor: Scrip
   override def afterExecuteAA_internal = {
     if (!n.isExcluded) {
        aaHappened( if (regardStartAndEndAsSeparateAtomicActions) DurationalCodeFragmentEnded else AtomicCodeFragmentExecuted)
-       succeeded; deactivate
+       if (n.hasSuccess) {
+         succeeded
+       }
+       deactivate
     }
   }
 }
 class UnsureCodeFragmentExecutor[R](n: N_code_unsure[R], scriptExecutor: ScriptExecutor[_]) extends AACodeFragmentExecutor[R](n, scriptExecutor)  {
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = {
     super.executeAA(lowLevelCodeExecutor)
+    n.result = ExecutionResult.Success // confusing to have both hasSuccess and result
     doCodeExecutionIn(lowLevelCodeExecutor)
   }
   override def afterExecuteAA_internal = {
-    if (n.hasSuccess) {
+    if (n.result == ExecutionResult.Success) {
+       n.hasSuccess = true
        aaHappened(AtomicCodeFragmentExecuted); succeeded; deactivate
     }
     else if (n.result==ExecutionResult.Ignore){ // allow for deactivating result
@@ -243,18 +306,26 @@ case class EventHandlingCodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptE
   override def executeAA(lowLevelCodeExecutor: CodeExecutorTrait): Unit = executeMatching(true) // dummy method needed because of a flaw in the class hierarchy
   def executeMatching(isMatching: Boolean): Unit = {  // not to be called by scriptExecutor, but by application code
     if (busy) return
-    _n.hasSuccess = isMatching
+    _n.result = if (isMatching) ExecutionResult.Success else ExecutionResult.Failure
+    _n.hasSuccess = false
     if (isMatching)
     {
       busy = true
-      _n.hasSuccess  = true
       _n.isExecuting = true
-      _n.$           = null
 
-      try   {val r = CodeExecutor executeCode _n
-                   if (_n.hasSuccess) _n.$ = scala.util.Success(r)
+      try   {//println(s"executeAA before executeCode; _n: ${_n}")
+             //_n.result = ExecutionResult.Success
+             //println(s"EventHandlingCodeFragmentExecutor.executeAA n: $n")
+             val r:R = CodeExecutor executeCode _n
+             // Weird: val r = CodeExecutor executeCode _n   (that is: without ":R")
+             // yields: java.lang.ClassCastException: scala.runtime.BoxedUnit cannot be cast to scala.runtime.Nothing$
+             // in case of an anyEvent.
+             if (_n.result == ExecutionResult.Success) {
+               _n.hasSuccess = true; _n.$ = scala.util.Success(r)
+               //println(s"EventHandlingCodeFragmentExecutor.executeAA Success _n: ${_n} _n.hasSuccess: ${_n.hasSuccess} ")
+             }
             }
-      catch {case f : Throwable => _n.$ = Failure(f) }
+      catch {case f : Throwable => _n.fail; _n.$ = Failure(f); f.printStackTrace()} //; println(s"captured: $f") }
       finally _n.isExecuting = false
 
      // if (n.hasSuccess)  maybe this test should be activated
@@ -265,6 +336,7 @@ case class EventHandlingCodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptE
     }
   }
   override def afterExecuteAA_internal: Unit = {
+//println(s"afterExecuteAA_internal hasSuccess: ${_n.hasSuccess}")
       if (_n.isExcluded || !n.hasSuccess) return
       _n match {
         case eh:N_code_eventhandling[_] =>

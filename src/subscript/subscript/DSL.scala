@@ -100,23 +100,23 @@ object DSL {
     catch {case t:Throwable => println(s"DSL._execute caught throwable: $t"); throw t}
   }
 
-  implicit // these code fragment variations require the "here" parameter explicitly
-  def _normal             [R](cf: N_code_normal            [R] =>R) = T_code_normal            (cf)
-  def _threaded           [R](cf: N_code_threaded          [R] =>R) = T_code_threaded          (cf)
-  def _unsure             [R](cf: N_code_unsure            [R] =>R) = T_code_unsure            (cf)
-  def _tiny               [R](cf: N_code_tiny              [R] =>R) = T_code_tiny              (cf)
-  def _eventhandling      [R](cf: N_code_eventhandling     [R] =>R) = T_code_eventhandling     (cf)
-  def _eventhandling_loop [R](cf: N_code_eventhandling_loop[R] =>R) = T_code_eventhandling_loop(cf)
+  def _normal             [R](cf: N_code_normal            [R] =>R, mustPropagateResultValue: Boolean) = T_code_normal            (cf, mustPropagateResultValue)
+  def _threaded           [R](cf: N_code_threaded          [R] =>R, mustPropagateResultValue: Boolean) = T_code_threaded          (cf, mustPropagateResultValue)
+  def _unsure             [R](cf: N_code_unsure            [R] =>R, mustPropagateResultValue: Boolean) = T_code_unsure            (cf, mustPropagateResultValue)
+  def _tiny               [R](cf: N_code_tiny              [R] =>R, mustPropagateResultValue: Boolean) = T_code_tiny              (cf, mustPropagateResultValue)
+  def _eventhandling      [R](cf: N_code_eventhandling     [R] =>R, mustPropagateResultValue: Boolean) = T_code_eventhandling     (cf, mustPropagateResultValue)
+  def _eventhandling_loop [R](cf: N_code_eventhandling_loop[R] =>R, mustPropagateResultValue: Boolean) = T_code_eventhandling_loop(cf, mustPropagateResultValue)
 
-  implicit // alternative code fragment variations that have no "here" parameter
-  def _normal0            [R](cf: => R ) = T_code_normal            ((_here:N_code_normal            [R]) => cf)
-  def _threaded0          [R](cf: => R ) = T_code_threaded          ((_here:N_code_threaded          [R]) => cf)
-  def _unsure0            [R](cf: => R ) = T_code_unsure            ((_here:N_code_unsure            [R]) => cf)
-  def _tiny0              [R](cf: => R ) = T_code_tiny              ((_here:N_code_tiny              [R]) => cf)
-  def _eventhandling0     [R](cf: => R ) = T_code_eventhandling     ((_here:N_code_eventhandling     [R]) => cf)
-  def _eventhandling_loop0[R](cf: => R ) = T_code_eventhandling_loop((_here:N_code_eventhandling_loop[R]) => cf)
+   // alternative code fragment variations that have no "here" parameter
+   // handy for "manual use", i.e. not compiler generated
+  def _normal0            [R](cf: => R, mustPropagateResultValue: Boolean = false) = T_code_normal            ((_here:N_code_normal            [R]) => cf, mustPropagateResultValue)
+  def _threaded0          [R](cf: => R, mustPropagateResultValue: Boolean = false) = T_code_threaded          ((_here:N_code_threaded          [R]) => cf, mustPropagateResultValue)
+  def _unsure0            [R](cf: => R, mustPropagateResultValue: Boolean = false) = T_code_unsure            ((_here:N_code_unsure            [R]) => cf, mustPropagateResultValue)
+  def _tiny0              [R](cf: => R, mustPropagateResultValue: Boolean = false) = T_code_tiny              ((_here:N_code_tiny              [R]) => cf, mustPropagateResultValue)
+  def _eventhandling0     [R](cf: => R, mustPropagateResultValue: Boolean = false) = T_code_eventhandling     ((_here:N_code_eventhandling     [R]) => cf, mustPropagateResultValue)
+  def _eventhandling_loop0[R](cf: => R, mustPropagateResultValue: Boolean = false) = T_code_eventhandling_loop((_here:N_code_eventhandling_loop[R]) => cf, mustPropagateResultValue)
 
-  implicit def _call      [R](calleeName: String, code: N_call[R] => ScriptNode[R]) = T_call[R](calleeName, code)
+  implicit def _call      [R](calleeName: String, code: N_call[R] => ScriptNode[R], mustPropagateResultValue: Boolean = false) = T_call[R](calleeName, code, mustPropagateResultValue)
   
   implicit def valueToActualValueParameter[T<:Any](value: T) = new ActualValueParameter(value)
 
@@ -224,86 +224,55 @@ object DSL {
   //def script dataflow_then[T,U](s: Script[T], t: T=>Script[U]): U = 
   //     var s_node: N_call[T] = null;
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
+  
+  // Second parameter not t but _t; SubScript code generation quirk, should be undone.
+  //def script dataflow_then[T](s: Script[T], _t: T=>ScriptNode[Any]): Any = 
+  //     var s_node: N_call[Any] = null;
+  //     do @{s_node = there}: s then t(s_node.callee.$.get.asInstanceOf[T])
   //def script dataflow_then(s: Script[Any], t: Any=>Script[Any]): Any = 
   //     var s_node: N_call[Any] = null;
   //     do @{s_node = there}: s then t(s_node.callee.$.get)
   
 
-  def NEW_dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_do_then = 
-    //_script(this, 'dataflow_then) {
-    //     implicit script => 
+  def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_do_then = 
     {
        var s_node: N_call[S] = null
-       _do_then(_call("s", (_n:N_call[S]) => {println(" _dataflow_then >> _do_then do-part"); s_node = _n; s}), 
-                _call("t", (_n:N_call[T]) => {println(" _dataflow_then >> _do_then then-part: ${s_node.callee.$.get}"); t(s_node.callee.$.get)}))
+       //println(" _dataflow_then >> INIT")
+       _do_then(_call("do",   (_n:N_call[S]) => {//println(" _dataflow_then >> _do_then do-part"); 
+                                              s_node = _n; _n.calls(s.template, (s.p: _*)); s}), 
+                _call("then", (_n:N_call[T]) => {//println(" _dataflow_then >> _do_then then-part: ${s_node.callee.$.get}"); 
+                                              //println(s"s_node.callee.$$: ${s_node.callee.$}")
+                                              val tp = t(s_node.$.get); 
+                                              _n.calls(tp.template, (tp.p: _*)); tp}, true))
     }
-     //)}}
   
-  
-  def _dataflow_then[S,T](s: ScriptNode[S], t: S=>ScriptNode[T]): T_call[T] = {
-    val dataflowScript: ScriptNode[T] = _script(this, 'dataflow_then) {script =>
-      var s_node: N_call[S] = null
-
-      val sCall: N_call[S] => ScriptNode[S] = here => {
-        s_node = here
-        here.calls(s.template, s.p: _*)
-        s
-      }
-
-      val tCall: N_call[T] => ScriptNode[T] = here => {
-        
-println(s"_dataflow_then- tCall: s_node success=${s_node.hasSuccess}")   
-     
-        val callee = s_node                        // Call node with the name "s"
-                     .callee                       // script    with the name "~~>"
-        val firstChild = callee
-                         .children
-                         .head
-                         .asInstanceOf[N_call[S]]  // Call node that calls the target script
-        val lhsScript = firstChild.callee          // The actual lhs script itself
-
-println(s"_dataflow_then - tCall: lhsScript=${lhsScript}")   
-        
-        val resTry = lhsScript.$                   // its result (a try)
-        val res: S = resTry.get                    // and the result value
-
-        val s = t(res)
-        here.calls(s.template, s.p: _*)   // why is this? No idea at all, but it seems necessary...
-        s
-      }
-
-      _do_then(_call("s", sCall), _call("t", tCall))
+  def _dataflow_then_else[S,T,U](s: ScriptNode[S], t: S=>ScriptNode[T], u: Throwable=>ScriptNode[U]): T_do_then_else = 
+    {
+       var s_node: N_call[S] = null
+       //println(" _dataflow_then_else >> INIT")
+       _do_then_else(_call("do", (_n:N_call[S])   => {//println(" _dataflow_then_else >> do-part"); 
+                                                      s_node = _n; _n.calls(s.template, (s.p: _*)); s}), 
+                     _call("then", (_n:N_call[T]) => {//println(" _dataflow_then_else >> then-part: ${s_node.callee.$.get}"); 
+                                                      //println(s"s_node.callee.$$: ${s_node.callee.$}")
+                                                      val tp = t(s_node.$.get); 
+                                                      _n.calls(tp.template, (tp.p: _*)); tp}, true), 
+                     _call("else", (_n:N_call[U]) => {//println(" _dataflow_then_else >> else-part: ${s_node.callee.$.get}"); 
+                                                      //println(s"s_node.callee.$$: ${s_node.callee.$}")
+                                                      val up = u(s_node.$failure); 
+                                                      _n.calls(up.template, (up.p: _*)); up}, true))
     }
-
-    _call("~~>[Call]", here => {
-      val s = dataflowScript
-      here.calls(s.template, s.p: _*)
-      s
-    })
-  }
-
   
-  def _dataflow_then_else[S,T,U](s: ScriptNode[S], t: S=>ScriptNode[T], u: Throwable=>ScriptNode[U]): ScriptNode[Any/*T&U*/] = 
-    _script(this, 'dataflow_then_else) { 
-         _node => 
-                  {implicit val script= _node; var s_node: N_call[S] = null
-                   _do_then_else(_call("s", (_n:N_call[S]) => {s_node = _n; s}), 
-                                 _call("t", (_n:N_call[T]) => {t(s_node.callee.$.get)}), 
-                                 _call("u", (_n:N_call[U]) => {u(s_node.callee.$.asInstanceOf[scala.util.Failure[T]].exception)}))}}
+  def _dataflow_else[S,T,U](s: ScriptNode[S], u: Throwable=>ScriptNode[U]): T_do_else = 
+    {
+       var s_node: N_call[S] = null
+       //println(" _dataflow_else >> INIT")
+       _do_else(     _call("do", (_n:N_call[S])   => {//println(" _dataflow_else >> do-part"); 
+                                                      s_node = _n; _n.calls(s.template, (s.p: _*)); s}), 
+                     _call("else", (_n:N_call[U]) => {//println(" _dataflow_else >> else-part: ${s_node.callee.$.get}"); 
+                                                      //println(s"s_node.callee.$$: ${s_node.callee.$}")
+                                                      val up = u(s_node.$failure); 
+                                                      _n.calls(up.template, (up.p: _*)); up}, true))
+    }
   
-//def _dataflow_then     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_then", [ do s then t(null.asInstanceOf[R])])
-//def _dataflow_else     [R,U](s: Script[R], t: R=>Script[U]) = _call[R]("dataflow_else", [ do s else t(null.asInstanceOf[R]) ])
-//def _dataflow_then_else[R,U](s: Script[R], t: R=>Script[U]
-//                                 , f: Throwable=>Script[U]) = _call[R]("dataflow_then_else", [ do s then t(null.asInstanceOf[R]) else f(null) ])
   
-  // FTTB type parameter String assumed. Reason:
-  // The following lines do not compile; msg is
-  // error: not found: value _t
-  //   def _dataflow_then[T<:String,U](s: Script[T], t: T=>Script[U]): Script[U] = [ do s then t(null) ]
-  //                                                                                           ^
-  
-  //def _dataflow_then[T<:String,U](s: Script[T], t: T=>Script[U]): Script[U] = [ do s then t(null) ]
-  //def _dataflow_else[     T,U](s: Script[T], t: T=>Script[U]): Script[U] = [ do s else t(null) ]
-  //def _dataflow_then_else[T,U](s: Script[T], t: T=>Script[U]
-  //                                 , f: Exception=>Script[U]): Script[U] = [ do s then t(null) else f(null) ]
  }

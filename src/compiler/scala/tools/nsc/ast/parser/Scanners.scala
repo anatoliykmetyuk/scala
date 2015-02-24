@@ -519,6 +519,10 @@ trait Scanners extends ScannersCommon {
               case '?' => RBRACE_QMARK
             }
           }
+          else if (isInSubScript_expression && chOld=='^') {
+            if    (ch=='^') {nextChar(); token = CARET2}
+            else            {            token = CARET }
+          }
           else {
             putChar(chOld)
             getOperatorRest()
@@ -1330,12 +1334,15 @@ trait Scanners extends ScannersCommon {
     case XMLSTART      => "$XMLSTART$<"
       
     // SubScript tokens:  
+      
+    case CARET                    => "'^'"   
+    case CARET2                   => "'^^'"   
     case CURLY1                   => "'~'"   
     case CURLY2                   => "'~~'"   
     case CURLY3                   => "'~~~'"   
-    case CURLYBROKEN1             => "~/"
+    case CURLYBROKEN1             => "'~/'"
     case CURLYBROKEN2             => "~/~"
-    case CURLYBROKEN3             => "~/~~"
+    case CURLYBROKEN3             => "'~/~~'"
     case CURLYARROW1              => "'~>'"   
     case CURLYARROW2              => "'~~>'"   
     case CURLYARROW3              => "'~~~>'"   

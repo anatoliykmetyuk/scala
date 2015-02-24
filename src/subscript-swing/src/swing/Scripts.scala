@@ -281,19 +281,21 @@ object Scripts {
     The redirections to the swing thread using "@gui:" are needed 
     because enabling and disabling the button etc must there be done
   */
+  
+ 
  implicit def script ..  // TBD: handle tabs in scanner so that line position becomes reasonable
    stateChange(slider: Slider)                   = event(SliderStateChangedReactor[Any,N_code_eventhandling[Any]](slider))
    clicked(button:AbstractButton)                = event(           ClickedReactor[Any,N_code_eventhandling[Any]](button))
 
- def script ..   // TBD: uncomment /*@gui:*/ and make it compile
-  event[E <: Event] (reactor:ScriptReactor[Any,N_code_eventhandling[Any]], ?e: E) =  /*@gui:*/ @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: {. e = reactor.currentEvent.asInstanceOf[E] .}
-  event (reactor:ScriptReactor[Any,N_code_eventhandling[Any]]) =  /*@gui:*/ @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: {.     .}
-  event_loop(reactor:ScriptReactor[Any,N_code_eventhandling_loop[Any]], task: MouseEvent=>Unit)   =  /*@gui:*/ @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: 
+ def script ..   // TBD: add @gui: annotations
+  event[E <: Event] (reactor:ScriptReactor[Any,N_code_eventhandling[Any]], ?e: E) =  @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: {. e = reactor.currentEvent.asInstanceOf[E] .}
+  event (reactor:ScriptReactor[Any,N_code_eventhandling[Any]]) =  @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: {.     .}
+  event_loop(reactor:ScriptReactor[Any,N_code_eventhandling_loop[Any]], task: MouseEvent=>Unit)   =  @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: 
                                                                                             {... task.apply(reactor.currentEvent.asInstanceOf[MouseEvent]) ...}
-  event_loop_KTE(reactor:ScriptReactor[Any,N_code_eventhandling_loop[Any]], task: KeyTyped=>Unit)   =  /*@gui:*/ @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: 
+  event_loop_KTE(reactor:ScriptReactor[Any,N_code_eventhandling_loop[Any]], task: KeyTyped=>Unit)   = @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: 
                                                                                             {... task.apply(reactor.currentEvent.asInstanceOf[KeyTyped]) ...}
   // TBD: MouseEvent should become type parameter, as in the following (which does not compile)
-  //event_loop[E<:Event](reactor:Reactor[Unit,N_code_eventhandling_loop[Unit]], task: E=>Unit)   =  /*@gui:*/ @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: 
+  //event_loop[E<:Event](reactor:Reactor[Unit,N_code_eventhandling_loop[Unit]], task: E=>Unit)   = @{reactor.subscribe(there); there.onDeactivate{reactor.unsubscribe}; there.onSuccess{reactor.acknowledgeEventHandled}}: 
   //                                                                                                {... task.apply(reactor.currentEvent.asInstanceOf[E]) ...}
        anyEvent(comp: Component)                           = event(          AnyEventReactor[Any,N_code_eventhandling[Any]](comp))                                                    
     windowClosing(window: Window)                          = event(     WindowClosingReactor[Any,N_code_eventhandling[Any]](window))
@@ -339,4 +341,5 @@ mouseClicks(n:Int,comp: Component, ?p : java.awt.Point) = var mce: MouseClicked 
     
      keyEvent2 (publisher: Publisher, ??keyTypedEvent : KeyTyped)  = event(         KeyTypedEventReactor [Any,N_code_eventhandling[Any]](publisher, _keyTypedEvent))
      keyEvents2(publisher: Publisher, task: KeyTyped=>Unit)        = event_loop_KTE(KeyTypedEventsReactor[Any,N_code_eventhandling_loop[Any]](publisher), task)
+
 }

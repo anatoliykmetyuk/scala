@@ -437,7 +437,6 @@ abstract class TreeBrowsers {
       case Typed(expr, tpe)                                => List(expr, tpe)
       case TypeApply  (fun, args)                          => List(fun) ::: args
       case Apply      (fun, args)                          => List(fun) ::: args
-      case ScriptApply(fun, args)                          => List(fun) ::: args
       case ApplyDynamic(qual, args)                        => List(qual)::: args
       case Super(qualif, mix)                              => List(qualif)
       case This(qualif)                                    => Nil
@@ -457,6 +456,12 @@ abstract class TreeBrowsers {
       case ArrayValue(elemtpt, elems)                      => elemtpt :: elems
       case EmptyTree                                       => Nil
       case Star(t)                                         => List(t)
+      
+      case AssignOrNamedArg(lhs,rhs)                       => List(lhs,rhs)
+
+      case ScriptApply(fun, args,_)                        => List(fun) ::: args
+      case ScriptCodeFragment(token, code)                 => val block = code.asInstanceOf[Block]; block.stats ::: List(block.expr)
+      case ScriptUserElement (kind, main, others, info)    => (if(main==null) Nil else List(main)) :::  (if(others==null) Nil else others)
     }
 
     /** Return a textual representation of this t's symbol */

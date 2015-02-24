@@ -25,6 +25,9 @@ trait CallGraphNode extends GraphNode
   
   def template: T
   var index = -1
+  var scriptNode: ScriptNode[_] = null
+  def resultPropagationDestination[R]: ScriptResultHolder[R] = (if (scriptNode!=null) scriptNode
+                                                               else                   scriptExecutor).asInstanceOf[ScriptResultHolder[R]]
   
   override def toString = f"$index%2d $template"
 }
@@ -33,18 +36,35 @@ trait ScriptResultHolder[R] {
   def $success:R = $.get; 
   def $success_=(v:R) = $ = Success(v); 
   def $failure:Throwable = if ($==null||$.isSuccess)null else $.asInstanceOf[Failure[R]].exception
-  def $failure_=(f:Throwable) = {$ = Failure[R](f); _fail}
-  def _fail: Unit
+  def $failure_=(f:Throwable) = {$ = Failure[R](f); fail} //; println(s"failure: $f")}
+  def fail: Unit
   
+  def setResult(t: Try[_]) = {
+    //println(s"node: $this setResult: $t")
+    $ = t.asInstanceOf[Try[R]]
+  }
+  
+  // TBD: remove
   def $capture(body: ()=>R) = {
+    import scala.language.existentials
     try {$success = body()}
-    catch{case t:Throwable => $failure=t}
+    catch{case t:Throwable => fail; $failure=t} //; println(s"captured: $t")}
+  }
+  def $capturer(body: =>R): ()=>Unit = () =>
+    try {$success = body}
+    catch {case t:Throwable => fail; $failure=t} //; println(s"captured: $t")}
+  
+  def resultPropagationDestination[R]: ScriptResultHolder[R]
+  def propagateResult = {
+    import scala.language.existentials
+    //println(s"node: $this propagateResult: $result to: $resultPropagationDestination")
+    resultPropagationDestination.setResult($)
   }
 }
 trait CallGraphTreeNode extends CallGraphNode     with GraphTreeNode /* TBD: `with Variables` to be moved to here*/
 trait CallGraphLeafNode extends CallGraphTreeNode with GraphLeafNode
 
-trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] {
+trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] with ExecutionResult {
   type T <: T_code_fragment[R,_]
   override def asynchronousAllowed: Boolean = true
   var msgAAToBeExecuted: CallGraphMessage = null
@@ -53,7 +73,7 @@ trait N_code_fragment[R] extends CallGraphLeafNode with ScriptResultHolder[R] {
   private[this] var _isExecuting = false
   override def isExecuting = _isExecuting
   def isExecuting_=(value: Boolean) = _isExecuting = value
-  hasSuccess = true
+  def mustPropagateResultValue = template.mustPropagateResultValue
 }
 
 object CallGraphNode {
