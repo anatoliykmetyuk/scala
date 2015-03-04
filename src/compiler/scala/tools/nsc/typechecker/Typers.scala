@@ -4813,6 +4813,11 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 
           // wrap up the results
 
+          // Quick fix
+          def issue(err: AbsTypeError) = {
+            throw new Exception("An error should have been here. Something went wrong in the typer after the merge with 2.11.5. Hence, this exception.")
+          }
+
           if   (tree_scriptResolution != null) {
             if (tree_methodResolution != null) {
               val err = AmbiguousTypeError(tree.pos, "call may be both to a script and a method")
