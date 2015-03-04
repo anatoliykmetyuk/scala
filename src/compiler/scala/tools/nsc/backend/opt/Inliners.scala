@@ -26,7 +26,7 @@ import scala.reflect.internal.util.NoSourceFile
  *                where `p` is defined in a library L, and is accessed from a library C (for Client),
  *                where C was compiled against L', an optimized version of L where the inliner made `p` public at the bytecode level.
  *                The only such members are fields, either synthetic or isParamAccessor, and thus having a dollar sign in their name
- *                (the accesibility of methods and constructors isn't touched by the inliner).
+ *                (the accessibility of methods and constructors isn't touched by the inliner).
  *
  * Thus we add one more goal to our list:
  *   (c) Compile C (either optimized or not) against any of L or L',
@@ -195,7 +195,7 @@ abstract class Inliners extends SubComponent {
 
     /** The current iclass */
     private var currentIClazz: IClass = _
-    private def warn(pos: Position, msg: String) = currentIClazz.cunit.inlinerWarning(pos, msg)
+    private def warn(pos: Position, msg: String) = currentRun.reporting.inlinerWarning(pos, msg)
 
     private def ownedName(sym: Symbol): String = exitingUncurry {
       val count = (
@@ -283,7 +283,7 @@ abstract class Inliners extends SubComponent {
       }
 
     val tfa   = new analysis.MTFAGrowable()
-    tfa.stat  = global.settings.Ystatistics.value
+    tfa.stat  = global.settings.YstatisticsEnabled
     val staleOut      = new mutable.ListBuffer[BasicBlock]
     val splicedBlocks = mutable.Set.empty[BasicBlock]
     val staleIn       = mutable.Set.empty[BasicBlock]

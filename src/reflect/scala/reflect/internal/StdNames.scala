@@ -99,17 +99,18 @@ trait StdNames {
 
     val SINGLETON_SUFFIX: String     = ".type"
 
-    val ANON_CLASS_NAME: NameType    = "$anon"
-    val ANON_FUN_NAME: NameType      = "$anonfun"
-    val EMPTY: NameType              = ""
-    val EMPTY_PACKAGE_NAME: NameType = "<empty>"
-    val IMPL_CLASS_SUFFIX            = "$class"
-    val IMPORT: NameType             = "<import>"
-    val MODULE_SUFFIX_NAME: NameType = MODULE_SUFFIX_STRING
-    val MODULE_VAR_SUFFIX: NameType  = "$module"
-    val PACKAGE: NameType            = "package"
-    val ROOT: NameType               = "<root>"
-    val SPECIALIZED_SUFFIX: NameType = "$sp"
+    val ANON_CLASS_NAME: NameType              = "$anon"
+    val DELAMBDAFY_LAMBDA_CLASS_NAME: NameType = "$lambda"
+    val ANON_FUN_NAME: NameType                = "$anonfun"
+    val EMPTY: NameType                        = ""
+    val EMPTY_PACKAGE_NAME: NameType           = "<empty>"
+    val IMPL_CLASS_SUFFIX                      = "$class"
+    val IMPORT: NameType                       = "<import>"
+    val MODULE_SUFFIX_NAME: NameType           = MODULE_SUFFIX_STRING
+    val MODULE_VAR_SUFFIX: NameType            = "$module"
+    val PACKAGE: NameType                      = "package"
+    val ROOT: NameType                         = "<root>"
+    val SPECIALIZED_SUFFIX: NameType           = "$sp"
 
     // value types (and AnyRef) are all used as terms as well
     // as (at least) arguments to the @specialize annotation.
@@ -127,6 +128,7 @@ trait StdNames {
     final val AnyRef: NameType        = "AnyRef"
     final val Array: NameType         = "Array"
     final val List: NameType          = "List"
+    final val Option: NameType        = "Option"
     final val Seq: NameType           = "Seq"
     final val Symbol: NameType        = "Symbol"
     final val WeakTypeTag: NameType   = "WeakTypeTag"
@@ -256,6 +258,7 @@ trait StdNames {
     final val Unliftable: NameType          = "Unliftable"
     final val Name: NameType                = "Name"
     final val Tree: NameType                = "Tree"
+    final val Text: NameType                = "Text"
     final val TermName: NameType            = "TermName"
     final val Type : NameType               = "Type"
     final val TypeName: NameType            = "TypeName"
@@ -483,7 +486,7 @@ trait StdNames {
     )
 
     def localDummyName(clazz: Symbol): TermName = newTermName(LOCALDUMMY_PREFIX + clazz.name + ">")
-    def superName(name: Name): TermName         = newTermName(SUPER_PREFIX_STRING + name)
+    def superName(name: Name, mix: Name = EMPTY): TermName = newTermName(SUPER_PREFIX_STRING + name + (if (mix.isEmpty) "" else "$" + mix))
 
     /** The name of an accessor for protected symbols. */
     def protName(name: Name): TermName = newTermName(PROTECTED_PREFIX + name)
@@ -786,6 +789,7 @@ trait StdNames {
     val values : NameType              = "values"
     val wait_ : NameType               = "wait"
     val withFilter: NameType           = "withFilter"
+    val xml: NameType                  = "xml"
     val zero: NameType                 = "zero"
 
     // quasiquote interpolators:
@@ -1153,6 +1157,7 @@ trait StdNames {
     final val GetClassLoader: TermName   = newTermName("getClassLoader")
     final val GetMethod: TermName        = newTermName("getMethod")
     final val Invoke: TermName           = newTermName("invoke")
+    final val InvokeExact: TermName      = newTermName("invokeExact")
 
     val Boxed = immutable.Map[TypeName, TypeName](
       tpnme.Boolean -> BoxedBoolean,

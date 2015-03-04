@@ -39,12 +39,12 @@ trait ScaladocAnalyzer extends Analyzer {
         for (useCase <- comment.useCases) {
           typer1.silent(_.asInstanceOf[ScaladocTyper].defineUseCases(useCase)) match {
             case SilentTypeError(err) =>
-              unit.warning(useCase.pos, err.errMsg)
+              reporter.warning(useCase.pos, err.errMsg)
             case _ =>
           }
           for (useCaseSym <- useCase.defined) {
             if (sym.name != useCaseSym.name)
-              unit.warning(useCase.pos, "@usecase " + useCaseSym.name.decode + " does not match commented symbol: " + sym.name.decode)
+              reporter.warning(useCase.pos, "@usecase " + useCaseSym.name.decode + " does not match commented symbol: " + sym.name.decode)
           }
         }
       }
@@ -190,8 +190,8 @@ abstract class ScaladocSyntaxAnalyzer[G <: Global](val global: G) extends Syntax
         typeParams.nonEmpty || version.nonEmpty || since.nonEmpty
       }
       def isDirty = unclean(unmooredParser parseComment doc)
-      if ((doc ne null) && (settings.lint || isDirty))
-        unit.warning(doc.pos, "discarding unmoored doc comment")
+      if ((doc ne null) && (settings.warnDocDetached || isDirty))
+        reporter.warning(doc.pos, "discarding unmoored doc comment")
     }
 
     override def flushDoc(): DocComment = (try lastDoc finally lastDoc = null)
@@ -208,7 +208,7 @@ abstract class ScaladocSyntaxAnalyzer[G <: Global](val global: G) extends Syntax
       super.skipDocComment()
     }
     override def skipBlockComment(): Unit = {
-      inDocComment = false
+      inDocComment = false // ??? this means docBuffer won't receive contents of this comment???
       docBuffer = new StringBuilder("/*")
       super.skipBlockComment()
     }
@@ -217,9 +217,10 @@ abstract class ScaladocSyntaxAnalyzer[G <: Global](val global: G) extends Syntax
       def foundStarComment(start: Int, end: Int) = try {
         val str = docBuffer.toString
         val pos = Position.range(unit.source, start, start, end)
-        unit.comment(pos, str)
-        if (inDocComment)
+        if (inDocComment) {
+          signalParsedDocComment(str, pos)
           lastDoc = DocComment(str, pos)
+        }
         true
       } finally {
         docBuffer    = null

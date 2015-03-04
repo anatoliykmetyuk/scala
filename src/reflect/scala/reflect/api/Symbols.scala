@@ -27,7 +27,7 @@ package api
  *    scala> class C[T] { def test[U](x: T)(y: U): Int = ??? }
  *    defined class C
  *
- *    scala> val test = typeOf[C[Int]].member(newTermName("test")).asMethod
+ *    scala> val test = typeOf[C[Int]].member(TermName("test")).asMethod
  *    test: reflect.runtime.universe.MethodSymbol = method test
  *
  *    scala> test.info
@@ -259,6 +259,9 @@ trait Symbols { self: Universe =>
     /** Does this symbol represent the definition of a class implicitly associated
      *  with an object definition (module class in scala compiler parlance).
      *  If yes, `isType` is also guaranteed to be true.
+     *
+     *  Note to compiler developers: During the "mixin" phase, trait implementation class symbols
+     *  receive the `lateMODULE` flag, hence `isImplClass && isModuleClass` becomes true.
      *
      *  @group Tests
      */

@@ -127,7 +127,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
 
     def checkNonCyclic(pos: Position, seen: Set[Symbol], clazz: Symbol): Unit =
       if (seen contains clazz)
-        unit.error(pos, "value class may not unbox to itself")
+        reporter.error(pos, "value class may not unbox to itself")
       else {
         val unboxed = definitions.underlyingOfValueClass(clazz).typeSymbol
         if (unboxed.isDerivedValueClass) checkNonCyclic(pos, seen + clazz, unboxed)
@@ -208,7 +208,7 @@ abstract class ExtensionMethods extends Transform with TypingTransformers {
           def makeExtensionMethodSymbol = {
             val extensionName = extensionNames(origMeth).head.toTermName
             val extensionMeth = (
-              companion.moduleClass.newMethod(extensionName, tree.pos.focus, origMeth.flags & ~OVERRIDE & ~PROTECTED | FINAL)
+              companion.moduleClass.newMethod(extensionName, tree.pos.focus, origMeth.flags & ~OVERRIDE & ~PROTECTED & ~LOCAL | FINAL)
                 setAnnotations origMeth.annotations
             )
             origMeth.removeAnnotation(TailrecClass) // it's on the extension method, now.

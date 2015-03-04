@@ -27,6 +27,16 @@ trait ContextErrors {
     override def toString() = "[Type error at:" + errPos + "] " + errMsg
   }
 
+  abstract class AbsAmbiguousTypeError extends AbsTypeError
+
+  case class AmbiguousTypeError(errPos: Position, errMsg: String)
+    extends AbsAmbiguousTypeError
+
+  case class AmbiguousImplicitTypeError(underlyingTree: Tree, errMsg: String)
+    extends AbsAmbiguousTypeError {
+    def errPos = underlyingTree.pos
+  }
+
   sealed abstract class TreeTypeError extends AbsTypeError {
     def underlyingTree: Tree
     def errPos = underlyingTree.pos
@@ -37,9 +47,6 @@ trait ContextErrors {
 
   case class AccessTypeError(underlyingTree: Tree, errMsg: String)
     extends TreeTypeError
-
-  case class AmbiguousTypeError(errPos: Position, errMsg: String)
-    extends AbsTypeError
 
   case class SymbolTypeError(underlyingSym: Symbol, errMsg: String)
     extends AbsTypeError {
@@ -75,8 +82,6 @@ trait ContextErrors {
       s"diverging implicit expansion for type ${pt}\nstarting with ${sym.fullLocationString}"
   }
 
-  case class AmbiguousImplicitTypeError(underlyingTree: Tree, errMsg: String)
-    extends TreeTypeError
 
   case class PosAndMsgTypeError(errPos: Position, errMsg: String)
     extends AbsTypeError
@@ -88,10 +93,6 @@ trait ContextErrors {
 
     def issueSymbolTypeError(sym: Symbol, msg: String)(implicit context: Context) {
       issueTypeError(SymbolTypeError(sym, msg))
-    }
-
-    def issueAmbiguousTypeError(pre: Type, sym1: Symbol, sym2: Symbol, err: AmbiguousTypeError)(implicit context: Context) {
-      context.issueAmbiguousError(pre, sym1, sym2, err)
     }
 
     def issueTypeError(err: AbsTypeError)(implicit context: Context) { context.issue(err) }
@@ -123,6 +124,36 @@ trait ContextErrors {
 
   import ErrorUtils._
 
+  private def MacroIncompatibleEngineError(friendlyMessage: String, internalMessage: String) = {
+    def debugDiagnostic = s"(internal diagnostic: $internalMessage)"
+    val message = if (macroDebugLite || macroDebugVerbose) s"$friendlyMessage $debugDiagnostic" else friendlyMessage
+    // TODO: clean this up! (This is a more explicit version of what the code use to do, to reveal the issue.)
+    throw new TypeError(analyzer.lastTreeToTyper.pos, message)
+  }
+
+  def MacroCantExpand210xMacrosError(internalMessage: String) =
+    MacroIncompatibleEngineError("can't expand macros compiled by previous versions of Scala", internalMessage)
+
+  def MacroCantExpandIncompatibleMacrosError(internalMessage: String) =
+    MacroIncompatibleEngineError("macro cannot be expanded, because it was compiled by an incompatible macro engine", internalMessage)
+
+  def NoImplicitFoundError(tree: Tree, param: Symbol)(implicit context: Context): Unit = {
+    def errMsg = {
+      val paramName = param.name
+      val paramTp = param.tpe
+      def evOrParam = (
+        if (paramName startsWith nme.EVIDENCE_PARAM_PREFIX)
+          "evidence parameter of type"
+        else
+          s"parameter $paramName:")
+      paramTp.typeSymbolDirect match {
+        case ImplicitNotFoundMsg(msg) => msg.format(paramName, paramTp)
+        case _ => s"could not find implicit value for $evOrParam $paramTp"
+      }
+    }
+    issueNormalTypeError(tree, errMsg)
+  }
+
   trait TyperContextErrors {
     self: Typer =>
 
@@ -139,24 +170,6 @@ trait ContextErrors {
           "stable identifier required, but "+tree+" found." + (
           if (treeInfo.hasVolatileType(tree)) addendum else ""))
         setError(tree)
-      }
-
-      def NoImplicitFoundError(tree: Tree, param: Symbol) = {
-        def errMsg = {
-          val paramName = param.name
-          val paramTp   = param.tpe
-          def evOrParam = (
-            if (paramName startsWith nme.EVIDENCE_PARAM_PREFIX)
-              "evidence parameter of type"
-            else
-              s"parameter $paramName:"
-          )
-          paramTp.typeSymbolDirect match {
-            case ImplicitNotFoundMsg(msg) => msg.format(paramName, paramTp)
-            case _ => s"could not find implicit value for $evOrParam $paramTp"
-          }
-        }
-        issueNormalTypeError(tree, errMsg)
       }
 
       def AdaptTypeError(tree: Tree, found: Type, req: Type) = {
@@ -733,17 +746,6 @@ trait ContextErrors {
         NormalTypeError(expandee, "too many argument lists for " + fun)
       }
 
-      private def MacroIncompatibleEngineError(friendlyMessage: String, internalMessage: String) = {
-        def debugDiagnostic = s"(internal diagnostic: $internalMessage)"
-        val message = if (macroDebugLite || macroDebugVerbose) s"$friendlyMessage $debugDiagnostic" else friendlyMessage
-        issueNormalTypeError(lastTreeToTyper, message)
-      }
-
-      def MacroCantExpand210xMacrosError(internalMessage: String) =
-        MacroIncompatibleEngineError("can't expand macros compiled by previous versions of Scala", internalMessage)
-
-      def MacroCantExpandIncompatibleMacrosError(internalMessage: String) =
-        MacroIncompatibleEngineError("macro cannot be expanded, because it was compiled by an incompatible macro engine", internalMessage)
 
       case object MacroExpansionException extends Exception with scala.util.control.ControlThrowable
 
@@ -883,20 +885,31 @@ trait ContextErrors {
         val WrongNumber, NoParams, ArgsDoNotConform = Value
       }
 
-      private def ambiguousErrorMsgPos(pos: Position, pre: Type, sym1: Symbol, sym2: Symbol, rest: String) =
-        if (sym1.hasDefault && sym2.hasDefault && sym1.enclClass == sym2.enclClass) {
-          val methodName = nme.defaultGetterToMethod(sym1.name)
-          (sym1.enclClass.pos,
-           "in "+ sym1.enclClass +", multiple overloaded alternatives of " + methodName +
-                     " define default arguments")
-        } else {
-          (pos,
-            ("ambiguous reference to overloaded definition,\n" +
-             "both " + sym1 + sym1.locationString + " of type " + pre.memberType(sym1) +
-             "\nand  " + sym2 + sym2.locationString + " of type " + pre.memberType(sym2) +
-             "\nmatch " + rest)
-          )
-        }
+      private def issueAmbiguousTypeErrorUnlessErroneous(pos: Position, pre: Type, sym1: Symbol, sym2: Symbol, rest: String): Unit = {
+        // To avoid stack overflows (SI-8890), we MUST (at least) report when either `validTargets` OR `ambiguousSuppressed`
+        // More details:
+        // If `!context.ambiguousErrors`, `reporter.issueAmbiguousError` (which `context.issueAmbiguousError` forwards to)
+        // buffers ambiguous errors. In this case, to avoid looping, we must issue even if `!validTargets`. (TODO: why?)
+        // When not buffering (and thus reporting to the user), we shouldn't issue unless `validTargets`,
+        // otherwise we report two different errors that trace back to the same root cause,
+        // and unless `validTargets`, we don't know for sure the ambiguity is real anyway.
+        val validTargets = !(pre.isErroneous || sym1.isErroneous || sym2.isErroneous)
+        val ambiguousBuffered = !context.ambiguousErrors
+        if (validTargets || ambiguousBuffered)
+          context.issueAmbiguousError(
+            if (sym1.hasDefault && sym2.hasDefault && sym1.enclClass == sym2.enclClass) {
+              val methodName = nme.defaultGetterToMethod(sym1.name)
+              AmbiguousTypeError(sym1.enclClass.pos,
+                s"in ${sym1.enclClass}, multiple overloaded alternatives of $methodName define default arguments")
+
+            } else {
+              AmbiguousTypeError(pos,
+                 "ambiguous reference to overloaded definition,\n" +
+                s"both ${sym1.fullLocationString} of type ${pre.memberType(sym1)}\n" +
+                s"and  ${sym2.fullLocationString} of type ${pre.memberType(sym2)}\n" +
+                s"match $rest")
+            })
+      }
 
       def AccessError(tree: Tree, sym: Symbol, ctx: Context, explanation: String): AbsTypeError =
         AccessError(tree, sym, ctx.enclClass.owner.thisType, ctx.enclClass.owner, explanation)
@@ -952,8 +965,7 @@ trait ContextErrors {
           val msg0 =
             "argument types " + argtpes.mkString("(", ",", ")") +
            (if (pt == WildcardType) "" else " and expected result type " + pt)
-          val (pos, msg) = ambiguousErrorMsgPos(tree.pos, pre, best, firstCompeting, msg0)
-          issueAmbiguousTypeError(pre, best, firstCompeting, AmbiguousTypeError(pos, msg))
+          issueAmbiguousTypeErrorUnlessErroneous(tree.pos, pre, best, firstCompeting, msg0)
           setErrorOnLastTry(lastTry, tree)
         } else setError(tree) // do not even try further attempts because they should all fail
                               // even if this is not the last attempt (because of the SO's possibility on the horizon)
@@ -966,8 +978,7 @@ trait ContextErrors {
       }
 
       def AmbiguousExprAlternativeError(tree: Tree, pre: Type, best: Symbol, firstCompeting: Symbol, pt: Type, lastTry: Boolean) = {
-        val (pos, msg) = ambiguousErrorMsgPos(tree.pos, pre, best, firstCompeting, "expected type " + pt)
-        issueAmbiguousTypeError(pre, best, firstCompeting, AmbiguousTypeError(pos, msg))
+        issueAmbiguousTypeErrorUnlessErroneous(tree.pos, pre, best, firstCompeting, "expected type " + pt)
         setErrorOnLastTry(lastTry, tree)
       }
 

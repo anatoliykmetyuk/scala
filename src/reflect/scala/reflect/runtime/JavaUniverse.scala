@@ -5,7 +5,7 @@ package runtime
 import scala.reflect.internal.{TreeInfo, SomePhase}
 import scala.reflect.internal.{SymbolTable => InternalSymbolTable}
 import scala.reflect.runtime.{SymbolTable => RuntimeSymbolTable}
-import scala.reflect.api.{TreeCreator, TypeCreator, Universe}
+import scala.reflect.api.{TypeCreator, Universe}
 
 /** An implementation of [[scala.reflect.api.Universe]] for runtime reflection using JVM classloaders.
  *
@@ -14,14 +14,26 @@ import scala.reflect.api.{TreeCreator, TypeCreator, Universe}
  *  @contentDiagram hideNodes "*Api" "*Extractor"
  */
 class JavaUniverse extends InternalSymbolTable with JavaUniverseForce with ReflectSetup with RuntimeSymbolTable { self =>
-
-  override def inform(msg: String): Unit = log(msg)
   def picklerPhase = SomePhase
   def erasurePhase = SomePhase
   lazy val settings = new Settings
-  private val isLogging = sys.props contains "scala.debug.reflect"
 
+  private val isLogging = sys.props contains "scala.debug.reflect"
   def log(msg: => AnyRef): Unit = if (isLogging) Console.err.println("[reflect] " + msg)
+
+  // TODO: why put output under isLogging? Calls to inform are already conditional on debug/verbose/...
+  import scala.reflect.internal.{Reporter, ReporterImpl}
+  override def reporter: Reporter = new ReporterImpl {
+    protected def info0(pos: Position, msg: String, severity: Severity, force: Boolean): Unit = log(msg)
+  }
+
+  // minimal Run to get Reporting wired
+  def currentRun = new RunReporting {}
+  class PerRunReporting extends PerRunReportingBase {
+    def deprecationWarning(pos: Position, msg: String): Unit = reporter.warning(pos, msg)
+  }
+  protected def PerRunReporting = new PerRunReporting
+
 
   type TreeCopier = InternalTreeCopierOps
   implicit val TreeCopierTag: ClassTag[TreeCopier] = ClassTag[TreeCopier](classOf[TreeCopier])

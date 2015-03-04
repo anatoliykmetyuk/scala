@@ -75,7 +75,7 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
   //         at least indirectly. Currently, these are `ArrayOps` and `StringOps`.
   //         It is also implemented in `TraversableOnce[A]`.
   /** A version of this collection with all
-   *  of the operations implemented sequentially (i.e. in a single-threaded manner).
+   *  of the operations implemented sequentially (i.e., in a single-threaded manner).
    *
    *  This method returns a reference to this collection. In parallel collections,
    *  it is redefined to return a sequential implementation of this collection. In
@@ -85,10 +85,9 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
    */
   def seq: TraversableOnce[A]
 
-  /** Presently these are abstract because the Traversable versions use
-   *  breakable/break, and I wasn't sure enough of how that's supposed to
-   *  function to consolidate them with the Iterator versions.
-   */
+  // Presently these are abstract because the Traversable versions use
+  // breakable/break, and I wasn't sure enough of how that's supposed to
+  // function to consolidate them with the Iterator versions.
   def forall(p: A => Boolean): Boolean
   def exists(p: A => Boolean): Boolean
   def find(p: A => Boolean): Option[A]
@@ -160,7 +159,7 @@ trait TraversableOnce[+A] extends Any with GenTraversableOnce[A] {
    *             op( op( ... op(x_1, x_2) ..., x_{n-1}), x_n)
    *           }}}
    *           where `x,,1,,, ..., x,,n,,` are the elements of this $coll.
-   *  @throws `UnsupportedOperationException` if this $coll is empty.   */
+   *  @throws UnsupportedOperationException if this $coll is empty.   */
   def reduceLeft[B >: A](op: (B, A) => B): B = {
     if (isEmpty)
       throw new UnsupportedOperationException("empty.reduceLeft")

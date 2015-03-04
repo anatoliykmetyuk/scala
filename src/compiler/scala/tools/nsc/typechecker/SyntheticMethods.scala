@@ -54,6 +54,9 @@ trait SyntheticMethods extends ast.TreeDSL {
   /** Does not force the info of `caseclazz` */
   final def caseAccessorName(caseclazz: Symbol, paramName: TermName) =
     (renamedCaseAccessors get caseclazz).fold(paramName)(_(paramName))
+  final def clearRenamedCaseAccessors(caseclazz: Symbol): Unit = {
+    renamedCaseAccessors -= caseclazz
+  }
 
   /** Add the synthetic methods to case classes.
    */
@@ -95,7 +98,7 @@ trait SyntheticMethods extends ast.TreeDSL {
     // which they shouldn't.
     val accessorLub  = (
       if (settings.Xexperimental) {
-        global.weakLub(accessors map (_.tpe.finalResultType)) match {
+        global.lub(accessors map (_.tpe.finalResultType)) match {
           case RefinedType(parents, decls) if !decls.isEmpty => intersectionType(parents)
           case tp                                            => tp
         }
@@ -339,12 +342,11 @@ trait SyntheticMethods extends ast.TreeDSL {
           !hasOverridingImplementation(m) || {
             clazz.isDerivedValueClass && (m == Any_hashCode || m == Any_equals) && {
               // Without a means to suppress this warning, I've thought better of it.
-              //
-              // if (settings.lint) {
-              //   (clazz.info nonPrivateMember m.name) filter (m => (m.owner != AnyClass) && (m.owner != clazz) && !m.isDeferred) andAlso { m =>
-              //     currentUnit.warning(clazz.pos, s"Implementation of ${m.name} inherited from ${m.owner} overridden in $clazz to enforce value class semantics")
-              //   }
-              // }
+              if (settings.warnValueOverrides) {
+                 (clazz.info nonPrivateMember m.name) filter (m => (m.owner != AnyClass) && (m.owner != clazz) && !m.isDeferred) andAlso { m =>
+                   currentUnit.warning(clazz.pos, s"Implementation of ${m.name} inherited from ${m.owner} overridden in $clazz to enforce value class semantics")
+                 }
+               }
               true
             }
           }

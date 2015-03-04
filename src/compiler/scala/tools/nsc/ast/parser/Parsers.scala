@@ -212,8 +212,13 @@ self =>
 
     override def newScanner() = new UnitScanner(unit, patches)
 
-    override def            warning(offset: Offset, msg: String) {unit.           warning(o2p(offset), msg)}
-    override def deprecationWarning(offset: Offset, msg: String) {unit.deprecationWarning(o2p(offset), msg)}
+
+    override def warning(offset: Offset, msg: String): Unit =
+      reporter.warning(o2p(offset), msg)
+
+    override def deprecationWarning(offset: Offset, msg: String): Unit =
+      currentRun.reporting.deprecationWarning(o2p(offset), msg)
+
 
     private var smartParsing = false
     @inline private def withSmartParsing[T](body: => T): T = {
@@ -227,17 +232,17 @@ self =>
     val syntaxErrors = new ListBuffer[(Int, String)]
     def showSyntaxErrors() =
       for ((offset, msg) <- syntaxErrors)
-        unit.error(o2p(offset), msg)
+        reporter.error(o2p(offset), msg)
 
-    override def syntaxError(offset: Offset, msg: String) {
+    override def syntaxError(offset: Offset, msg: String): Unit = {
       if (smartParsing) syntaxErrors += ((offset, msg))
-      else unit.error(o2p(offset), msg)
+      else reporter.error(o2p(offset), msg)
     }
 
-    override def incompleteInputError(msg: String) {
+    override def incompleteInputError(msg: String): Unit = {
       val offset = source.content.length - 1
       if (smartParsing) syntaxErrors += ((offset, msg))
-      else unit.incompleteInputError(o2p(offset), msg)
+      else currentRun.parsing.incompleteInputError(o2p(offset), msg)
     }
 
     /** parse unit. If there are inbalanced braces,
@@ -338,6 +343,7 @@ self =>
      */
     private var inScalaPackage = false
     private var currentPackage = ""
+
             def      resetPackage() {inScalaPackage = false; currentPackage = ""}
     private def inScalaRootPackage = inScalaPackage       && currentPackage == "scala"
 
@@ -509,7 +515,7 @@ self =>
       finally inFunReturnType = saved
     }
 
-    protected def skip(targetToken: Token) {
+    protected def skip(targetToken: Token): Unit = {
       var nparens = 0
       var nbraces = 0
       while (true) {
@@ -561,20 +567,20 @@ self =>
     }
     def warning(offset: Offset, msg: String): Unit
     def incompleteInputError(msg: String): Unit
+
     private def syntaxError(pos:  Position, msg: String, skipIt: Boolean) {syntaxError(pos pointOrElse in.offset, msg, skipIt)}
     def         syntaxError(offset: Offset, msg: String                 ): Unit
     def         syntaxError(                msg: String, skipIt: Boolean) {syntaxError(in.offset, msg, skipIt) /*; Thread.dumpStack*/}
 
-    def syntaxError(offset: Offset, msg: String, skipIt: Boolean) {
+    def syntaxError(offset: Offset, msg: String, skipIt: Boolean): Unit = {
       if (offset > lastErrorOffset) {
         syntaxError(offset, msg)
-        // no more errors on this token.
-        lastErrorOffset = in.offset
+        lastErrorOffset = in.offset         // no more errors on this token.
       }
       if (skipIt) skip(UNDEF)
     }
 
-    def warning(msg: String) { warning(in.offset, msg) }
+    def warning(msg: String): Unit = warning(in.offset, msg)
 
     def syntaxErrorOrIncomplete(msg: String, skipIt: Boolean) {
       if (in.token == EOF)  incompleteInputError(msg)
@@ -756,7 +762,7 @@ self =>
 
     /** Convert tree to formal parameter. */
     def convertToParam(tree: Tree): ValDef = atPos(tree.pos) {
-      def removeAsPlaceholder(name: Name) {
+      def removeAsPlaceholder(name: Name): Unit = {
         placeholderParams = placeholderParams filter (_.name != name)
       }
       def errorParam = makeParam(nme.ERROR, errorTypeTree setPos o2p(tree.pos.end))
@@ -1087,7 +1093,7 @@ self =>
     def identOrMacro(): Name = if (isMacro) rawIdent() else ident()
 
     def selector(t: Tree): Tree = {
-      val point = in.offset
+      val point = if(isIdent) in.offset else in.lastOffset //SI-8459
       //assert(t.pos.isDefined, t)
       if (t != EmptyTree) Select(t, ident(skipIt = false)) setPos r2p(t.pos.start, point, in.lastOffset)
       else errorTermTree // has already been reported
@@ -1249,15 +1255,15 @@ self =>
                                                      skipIt = true)(EmptyTree)
       // Like Swiss cheese, with holes
       def stringCheese: Tree = atPos(in.offset) {
-        val start = in.offset
+        val start        = in.offset
         val interpolator = in.name.encoded // ident() for INTERPOLATIONID
 
         val partsBuf = new ListBuffer[Tree]
-        val exprBuf = new ListBuffer[Tree]
+        val exprsBuf = new ListBuffer[Tree]
         in.nextToken()
         while (in.token == STRINGPART) {
           partsBuf += literal()
-          exprBuf += (
+          exprsBuf += (
             if (inPattern) dropAnyBraces(pattern())
             else in.token match {
               case IDENTIFIER => atPos(in.offset)(Ident(ident()))
@@ -1270,11 +1276,13 @@ self =>
         }
         if (in.token == STRINGLIT) partsBuf += literal()
 
+      // Documenting that it is intentional that the ident is not rooted for purposes of virtualization
+      //val t1 = atPos(o2p(start)) { Select(Select (Ident(nme.ROOTPKG), nme.scala_), nme.StringContext) }
         val t1 = atPos(o2p(start)) { Ident(nme.StringContext) }
         val t2 = atPos(start) { Apply(t1, partsBuf.toList) }
         t2 setPos t2.pos.makeTransparent
         val t3 = Select(t2, interpolator) setPos t2.pos
-        atPos(start) { Apply(t3, exprBuf.toList) }
+        atPos(start) { Apply(t3, exprsBuf.toList) }
       }
       if (inPattern) stringCheese
       else withPlaceholders(stringCheese, isAny = true) // strinterpolator params are Any* by definition
@@ -1285,12 +1293,12 @@ self =>
     def newLineOpt () {if (in.token == NEWLINE) in.nextToken()}
     def newLinesOpt() {if (in.token == NEWLINE || in.token == NEWLINES) in.nextToken()}
 
-    def newLineOptWhenFollowedBy(token: Offset) {
+    def newLineOptWhenFollowedBy(token: Offset): Unit = {
       // note: next is defined here because current == NEWLINE
       if (in.token == NEWLINE && in.next.token == token) newLineOpt()
     }
 
-    def newLineOptWhenFollowing(p: Token => Boolean) {
+    def newLineOptWhenFollowing(p: Token => Boolean): Unit = {
       // note: next is defined here because current == NEWLINE
       if (in.token == NEWLINE && p(in.next.token)) newLineOpt()
     }
@@ -3311,7 +3319,7 @@ self =>
     }
 
     /** {{{
-     *  PrefixExpr   ::= [`-' | `+' | `~' | `!' | `&'] SimpleExpr
+     *  PrefixExpr   ::= [`-' | `+' | `~' | `!'] SimpleExpr
      *  }}}
      */
     def prefixExpr(): Tree = {

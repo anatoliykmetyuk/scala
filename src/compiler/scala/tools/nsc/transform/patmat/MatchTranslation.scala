@@ -154,7 +154,7 @@ trait MatchTranslation {
         case SymbolBound(sym, expr)                                   => bindingStep(sym, expr)
         case Literal(Constant(_)) | Ident(_) | Select(_, _) | This(_) => equalityTestStep()
         case Alternative(alts)                                        => alternativesStep(alts)
-        case _                                                        => context.unit.error(pos, unsupportedPatternMsg) ; noStep()
+        case _                                                        => reporter.error(pos, unsupportedPatternMsg) ; noStep()
       }
       def translate(): List[TreeMaker] = nextStep() merge (_.translate())
 
@@ -208,7 +208,7 @@ trait MatchTranslation {
         case _                                                    => (cases, None)
       }
 
-      checkMatchVariablePatterns(nonSyntheticCases)
+      if (!settings.XnoPatmatAnalysis) checkMatchVariablePatterns(nonSyntheticCases)
 
       // we don't transform after uncurry
       // (that would require more sophistication when generating trees,
@@ -248,7 +248,10 @@ trait MatchTranslation {
       if (caseDefs forall treeInfo.isCatchCase) caseDefs
       else {
         val swatches = { // switch-catches
-          val bindersAndCases = caseDefs map { caseDef =>
+          // SI-7459 must duplicate here as we haven't commited to switch emission, and just figuring out
+          //         if we can ends up mutating `caseDefs` down in the use of `substituteSymbols` in
+          //         `TypedSubstitution#Substitution`. That is called indirectly by `emitTypeSwitch`.
+          val bindersAndCases = caseDefs.map(_.duplicate) map { caseDef =>
             // generate a fresh symbol for each case, hoping we'll end up emitting a type-switch (we don't have a global scrut there)
             // if we fail to emit a fine-grained switch, have to do translateCase again with a single scrutSym (TODO: uniformize substitution on treemakers so we can avoid this)
             val caseScrutSym = freshSym(pos, pureType(ThrowableTpe))
@@ -377,8 +380,8 @@ trait MatchTranslation {
     object ExtractorCall {
       // TODO: check unargs == args
       def apply(tree: Tree): ExtractorCall = tree match {
-        case UnApply(unfun, args) => new ExtractorCallRegular(alignPatterns(tree), unfun, args) // extractor
-        case Apply(fun, args)     => new ExtractorCallProd(alignPatterns(tree), fun, args)      // case class
+        case UnApply(unfun, args) => new ExtractorCallRegular(alignPatterns(context, tree), unfun, args) // extractor
+        case Apply(fun, args)     => new ExtractorCallProd(alignPatterns(context, tree), fun, args)      // case class
       }
     }
 
@@ -518,7 +521,7 @@ trait MatchTranslation {
       // reference the (i-1)th case accessor if it exists, otherwise the (i-1)th tuple component
       override protected def tupleSel(binder: Symbol)(i: Int): Tree = {
         val accessors = binder.caseFieldAccessors
-        if (accessors isDefinedAt (i-1)) REF(binder) DOT accessors(i-1)
+        if (accessors isDefinedAt (i-1)) gen.mkAttributedStableRef(binder) DOT accessors(i-1)
         else codegen.tupleSel(binder)(i) // this won't type check for case classes, as they do not inherit ProductN
       }
     }
@@ -544,10 +547,17 @@ trait MatchTranslation {
         // wrong when isSeq, and resultInMonad should always be correct since it comes
         // directly from the extractor's result type
         val binder         = freshSym(pos, pureType(resultInMonad))
+        val potentiallyMutableBinders: Set[Symbol] =
+          if (extractorApply.tpe.typeSymbol.isNonBottomSubClass(OptionClass) && !aligner.isSeq)
+            Set.empty
+          else
+            // Ensures we capture unstable bound variables eagerly. These can arise under name based patmat or by indexing into mutable Seqs. See run t9003.scala
+            subPatBinders.toSet
 
         ExtractorTreeMaker(extractorApply, lengthGuard(binder), binder)(
           subPatBinders,
           subPatRefs(binder),
+          potentiallyMutableBinders,
           aligner.isBool,
           checkedLength,
           patBinderOrCasted,

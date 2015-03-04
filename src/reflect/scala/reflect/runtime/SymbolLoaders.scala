@@ -65,10 +65,15 @@ private[reflect] trait SymbolLoaders { self: SymbolTable =>
   class LazyPackageType extends LazyType with FlagAgnosticCompleter {
     override def complete(sym: Symbol) {
       assert(sym.isPackageClass)
-      sym setInfo new ClassInfoType(List(), new PackageScope(sym), sym)
+      // Time travel to a phase before refchecks avoids an initialization issue. `openPackageModule`
+      // creates a module symbol and invokes invokes `companionModule` while the `infos` field is
+      // still null. This calls `isModuleNotMethod`, which forces the `info` if run after refchecks.
+      slowButSafeEnteringPhaseNotLaterThan(picklerPhase) {
+        sym setInfo new ClassInfoType(List(), new PackageScope(sym), sym)
         // override def safeToString = pkgClass.toString
-      openPackageModule(sym)
-      markAllCompleted(sym)
+        openPackageModule(sym)
+        markAllCompleted(sym)
+      }
     }
   }
 
@@ -91,7 +96,7 @@ private[reflect] trait SymbolLoaders { self: SymbolTable =>
   //
   // Short of significantly changing SymbolLoaders I see no other way than just
   // to slap a global lock on materialization in runtime reflection.
-  class PackageScope(pkgClass: Symbol) extends Scope(initFingerPrints = -1L) // disable fingerprinting as we do not know entries beforehand
+  class PackageScope(pkgClass: Symbol) extends Scope
       with SynchronizedScope {
     assert(pkgClass.isType)
 

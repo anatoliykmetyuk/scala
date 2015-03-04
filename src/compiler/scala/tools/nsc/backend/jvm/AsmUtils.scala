@@ -5,9 +5,10 @@
 
 package scala.tools.nsc.backend.jvm
 
-import scala.tools.asm.tree.{ClassNode, MethodNode}
+import scala.tools.asm.tree.{AbstractInsnNode, ClassNode, MethodNode}
 import java.io.PrintWriter
 import scala.tools.asm.util.{TraceClassVisitor, TraceMethodVisitor, Textifier}
+import scala.tools.asm.ClassReader
 
 object AsmUtils {
 
@@ -50,4 +51,16 @@ object AsmUtils {
     w.flush()
   }
 
+  def traceClass(bytes: Array[Byte]): Unit = traceClass(readClass(bytes))
+
+  def readClass(bytes: Array[Byte]): ClassNode = {
+    val node = new ClassNode()
+    new ClassReader(bytes).accept(node, 0)
+    node
+  }
+
+  def instructionString(instruction: AbstractInsnNode): String = instruction.getOpcode match {
+    case -1 => instruction.toString
+    case op => scala.tools.asm.util.Printer.OPCODES(op)
+  }
 }

@@ -12,8 +12,7 @@ import scala.reflect.internal.util._
 import StringOps._
 
 /**
- * This class implements a Reporter that displays messages on a text
- * console.
+ * This class implements a Reporter that displays messages on a text console.
  */
 class ConsoleReporter(val settings: Settings, reader: BufferedReader, writer: PrintWriter) extends AbstractReporter {
   def this(settings: Settings) = this(settings, Console.in, new PrintWriter(Console.err, true))
@@ -30,7 +29,7 @@ class ConsoleReporter(val settings: Settings, reader: BufferedReader, writer: Pr
     case INFO    => null
   }
 
-  private def clabel(severity: Severity): String = {
+  protected def clabel(severity: Severity): String = {
     val label0 = label(severity)
     if (label0 eq null) "" else label0 + ": "
   }

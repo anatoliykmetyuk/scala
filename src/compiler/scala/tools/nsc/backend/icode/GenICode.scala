@@ -680,7 +680,7 @@ abstract class GenICode extends SubComponent {
                 val dims = arr.dimensions
                 var elemKind = arr.elementKind
                 if (args.length > dims)
-                  unit.error(tree.pos, "too many arguments for array constructor: found " + args.length +
+                  reporter.error(tree.pos, "too many arguments for array constructor: found " + args.length +
                              " but array has only " + dims + " dimension(s)")
                 if (args.length != dims)
                   for (i <- args.length until dims) elemKind = ARRAY(elemKind)
@@ -1424,11 +1424,18 @@ abstract class GenICode extends SubComponent {
           def genZandOrZor(and: Boolean): Boolean = {
             val ctxInterm = ctx.newBlock()
 
-            val branchesReachable = if (and) genCond(lhs, ctx, ctxInterm, elseCtx)
+            val lhsBranchesReachable = if (and) genCond(lhs, ctx, ctxInterm, elseCtx)
             else genCond(lhs, ctx, thenCtx, ctxInterm)
-            ctxInterm.bb killUnless branchesReachable
+            // If lhs is known to throw, we can kill the just created ctxInterm.
+            ctxInterm.bb killUnless lhsBranchesReachable
 
-            genCond(rhs, ctxInterm, thenCtx, elseCtx)
+            val rhsBranchesReachable = genCond(rhs, ctxInterm, thenCtx, elseCtx)
+
+            // Reachable means "it does not always throw", i.e. "it might not throw".
+            // In an expression (a && b) or (a || b), the b branch might not be evaluated.
+            // Such an expression is therefore known to throw only if both expressions throw. Or,
+            // successors are reachable if either of the two is reachable (SI-8625).
+            lhsBranchesReachable || rhsBranchesReachable
           }
           def genRefEq(isEq: Boolean) = {
             val f = genEqEqPrimitive(lhs, rhs, ctx) _
@@ -1488,7 +1495,7 @@ abstract class GenICode extends SubComponent {
           if (!settings.optimise) {
             if (l.tpe <:< BoxedNumberClass.tpe) {
               if (r.tpe <:< BoxedNumberClass.tpe) platform.externalEqualsNumNum
-              else if (r.tpe <:< BoxedCharacterClass.tpe) platform.externalEqualsNumChar
+              else if (r.tpe <:< BoxedCharacterClass.tpe) platform.externalEqualsNumObject // will be externalEqualsNumChar in 2.12, SI-9030
               else platform.externalEqualsNumObject
             } else platform.externalEquals
           } else {

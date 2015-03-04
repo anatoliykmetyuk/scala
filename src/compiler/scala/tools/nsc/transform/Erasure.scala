@@ -98,7 +98,7 @@ abstract class Erasure extends AddInterfaces
     val len = sig.length
     val copy: Array[Char] = sig.toCharArray
     var changed = false
-    while (i < sig.length) {
+    while (i < len) {
       val ch = copy(i)
       if (ch == '.' && last != '>') {
          copy(i) = '$'
@@ -185,6 +185,25 @@ abstract class Erasure extends AddInterfaces
 
   private def isErasedValueType(tpe: Type) = tpe.isInstanceOf[ErasedValueType]
 
+  /* Drop redundant types (ones which are implemented by some other parent) from the immediate parents.
+   * This is important on Android because there is otherwise an interface explosion.
+   */
+  def minimizeParents(parents: List[Type]): List[Type] = {
+    var rest   = parents
+    var leaves = collection.mutable.ListBuffer.empty[Type]
+    while(rest.nonEmpty) {
+      val candidate = rest.head
+      val nonLeaf = leaves exists { t => t.typeSymbol isSubClass candidate.typeSymbol }
+      if(!nonLeaf) {
+        leaves = leaves filterNot { t => candidate.typeSymbol isSubClass t.typeSymbol }
+        leaves += candidate
+      }
+      rest = rest.tail
+    }
+    leaves.toList
+  }
+
+
   /** The Java signature of type 'info', for symbol sym. The symbol is used to give the right return
    *  type for constructors.
    */
@@ -192,16 +211,24 @@ abstract class Erasure extends AddInterfaces
     val isTraitSignature = sym0.enclClass.isTrait
 
     def superSig(parents: List[Type]) = {
-      val ps = (
-        if (isTraitSignature) {
+      def isInterfaceOrTrait(sym: Symbol) = sym.isInterface || sym.isTrait
+
+      // a signature should always start with a class
+      def ensureClassAsFirstParent(tps: List[Type]) = tps match {
+        case Nil => ObjectTpe :: Nil
+        case head :: tail if isInterfaceOrTrait(head.typeSymbol) => ObjectTpe :: tps
+        case _ => tps
+      }
+
+      val minParents = minimizeParents(parents)
+      val validParents =
+        if (isTraitSignature)
           // java is unthrilled about seeing interfaces inherit from classes
-          val ok = parents filter (p => p.typeSymbol.isTrait || p.typeSymbol.isInterface)
-          // traits should always list Object.
-          if (ok.isEmpty || ok.head.typeSymbol != ObjectClass) ObjectTpe :: ok
-          else ok
-        }
-        else parents
-      )
+          minParents filter (p => isInterfaceOrTrait(p.typeSymbol))
+        else minParents
+
+      val ps = ensureClassAsFirstParent(validParents)
+
       (ps map boxedSig).mkString
     }
     def boxedSig(tp: Type) = jsig(tp, primitiveOK = false)
@@ -410,7 +437,6 @@ abstract class Erasure extends AddInterfaces
       def fulldef(sym: Symbol) =
         if (sym == NoSymbol) sym.toString
         else s"$sym: ${sym.tpe} in ${sym.owner}"
-      var noclash = true
       val clashErrors = mutable.Buffer[(Position, String)]()
       def clashError(what: String) = {
         val pos = if (member.owner == root) member.pos else root.pos
@@ -468,8 +494,12 @@ abstract class Erasure extends AddInterfaces
       if (!bridgeNeeded)
         return
 
-      val newFlags = (member.flags | BRIDGE | ARTIFACT) & ~(ACCESSOR | DEFERRED | LAZY | lateDEFERRED)
-      val bridge   = other.cloneSymbolImpl(root, newFlags) setPos root.pos
+      var newFlags = (member.flags | BRIDGE | ARTIFACT) & ~(ACCESSOR | DEFERRED | LAZY | lateDEFERRED)
+      // If `member` is a ModuleSymbol, the bridge should not also be a ModuleSymbol. Otherwise we
+      // end up with two module symbols with the same name in the same scope, which is surprising
+      // when implementing later phases.
+      if (member.isModule) newFlags = (newFlags | METHOD) & ~(MODULE | lateMETHOD | STABLE)
+      val bridge = other.cloneSymbolImpl(root, newFlags) setPos root.pos
 
       debuglog("generating bridge from %s (%s): %s to %s: %s".format(
         other, flagsToString(newFlags),
@@ -488,7 +518,7 @@ abstract class Erasure extends AddInterfaces
         ||  (checkBridgeOverrides(member, other, bridge) match {
               case Nil => true
               case es if member.owner.isAnonymousClass => resolveAnonymousBridgeClash(member, bridge); true
-              case es => for ((pos, msg) <- es) unit.error(pos, msg); false
+              case es => for ((pos, msg) <- es) reporter.error(pos, msg); false
             })
       )
 
@@ -724,7 +754,7 @@ abstract class Erasure extends AddInterfaces
         )
         val when = if (exitingRefchecks(lowType matches highType)) "" else " after erasure: " + exitingPostErasure(highType)
 
-        unit.error(pos,
+        reporter.error(pos,
           s"""|$what:
               |${exitingRefchecks(highString)} and
               |${exitingRefchecks(lowString)}
@@ -865,7 +895,7 @@ abstract class Erasure extends AddInterfaces
           fn match {
             case TypeApply(sel @ Select(qual, name), List(targ)) =>
               if (qual.tpe != null && isPrimitiveValueClass(qual.tpe.typeSymbol) && targ.tpe != null && targ.tpe <:< AnyRefTpe)
-                unit.error(sel.pos, "isInstanceOf cannot test if value types are references.")
+                reporter.error(sel.pos, "isInstanceOf cannot test if value types are references.")
 
               def mkIsInstanceOf(q: () => Tree)(tp: Type): Tree =
                 Apply(
@@ -952,7 +982,7 @@ abstract class Erasure extends AddInterfaces
                     case nme.length => nme.array_length
                     case nme.update => nme.array_update
                     case nme.clone_ => nme.array_clone
-                    case _          => unit.error(tree.pos, "Unexpected array member, no translation exists.") ; nme.NO_NAME
+                    case _          => reporter.error(tree.pos, "Unexpected array member, no translation exists.") ; nme.NO_NAME
                   }
                   gen.mkRuntimeCall(arrayMethodName, qual :: args)
                 }
@@ -1050,20 +1080,18 @@ abstract class Erasure extends AddInterfaces
             }
           }
 
-          def isAccessible(sym: Symbol) = localTyper.context.isAccessible(sym, sym.owner.thisType)
-          if (!isAccessible(owner) && qual.tpe != null) {
+          def isJvmAccessible(sym: Symbol) = (sym.isClass && !sym.isJavaDefined) || localTyper.context.isAccessible(sym, sym.owner.thisType)
+          if (!isJvmAccessible(owner) && qual.tpe != null) {
             qual match {
               case Super(_, _) =>
-                // Insert a cast here at your peril -- see SI-5162. Bail out if the target method is defined in
-                // Java, otherwise, we'd get an IllegalAccessError at runtime. If the target method is defined in
-                // Scala, however, we should have access.
-                if (owner.isJavaDefined) unit.error(tree.pos, s"Unable to access ${tree.symbol.fullLocationString} with a super reference.")
+                // Insert a cast here at your peril -- see SI-5162.
+                reporter.error(tree.pos, s"Unable to access ${tree.symbol.fullLocationString} with a super reference.")
                 tree
               case _ =>
                 // Todo: Figure out how qual.tpe could be null in the check above (it does appear in build where SwingWorker.this
                 // has a null type).
                 val qualSym = qual.tpe.widen.typeSymbol
-                if (isAccessible(qualSym) && !qualSym.isPackageClass && !qualSym.isPackageObjectClass) {
+                if (isJvmAccessible(qualSym) && !qualSym.isPackageClass && !qualSym.isPackageObjectClass) {
                   // insert cast to prevent illegal access error (see #4283)
                   // util.trace("insert erasure cast ") (*/
                   treeCopy.Select(tree, gen.mkAttributedCast(qual, qual.tpe.widen), name) //)
@@ -1135,7 +1163,7 @@ abstract class Erasure extends AddInterfaces
         val tree2 = mixinTransformer.transform(tree1)
         // debuglog("tree after addinterfaces: \n" + tree2)
 
-        newTyper(rootContext(unit, tree, erasedTypes = true)).typed(tree2)
+        newTyper(rootContextPostTyper(unit, tree)).typed(tree2)
       }
     }
   }
