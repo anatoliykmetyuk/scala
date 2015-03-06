@@ -47,7 +47,7 @@ class CannotHaveAttrsTest {
       assertEquals(t.tpe, NoType)
     }
 
-  @Test
+  @Test @org.junit.Ignore // SI-8816
   def nonDefaultPosAssignmentFails = {
     val pos = new OffsetPosition(null, 0)
     attrlessTrees.foreach { t =>
@@ -56,12 +56,24 @@ class CannotHaveAttrsTest {
     }
   }
 
-  @Test
+  @Test @org.junit.Ignore // SI-8816
   def nonDefaultTpeAssignmentFails = {
     val tpe = typeOf[Int]
     attrlessTrees.foreach { t =>
       assertThrows[IllegalArgumentException] { t.tpe = tpe }
       assertThrows[IllegalArgumentException] { t.setType(tpe) }
+    }
+  }
+
+  class Attach
+  @Test
+  def attachmentsAreIgnored = {
+    attrlessTrees.foreach { t =>
+      t.setAttachments(NoPosition.update(new Attach))
+      assert(t.attachments == NoPosition)
+      t.updateAttachment(new Attach)
+      assert(t.attachments == NoPosition)
+      t.removeAttachment[Attach] // no exception
     }
   }
 }

@@ -211,7 +211,12 @@ abstract class UnPickler {
         def fromName(name: Name) = name.toTermName match {
           case nme.ROOT     => loadingMirror.RootClass
           case nme.ROOTPKG  => loadingMirror.RootPackage
-          case _            => adjust(owner.info.decl(name))
+          case _            =>
+            val decl = owner match {
+              case stub: StubSymbol => NoSymbol // SI-8502 Don't call .info and fail the stub
+              case _ => owner.info.decl(name)
+            }
+            adjust(decl)
         }
         def nestedObjectSymbol: Symbol = {
           // If the owner is overloaded (i.e. a method), it's not possible to select the
@@ -243,8 +248,14 @@ abstract class UnPickler {
            } getOrElse "")
         }
 
+        def localDummy = {
+          if (nme.isLocalDummyName(name))
+            owner.newLocalDummy(NoPosition)
+          else NoSymbol
+        }
+
         // (1) Try name.
-        fromName(name) orElse {
+        localDummy orElse fromName(name) orElse {
           // (2) Try with expanded name.  Can happen if references to private
           // symbols are read from outside: for instance when checking the children
           // of a class.  See #1722.
@@ -254,12 +265,13 @@ abstract class UnPickler {
               // (4) Call the mirror's "missing" hook.
               adjust(mirrorThatLoaded(owner).missingHook(owner, name)) orElse {
                 // (5) Create a stub symbol to defer hard failure a little longer.
-                val fullName = s"${owner.fullName}.$name"
+                val advice = moduleAdvice(s"${owner.fullName}.$name")
                 val missingMessage =
-                  s"""|bad symbolic reference to $fullName encountered in class file '$filename'.
-                      |Cannot access ${name.longString} in ${owner.kindString} ${owner.fullName}. The current classpath may be
-                      |missing a definition for $fullName, or $filename may have been compiled against a version that's
-                      |incompatible with the one found on the current classpath.${moduleAdvice(fullName)}""".stripMargin
+                  s"""|missing or invalid dependency detected while loading class file '$filename'.
+                      |Could not access ${name.longString} in ${owner.kindString} ${owner.fullName},
+                      |because it (or its dependencies) are missing. Check your build definition for
+                      |missing or conflicting dependencies. (Re-run with `-Ylog-classpath` to see the problematic classpath.)
+                      |A full rebuild may help if '$filename' was compiled against an incompatible version of ${owner.fullName}.$advice""".stripMargin
                 owner.newStubSymbol(name, missingMessage)
               }
             }
@@ -290,6 +302,27 @@ abstract class UnPickler {
       def pflags       = flags & PickledFlags
 
       def finishSym(sym: Symbol): Symbol = {
+        /**
+         * member symbols (symbols owned by a class) are added to the class's scope, with a number
+         * of exceptions:
+         *
+         * (.) ...
+         * (1) `local child` represents local child classes, see comment in Pickler.putSymbol.
+         *     Since it is not a member, it should not be entered in the owner's scope.
+         * (2) Similarly, we ignore local dummy symbols, as seen in SI-8868
+         */
+        def shouldEnterInOwnerScope = {
+          sym.owner.isClass &&
+            sym != classRoot &&
+            sym != moduleRoot &&
+            !sym.isModuleClass &&
+            !sym.isRefinementClass &&
+            !sym.isTypeParameter &&
+            !sym.isExistentiallyBound &&
+            sym.rawname != tpnme.LOCAL_CHILD && // (1)
+            !nme.isLocalDummyName(sym.rawname)  // (2)
+        }
+
         markFlagsCompleted(sym)(mask = AllFlags)
         sym.privateWithin = privateWithin
         sym.info = (
@@ -302,8 +335,7 @@ abstract class UnPickler {
             newLazyTypeRefAndAlias(inforef, readNat())
           }
         )
-        if (sym.owner.isClass && sym != classRoot && sym != moduleRoot &&
-            !sym.isModuleClass && !sym.isRefinementClass && !sym.isTypeParameter && !sym.isExistentiallyBound)
+        if (shouldEnterInOwnerScope)
           symScope(sym.owner) enter sym
 
         sym
@@ -362,14 +394,24 @@ abstract class UnPickler {
         case CLASSINFOtpe => ClassInfoType(parents, symScope(clazz), clazz)
       }
 
+      def readThisType(): Type = {
+        val sym = readSymbolRef() match {
+          case stub: StubSymbol if !stub.isClass =>
+            // SI-8502 This allows us to create a stub for a unpickled reference to `missingPackage.Foo`.
+            stub.owner.newStubSymbol(stub.name.toTypeName, stub.missingMessage)
+          case sym => sym
+        }
+        ThisType(sym)
+      }
+
       // We're stuck with the order types are pickled in, but with judicious use
       // of named parameters we can recapture a declarative flavor in a few cases.
       // But it's still a rat's nest of adhockery.
       (tag: @switch) match {
         case NOtpe                     => NoType
         case NOPREFIXtpe               => NoPrefix
-        case THIStpe                   => ThisType(readSymbolRef())
-        case SINGLEtpe                 => SingleType(readTypeRef(), readSymbolRef())
+        case THIStpe                   => readThisType()
+        case SINGLEtpe                 => SingleType(readTypeRef(), readSymbolRef().filter(_.isStable)) // SI-7596 account for overloading
         case SUPERtpe                  => SuperType(readTypeRef(), readTypeRef())
         case CONSTANTtpe               => ConstantType(readConstantRef())
         case TYPEREFtpe                => TypeRef(readTypeRef(), readSymbolRef(), readTypes())
@@ -681,10 +723,24 @@ abstract class UnPickler {
       private val p = phase
       protected def completeInternal(sym: Symbol) : Unit = try {
         val tp = at(i, () => readType(sym.isTerm)) // after NMT_TRANSITION, revert `() => readType(sym.isTerm)` to `readType`
-        if (p ne null)
-          slowButSafeEnteringPhase(p) (sym setInfo tp)
+
+        // This is a temporary fix allowing to read classes generated by an older, buggy pickler.
+        // See the generation of the LOCAL_CHILD class in Pickler.scala. In an earlier version, the
+        // pickler did not add the ObjectTpe superclass, it used a trait as the first parent. This
+        // tripped an assertion in AddInterfaces which checks that the first parent is not a trait.
+        // This workaround can probably be removed in 2.12, because the 2.12 compiler is supposed
+        // to only read classfiles generated by 2.12.
+        val fixLocalChildTp = if (sym.rawname == tpnme.LOCAL_CHILD) tp match {
+            case ClassInfoType(superClass :: traits, decls, typeSymbol) if superClass.typeSymbol.isTrait =>
+              ClassInfoType(definitions.ObjectTpe :: superClass :: traits, decls, typeSymbol)
+            case _ => tp
+          } else tp
+
+        if (p ne null) {
+          slowButSafeEnteringPhase(p)(sym setInfo fixLocalChildTp)
+        }
         if (currentRunId != definedAtRunId)
-          sym.setInfo(adaptToNewRunMap(tp))
+          sym.setInfo(adaptToNewRunMap(fixLocalChildTp))
       }
       catch {
         case e: MissingRequirementError => throw toTypeError(e)

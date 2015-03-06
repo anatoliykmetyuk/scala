@@ -9,8 +9,7 @@ package backend.jvm
 
 import scala.tools.asm
 import scala.annotation.switch
-import scala.collection.{ immutable, mutable }
-import collection.convert.Wrappers.JListWrapper
+import scala.collection.mutable
 
 /*
  *  A high-level facade to the ASM API for bytecode generation.
@@ -19,22 +18,24 @@ import collection.convert.Wrappers.JListWrapper
  *  @version 1.0
  *
  */
-abstract class BCodeIdiomatic extends BCodeGlue {
+abstract class BCodeIdiomatic extends SubComponent {
+  val bTypes = new BTypesFromSymbols[global.type](global)
 
   import global._
+  import bTypes._
+  import coreBTypes._
 
   val classfileVersion: Int = settings.target.value match {
     case "jvm-1.5"     => asm.Opcodes.V1_5
     case "jvm-1.6"     => asm.Opcodes.V1_6
     case "jvm-1.7"     => asm.Opcodes.V1_7
+    case "jvm-1.8"     => asm.Opcodes.V1_8
   }
 
   val majorVersion: Int = (classfileVersion & 0xFF)
   val emitStackMapFrame = (majorVersion >= 50)
 
-  def mkFlags(args: Int*) = args.foldLeft(0)(_ | _)
-
-  val extraProc: Int = mkFlags(
+  val extraProc: Int = GenBCode.mkFlags(
     asm.ClassWriter.COMPUTE_MAXS,
     if (emitStackMapFrame) asm.ClassWriter.COMPUTE_FRAMES else 0
   )
@@ -43,15 +44,6 @@ abstract class BCodeIdiomatic extends BCodeGlue {
 
   val CLASS_CONSTRUCTOR_NAME    = "<clinit>"
   val INSTANCE_CONSTRUCTOR_NAME = "<init>"
-
-  val ObjectReference   = brefType("java/lang/Object")
-  val AnyRefReference   = ObjectReference
-  val objArrayReference = arrayOf(ObjectReference)
-
-  val JAVA_LANG_OBJECT  = ObjectReference
-  val JAVA_LANG_STRING  = brefType("java/lang/String")
-
-  var StringBuilderReference: BType = null
 
   val EMPTY_STRING_ARRAY   = Array.empty[String]
   val EMPTY_INT_ARRAY      = Array.empty[Int]
@@ -106,17 +98,6 @@ abstract class BCodeIdiomatic extends BCodeGlue {
       i -= 1
     }
     a
-  }
-
-  /*
-   * The type of 1-dimensional arrays of `elem` type.
-   * The invoker is responsible for tracking (if needed) the inner class given by the elem BType.
-   *
-   * must-single-thread
-   */
-  final def arrayOf(elem: BType): BType = {
-    assert(!(elem.isUnitType), s"The element type of an array can't be: $elem")
-    brefType("[" + elem.getDescriptor)
   }
 
   /* Just a namespace for utilities that encapsulate MethodVisitor idioms.
@@ -242,12 +223,12 @@ abstract class BCodeIdiomatic extends BCodeGlue {
     final def genStringConcat(el: BType) {
 
       val jtype =
-        if (el.isArray || el.hasObjectSort) JAVA_LANG_OBJECT
-        else el;
+        if (el.isArray || el.isClass) ObjectReference
+        else el
 
-      val bt = BType.getMethodType(StringBuilderReference, Array(jtype))
+      val bt = MethodBType(List(jtype), StringBuilderReference)
 
-      invokevirtual(StringBuilderClassName, "append", bt.getDescriptor)
+      invokevirtual(StringBuilderClassName, "append", bt.descriptor)
     }
 
     /*
@@ -268,8 +249,8 @@ abstract class BCodeIdiomatic extends BCodeGlue {
     final def emitT2T(from: BType, to: BType) {
 
       assert(
-        from.isNonUnitValueType && to.isNonUnitValueType,
-        s"Cannot emit primitive conversion from $from to $to"
+        from.isNonVoidPrimitiveType && to.isNonVoidPrimitiveType,
+        s"Cannot emit primitive conversion from $from to $to - ${global.currentUnit}"
       )
 
           def pickOne(opcs: Array[Int]) { // TODO index on to.sort
@@ -290,37 +271,37 @@ abstract class BCodeIdiomatic extends BCodeGlue {
       assert(from != BOOL && to != BOOL, s"inconvertible types : $from -> $to")
 
       // We're done with BOOL already
-      (from.sort: @switch) match {
+      from match {
 
         // using `asm.Type.SHORT` instead of `BType.SHORT` because otherwise "warning: could not emit switch for @switch annotated match"
 
-        case asm.Type.BYTE  => pickOne(JCodeMethodN.fromByteT2T)
-        case asm.Type.SHORT => pickOne(JCodeMethodN.fromShortT2T)
-        case asm.Type.CHAR  => pickOne(JCodeMethodN.fromCharT2T)
-        case asm.Type.INT   => pickOne(JCodeMethodN.fromIntT2T)
+        case BYTE  => pickOne(JCodeMethodN.fromByteT2T)
+        case SHORT => pickOne(JCodeMethodN.fromShortT2T)
+        case CHAR  => pickOne(JCodeMethodN.fromCharT2T)
+        case INT   => pickOne(JCodeMethodN.fromIntT2T)
 
-        case asm.Type.FLOAT  =>
+        case FLOAT  =>
           import asm.Opcodes.{ F2L, F2D, F2I }
-          (to.sort: @switch) match {
-            case asm.Type.LONG    => emit(F2L)
-            case asm.Type.DOUBLE  => emit(F2D)
-            case _                => emit(F2I); emitT2T(INT, to)
+          to match {
+            case LONG    => emit(F2L)
+            case DOUBLE  => emit(F2D)
+            case _       => emit(F2I); emitT2T(INT, to)
           }
 
-        case asm.Type.LONG   =>
+        case LONG   =>
           import asm.Opcodes.{ L2F, L2D, L2I }
-          (to.sort: @switch) match {
-            case asm.Type.FLOAT   => emit(L2F)
-            case asm.Type.DOUBLE  => emit(L2D)
-            case _                => emit(L2I); emitT2T(INT, to)
+          to match {
+            case FLOAT   => emit(L2F)
+            case DOUBLE  => emit(L2D)
+            case _       => emit(L2I); emitT2T(INT, to)
           }
 
-        case asm.Type.DOUBLE =>
+        case DOUBLE =>
           import asm.Opcodes.{ D2L, D2F, D2I }
-          (to.sort: @switch) match {
-            case asm.Type.FLOAT   => emit(D2F)
-            case asm.Type.LONG    => emit(D2L)
-            case _                => emit(D2I); emitT2T(INT, to)
+          to match {
+            case FLOAT   => emit(D2F)
+            case LONG    => emit(D2L)
+            case _       => emit(D2I); emitT2T(INT, to)
           }
       }
     } // end of emitT2T()
@@ -372,24 +353,26 @@ abstract class BCodeIdiomatic extends BCodeGlue {
 
     // can-multi-thread
     final def newarray(elem: BType) {
-      if (elem.isRefOrArrayType || elem.isPhantomType ) {
-        /* phantom type at play in `Array(null)`, SI-1513. On the other hand, Array(()) has element type `scala.runtime.BoxedUnit` which hasObjectSort. */
-        jmethod.visitTypeInsn(Opcodes.ANEWARRAY, elem.getInternalName)
-      } else {
-        val rand = {
-          // using `asm.Type.SHORT` instead of `BType.SHORT` because otherwise "warning: could not emit switch for @switch annotated match"
-          (elem.sort: @switch) match {
-            case asm.Type.BOOLEAN => Opcodes.T_BOOLEAN
-            case asm.Type.BYTE    => Opcodes.T_BYTE
-            case asm.Type.SHORT   => Opcodes.T_SHORT
-            case asm.Type.CHAR    => Opcodes.T_CHAR
-            case asm.Type.INT     => Opcodes.T_INT
-            case asm.Type.LONG    => Opcodes.T_LONG
-            case asm.Type.FLOAT   => Opcodes.T_FLOAT
-            case asm.Type.DOUBLE  => Opcodes.T_DOUBLE
+      elem match {
+        case c: RefBType =>
+          /* phantom type at play in `Array(null)`, SI-1513. On the other hand, Array(()) has element type `scala.runtime.BoxedUnit` which isObject. */
+          jmethod.visitTypeInsn(Opcodes.ANEWARRAY, c.classOrArrayType)
+        case _ =>
+          assert(elem.isNonVoidPrimitiveType)
+          val rand = {
+            // using `asm.Type.SHORT` instead of `BType.SHORT` because otherwise "warning: could not emit switch for @switch annotated match"
+            elem match {
+              case BOOL   => Opcodes.T_BOOLEAN
+              case BYTE   => Opcodes.T_BYTE
+              case SHORT  => Opcodes.T_SHORT
+              case CHAR   => Opcodes.T_CHAR
+              case INT    => Opcodes.T_INT
+              case LONG   => Opcodes.T_LONG
+              case FLOAT  => Opcodes.T_FLOAT
+              case DOUBLE => Opcodes.T_DOUBLE
+            }
           }
-        }
-        jmethod.visitIntInsn(Opcodes.NEWARRAY, rand)
+          jmethod.visitIntInsn(Opcodes.NEWARRAY, rand)
       }
     }
 
@@ -409,19 +392,19 @@ abstract class BCodeIdiomatic extends BCodeGlue {
 
     // can-multi-thread
     final def invokespecial(owner: String, name: String, desc: String) {
-      jmethod.visitMethodInsn(Opcodes.INVOKESPECIAL, owner, name, desc)
+      jmethod.visitMethodInsn(Opcodes.INVOKESPECIAL, owner, name, desc, false)
     }
     // can-multi-thread
     final def invokestatic(owner: String, name: String, desc: String) {
-      jmethod.visitMethodInsn(Opcodes.INVOKESTATIC, owner, name, desc)
+      jmethod.visitMethodInsn(Opcodes.INVOKESTATIC, owner, name, desc, false)
     }
     // can-multi-thread
     final def invokeinterface(owner: String, name: String, desc: String) {
-      jmethod.visitMethodInsn(Opcodes.INVOKEINTERFACE, owner, name, desc)
+      jmethod.visitMethodInsn(Opcodes.INVOKEINTERFACE, owner, name, desc, true)
     }
     // can-multi-thread
     final def invokevirtual(owner: String, name: String, desc: String) {
-      jmethod.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner, name, desc)
+      jmethod.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner, name, desc, false)
     }
 
     // can-multi-thread
@@ -529,7 +512,7 @@ abstract class BCodeIdiomatic extends BCodeGlue {
     // can-multi-thread
     final def emitVarInsn(opc: Int, idx: Int, tk: BType) {
       assert((opc == Opcodes.ILOAD) || (opc == Opcodes.ISTORE), opc)
-      jmethod.visitVarInsn(tk.getOpcode(opc), idx)
+      jmethod.visitVarInsn(tk.typedOpcode(opc), idx)
     }
 
     // ---------------- array load and store ----------------
@@ -538,7 +521,7 @@ abstract class BCodeIdiomatic extends BCodeGlue {
     final def emitTypeBased(opcs: Array[Int], tk: BType) {
       assert(tk != UNIT, tk)
       val opc = {
-        if (tk.isRefOrArrayType) {  opcs(0) }
+        if (tk.isRef) { opcs(0) }
         else if (tk.isIntSizedType) {
           (tk: @unchecked) match {
             case BOOL | BYTE     => opcs(1)
@@ -563,11 +546,11 @@ abstract class BCodeIdiomatic extends BCodeGlue {
     final def emitPrimitive(opcs: Array[Int], tk: BType) {
       val opc = {
         // using `asm.Type.SHORT` instead of `BType.SHORT` because otherwise "warning: could not emit switch for @switch annotated match"
-        (tk.sort: @switch) match {
-          case asm.Type.LONG   => opcs(1)
-          case asm.Type.FLOAT  => opcs(2)
-          case asm.Type.DOUBLE => opcs(3)
-          case _               => opcs(0)
+        tk match {
+          case LONG   => opcs(1)
+          case FLOAT  => opcs(2)
+          case DOUBLE => opcs(3)
+          case _      => opcs(0)
         }
       }
       emit(opc)
@@ -582,15 +565,14 @@ abstract class BCodeIdiomatic extends BCodeGlue {
     // ---------------- type checks and casts ----------------
 
     // can-multi-thread
-    final def isInstance(tk: BType) {
-      jmethod.visitTypeInsn(Opcodes.INSTANCEOF, tk.getInternalName)
+    final def isInstance(tk: RefBType): Unit = {
+      jmethod.visitTypeInsn(Opcodes.INSTANCEOF, tk.classOrArrayType)
     }
 
     // can-multi-thread
-    final def checkCast(tk: BType) {
-      assert(tk.isRefOrArrayType, s"checkcast on primitive type: $tk")
+    final def checkCast(tk: RefBType): Unit = {
       // TODO ICode also requires: but that's too much, right? assert(!isBoxedType(tk),     "checkcast on boxed type: " + tk)
-      jmethod.visitTypeInsn(Opcodes.CHECKCAST, tk.getInternalName)
+      jmethod.visitTypeInsn(Opcodes.CHECKCAST, tk.classOrArrayType)
     }
 
   } // end of class JCodeMethodN
@@ -650,7 +632,7 @@ abstract class BCodeIdiomatic extends BCodeGlue {
    */
   final def coercionTo(code: Int): BType = {
     import scalaPrimitives._
-    (code: @scala.annotation.switch) match {
+    (code: @switch) match {
       case B2B | C2B | S2B | I2B | L2B | F2B | D2B => BYTE
       case B2C | C2C | S2C | I2C | L2C | F2C | D2C => CHAR
       case B2S | C2S | S2S | I2S | L2S | F2S | D2S => SHORT
@@ -659,21 +641,6 @@ abstract class BCodeIdiomatic extends BCodeGlue {
       case B2F | C2F | S2F | I2F | L2F | F2F | D2F => FLOAT
       case B2D | C2D | S2D | I2D | L2D | F2D | D2D => DOUBLE
     }
-  }
-
-  final val typeOfArrayOp: Map[Int, BType] = {
-    import scalaPrimitives._
-    Map(
-      (List(ZARRAY_LENGTH, ZARRAY_GET, ZARRAY_SET) map (_ -> BOOL))   ++
-      (List(BARRAY_LENGTH, BARRAY_GET, BARRAY_SET) map (_ -> BYTE))   ++
-      (List(SARRAY_LENGTH, SARRAY_GET, SARRAY_SET) map (_ -> SHORT))  ++
-      (List(CARRAY_LENGTH, CARRAY_GET, CARRAY_SET) map (_ -> CHAR))   ++
-      (List(IARRAY_LENGTH, IARRAY_GET, IARRAY_SET) map (_ -> INT))    ++
-      (List(LARRAY_LENGTH, LARRAY_GET, LARRAY_SET) map (_ -> LONG))   ++
-      (List(FARRAY_LENGTH, FARRAY_GET, FARRAY_SET) map (_ -> FLOAT))  ++
-      (List(DARRAY_LENGTH, DARRAY_GET, DARRAY_SET) map (_ -> DOUBLE)) ++
-      (List(OARRAY_LENGTH, OARRAY_GET, OARRAY_SET) map (_ -> ObjectReference)) : _*
-    )
   }
 
   /*

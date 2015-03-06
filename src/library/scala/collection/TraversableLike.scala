@@ -345,8 +345,8 @@ trait TraversableLike[+A, +Repr] extends Any
    *  $mayNotTerminateInf
    *
    *  @param   p     the predicate used to test elements.
-   *  @return        `true` if the given predicate `p` holds for all elements
-   *                 of this $coll, otherwise `false`.
+   *  @return        `true`  if this $coll is empty, otherwise `true` if the given predicate `p`
+    *                holds for all elements of this $coll, otherwise `false`.
    */
   def forall(p: A => Boolean): Boolean = {
     var result = true
@@ -362,8 +362,8 @@ trait TraversableLike[+A, +Repr] extends Any
    *  $mayNotTerminateInf
    *
    *  @param   p     the predicate used to test elements.
-   *  @return        `true` if the given predicate `p` holds for some of the
-   *                 elements of this $coll, otherwise `false`.
+   *  @return        `false` if this $coll is empty, otherwise `true` if the given predicate `p`
+    *                holds for some of the elements of this $coll, otherwise `false`
    */
   def exists(p: A => Boolean): Boolean = {
     var result = false
@@ -419,7 +419,7 @@ trait TraversableLike[+A, +Repr] extends Any
   /** Selects the first element of this $coll.
    *  $orderDependent
    *  @return  the first element of this $coll.
-   *  @throws `NoSuchElementException` if the $coll is empty.
+   *  @throws NoSuchElementException if the $coll is empty.
    */
   def head: A = {
     var result: () => A = () => throw new NoSuchElementException
@@ -473,7 +473,7 @@ trait TraversableLike[+A, +Repr] extends Any
    *  $orderDependent
    *  @return  a $coll consisting of all elements of this $coll
    *           except the last one.
-   *  @throws `UnsupportedOperationException` if the $coll is empty.
+   *  @throws UnsupportedOperationException if the $coll is empty.
    */
   def init: Repr = {
     if (isEmpty) throw new UnsupportedOperationException("empty.init")

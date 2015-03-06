@@ -296,7 +296,7 @@ trait Namers extends MethodSynthesis {
       }
       tree.symbol match {
         case NoSymbol => try dispatch() catch typeErrorHandler(tree, this.context)
-        case sym      => enterExistingSym(sym)
+        case sym      => enterExistingSym(sym, tree)
       }
     }
 
@@ -413,6 +413,7 @@ trait Namers extends MethodSynthesis {
         if (isRedefinition) {
           updatePosFlags(existing, tree.pos, tree.mods.flags)
           setPrivateWithin(tree, existing)
+          clearRenamedCaseAccessors(existing)
           existing
         }
         else assignAndEnterSymbol(tree) setFlag inConstructorFlag
@@ -443,7 +444,7 @@ trait Namers extends MethodSynthesis {
         && clazz.exists
       )
       if (fails) {
-        context.unit.error(tree.pos, (
+        reporter.error(tree.pos, (
             s"Companions '$clazz' and '$module' must be defined in same file:\n"
           + s"  Found in ${clazz.sourceFile.canonicalPath} and ${module.sourceFile.canonicalPath}")
         )
@@ -583,7 +584,7 @@ trait Namers extends MethodSynthesis {
           // more than one hidden name, the second will not be warned.
           // So it is the position of the actual hidden name.
           //
-          // Note: java imports have precence over definitions in the same package
+          // Note: java imports have precedence over definitions in the same package
           //       so don't warn for them. There is a corresponding special treatment
           //       in the shadowing rules in typedIdent to (SI-7232). In any case,
           //       we shouldn't be emitting warnings for .java source files.
@@ -717,8 +718,8 @@ trait Namers extends MethodSynthesis {
         m.updateAttachment(new ConstructorDefaultsAttachment(tree, null))
       }
       val owner = tree.symbol.owner
-      if (settings.lint && owner.isPackageObjectClass && !mods.isImplicit) {
-        context.unit.warning(tree.pos,
+      if (settings.warnPackageObjectClasses && owner.isPackageObjectClass && !mods.isImplicit) {
+        reporter.warning(tree.pos,
           "it is not recommended to define classes/objects inside of package objects.\n" +
           "If possible, define " + tree.symbol + " in " + owner.skipPackageObject + " instead."
         )
@@ -730,13 +731,15 @@ trait Namers extends MethodSynthesis {
           log("enter implicit wrapper "+tree+", owner = "+owner)
           enterImplicitWrapper(tree)
         }
-        else context.unit.error(tree.pos, "implicit classes must accept exactly one primary constructor parameter")
+        else reporter.error(tree.pos, "implicit classes must accept exactly one primary constructor parameter")
       }
       validateCompanionDefs(tree)
     }
 
     // Hooks which are overridden in the presentation compiler
-    def enterExistingSym(sym: Symbol): Context = this.context
+    def enterExistingSym(sym: Symbol, tree: Tree): Context = {
+      this.context
+    }
     def enterIfNotThere(sym: Symbol) { }
 
     def enterSyntheticSym(tree: Tree): Symbol = {
@@ -1040,10 +1043,10 @@ trait Namers extends MethodSynthesis {
        * so the resulting type is a valid external method type, it does not contain (references to) skolems.
        */
       def thisMethodType(restpe: Type) = {
-        val checkDependencies = new DependentTypeChecker(context)(this)
-        checkDependencies check vparamSymss
-        // DEPMETTODO: check not needed when they become on by default
-        checkDependencies(restpe)
+        if (vparamSymss.lengthCompare(0) > 0) { // OPT fast path for methods of 0-1 parameter lists
+          val checkDependencies = new DependentTypeChecker(context)(this)
+          checkDependencies check vparamSymss
+        }
 
         val makeMethodType = (vparams: List[Symbol], restpe: Type) => {
           // TODODEPMET: check that we actually don't need to do anything here
@@ -1177,7 +1180,13 @@ trait Namers extends MethodSynthesis {
         }
       }
 
-      addDefaultGetters(meth, ddef, vparamss, tparams, overriddenSymbol(methResTp))
+      val overridden = {
+        val isConstr   = meth.isConstructor
+        if (isConstr || !methOwner.isClass) NoSymbol else overriddenSymbol(methResTp)
+      }
+      val hasDefaults = mexists(vparamss)(_.symbol.hasDefault) || mexists(overridden.paramss)(_.hasDefault)
+      if (hasDefaults)
+        addDefaultGetters(meth, ddef, vparamss, tparams, overridden)
 
       // fast track macros, i.e. macros defined inside the compiler, are hardcoded
       // hence we make use of that and let them have whatever right-hand side they need
@@ -1219,7 +1228,7 @@ trait Namers extends MethodSynthesis {
      * typechecked, the corresponding param would not yet have the "defaultparam"
      * flag.
      */
-    private def addDefaultGetters(meth: Symbol, ddef: DefDef, vparamss: List[List[ValDef]], tparams: List[TypeDef], overriddenSymbol: => Symbol) {
+    private def addDefaultGetters(meth: Symbol, ddef: DefDef, vparamss: List[List[ValDef]], tparams: List[TypeDef], overridden: Symbol) {
       val DefDef(_, _, rtparams0, rvparamss0, _, _) = resetAttrs(ddef.duplicate)
       // having defs here is important to make sure that there's no sneaky tree sharing
       // in methods with multiple default parameters
@@ -1227,7 +1236,6 @@ trait Namers extends MethodSynthesis {
       def rvparamss = rvparamss0.map(_.map(_.duplicate))
       val methOwner  = meth.owner
       val isConstr   = meth.isConstructor
-      val overridden = if (isConstr || !methOwner.isClass) NoSymbol else overriddenSymbol
       val overrides  = overridden != NoSymbol && !overridden.isOverloaded
       // value parameters of the base class (whose defaults might be overridden)
       var baseParamss = (vparamss, overridden.tpe.paramss) match {
@@ -1489,8 +1497,7 @@ trait Namers extends MethodSynthesis {
           case defn: MemberDef =>
             val ainfos = defn.mods.annotations filterNot (_ eq null) map { ann =>
               val ctx    = typer.context
-              val annCtx = ctx.make(ann)
-              annCtx.setReportErrors()
+              val annCtx = ctx.makeNonSilent(ann)
               // need to be lazy, #1782. beforeTyper to allow inferView in annotation args, SI-5892.
               AnnotationInfo lazily {
                 enteringTyper(newTyper(annCtx) typedAnnotation ann)
@@ -1639,6 +1646,7 @@ trait Namers extends MethodSynthesis {
         def symbolAllowsDeferred = (
              sym.isValueParameter
           || sym.isTypeParameterOrSkolem
+          || (sym.isAbstractType && sym.owner.isClass)
           || context.tree.isInstanceOf[ExistentialTypeTree]
         )
         // Does the symbol owner require no undefined members?
@@ -1745,7 +1753,6 @@ trait Namers extends MethodSynthesis {
         for (p <- vps)
           this(p.info)
         // can only refer to symbols in earlier parameter sections
-        // (if the extension is enabled)
         okParams ++= vps
       }
     }

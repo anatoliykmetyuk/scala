@@ -111,7 +111,7 @@ class ListSet[A] extends AbstractSet[A]
 
   /** Creates a new iterator over all elements contained in this set.
    *
-   *  @throws Predef.NoSuchElementException
+   *  @throws java.util.NoSuchElementException
    *  @return the new iterator
    */
   def iterator: Iterator[A] = new AbstractIterator[A] {
@@ -127,16 +127,23 @@ class ListSet[A] extends AbstractSet[A]
   }
 
   /**
-   *  @throws Predef.NoSuchElementException
+   *  @throws java.util.NoSuchElementException
    */
   override def head: A = throw new NoSuchElementException("Set has no elements")
 
   /**
-   *  @throws Predef.NoSuchElementException
+   *  @throws java.util.NoSuchElementException
    */
   override def tail: ListSet[A] = throw new NoSuchElementException("Next of an empty set")
 
   override def stringPrefix = "ListSet"
+
+  /** Returns this $coll as an immutable set.
+   *  
+   *  A new set will not be built; lazy collections will stay lazy.
+   */
+  @deprecatedOverriding("Immutable sets should do nothing on toSet but return themselves cast as a Set.", "2.11.0")
+  override def toSet[B >: A]: Set[B] = this.asInstanceOf[Set[B]]
 
   /** Represents an entry in the `ListSet`.
    */

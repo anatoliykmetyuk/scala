@@ -64,7 +64,9 @@ trait InteractiveAnalyzer extends Analyzer {
     // that case the definitions that were already attributed as
     // well as any default parameters of such methods need to be
     // re-entered in the current scope.
-    override def enterExistingSym(sym: Symbol): Context = {
+    //
+    // Tested in test/files/presentation/t8941b
+    override def enterExistingSym(sym: Symbol, tree: Tree): Context = {
       if (sym != null && sym.owner.isTerm) {
         enterIfNotThere(sym)
         if (sym.isLazy)
@@ -72,8 +74,17 @@ trait InteractiveAnalyzer extends Analyzer {
 
         for (defAtt <- sym.attachments.get[DefaultsOfLocalMethodAttachment])
           defAtt.defaultGetters foreach enterIfNotThere
+      } else if (sym != null && sym.isClass && sym.isImplicit) {
+        val owningInfo = sym.owner.info
+        val existingDerivedSym = owningInfo.decl(sym.name.toTermName).filter(sym => sym.isSynthetic && sym.isMethod)
+        existingDerivedSym.alternatives foreach (owningInfo.decls.unlink)
+        val defTree = tree match {
+          case dd: DocDef => dd.definition // See SI-9011, Scala IDE's presentation compiler incorporates ScalaDocGlobal with InterativeGlobal, so we have to unwrap DocDefs.
+          case _ => tree
+        }
+        enterImplicitWrapper(defTree.asInstanceOf[ClassDef])
       }
-      super.enterExistingSym(sym)
+      super.enterExistingSym(sym, tree)
     }
     override def enterIfNotThere(sym: Symbol) {
       val scope = context.scope
@@ -121,8 +132,8 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     else NullLogger
 
   import log.logreplay
-  debugLog("logger: " + log.getClass + " writing to " + (new java.io.File(logName)).getAbsolutePath)
-  debugLog("classpath: "+classPath)
+  debugLog(s"logger: ${log.getClass} writing to ${(new java.io.File(logName)).getAbsolutePath}")
+  debugLog(s"classpath: $classPath")
 
   private var curTime = System.nanoTime
   private def timeStep = {
@@ -142,8 +153,6 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   // don't keep the original owner in presentation compiler runs
   // (the map will grow indefinitely, and the only use case is the backend)
   override protected def saveOriginalOwner(sym: Symbol) { }
-  override protected def originalEnclosingMethod(sym: Symbol) =
-    abort("originalOwner is not kept in presentation compiler runs.")
 
   override def forInteractive = true
   override protected def synchronizeNames = true
@@ -734,7 +743,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     }
   }
 
-  private def reloadSource(source: SourceFile) {
+  private[interactive] def reloadSource(source: SourceFile) {
     val unit = new RichCompilationUnit(source)
     unitOfFile(source.file) = unit
     toBeRemoved -= source.file
@@ -783,7 +792,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   }
 
   /** A fully attributed tree located at position `pos` */
-  private def typedTreeAt(pos: Position): Tree = getUnit(pos.source) match {
+  private[interactive] def typedTreeAt(pos: Position): Tree = getUnit(pos.source) match {
     case None =>
       reloadSources(List(pos.source))
       try typedTreeAt(pos)

@@ -94,6 +94,7 @@ object Option {
  *  @define bfinfo an implicit value of class `CanBuildFrom` which determines the result class `That` from the current
  *    representation type `Repr` and the new element type `B`.
  */
+@SerialVersionUID(-114498752079829388L) // value computed by serialver for 2.11.2, annotation added in 2.11.4
 sealed abstract class Option[+A] extends Product with Serializable {
   self =>
 
@@ -107,7 +108,7 @@ sealed abstract class Option[+A] extends Product with Serializable {
 
   /** Returns the option's value.
    *  @note The option must be nonEmpty.
-   *  @throws Predef.NoSuchElementException if the option is empty.
+   *  @throws java.util.NoSuchElementException if the option is empty.
    */
   def get: A
 
@@ -211,6 +212,17 @@ sealed abstract class Option[+A] extends Product with Serializable {
 
   /** Tests whether the option contains a given value as an element.
    *
+   *  @example {{{
+   *  // Returns true because Some instance contains string "something" which equals "something".
+   *  Some("something") contains "something"
+   *
+   *  // Returns false because "something" != "anything".
+   *  Some("something") contains "anything"
+   *
+   *  // Returns false when method called on None.
+   *  None contains "anything"
+   *  }}}
+   *
    *  @param elem the element to test.
    *  @return `true` if the option has an element that is equal (as
    *  determined by `==`) to `elem`, `false` otherwise.
@@ -250,6 +262,17 @@ sealed abstract class Option[+A] extends Product with Serializable {
    * value, '''if''' this option is
    * nonempty '''and''' `pf` is defined for that value.
    * Returns $none otherwise.
+   *
+   *  @example {{{
+   *  // Returns Some(HTTP) because the partial function covers the case.
+   *  Some("http") collect {case "http" => "HTTP"}
+   *
+   *  // Returns None because the partial function doesn't cover the case.
+   *  Some("ftp") collect {case "http" => "HTTP"}
+   *
+   *  // Returns None because None is passed to the collect method.
+   *  None collect {case value => value}
+   *  }}}
    *
    *  @param  pf   the partial function.
    *  @return the result of applying `pf` to this $option's
@@ -306,6 +329,7 @@ sealed abstract class Option[+A] extends Product with Serializable {
  *  @author  Martin Odersky
  *  @version 1.0, 16/07/2003
  */
+@SerialVersionUID(1234815782226070388L) // value computed by serialver for 2.11.2, annotation added in 2.11.4
 final case class Some[+A](x: A) extends Option[A] {
   def isEmpty = false
   def get = x
@@ -317,6 +341,7 @@ final case class Some[+A](x: A) extends Option[A] {
  *  @author  Martin Odersky
  *  @version 1.0, 16/07/2003
  */
+@SerialVersionUID(5066590221178148012L) // value computed by serialver for 2.11.2, annotation added in 2.11.4
 case object None extends Option[Nothing] {
   def isEmpty = true
   def get = throw new NoSuchElementException("None.get")

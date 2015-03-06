@@ -220,7 +220,7 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   }
 
   /** `???` can be used for marking methods that remain to be implemented.
-   *  @throws  A `NotImplementedError`
+   *  @throws NotImplementedError
    */
   def ??? : Nothing = throw new NotImplementedError
 
@@ -303,7 +303,7 @@ object Predef extends LowPriorityImplicits with DeprecatedPredef {
   @inline implicit def augmentString(x: String): StringOps = new StringOps(x)
   @inline implicit def unaugmentString(x: StringOps): String = x.repr
 
-  // printing and reading -----------------------------------------------
+  // printing -----------------------------------------------------------
 
   def print(x: Any) = Console.print(x)
   def println() = Console.println()

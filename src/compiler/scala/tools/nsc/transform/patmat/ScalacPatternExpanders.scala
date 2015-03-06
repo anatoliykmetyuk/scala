@@ -18,6 +18,7 @@ trait ScalacPatternExpanders {
   import global._
   import definitions._
   import treeInfo._
+  import analyzer._
 
   type PatternAligned = ScalacPatternExpander#Aligned
 
@@ -72,9 +73,7 @@ trait ScalacPatternExpanders {
      *  Unfortunately the MethodType does not carry the information of whether
      *  it was unapplySeq, so we have to funnel that information in separately.
      */
-    def unapplyMethodTypes(method: Type, isSeq: Boolean): Extractor = {
-      val whole    = firstParamType(method)
-      val result   = method.finalResultType
+    def unapplyMethodTypes(whole: Type, result: Type, isSeq: Boolean): Extractor = {
       val expanded = (
         if (result =:= BooleanTpe) Nil
         else typeOfMemberNamedGet(result) match {
@@ -94,7 +93,7 @@ trait ScalacPatternExpanders {
     def tupleExtractor(extractor: Extractor): Extractor =
       extractor.copy(fixed = tupleType(extractor.fixed) :: Nil)
 
-    private def validateAligned(tree: Tree, aligned: Aligned): Aligned = {
+    private def validateAligned(context: Context, tree: Tree, aligned: Aligned): Aligned = {
       import aligned._
 
       def owner         = tree.symbol.owner
@@ -103,8 +102,8 @@ trait ScalacPatternExpanders {
       def offerString   = if (extractor.isErroneous) "" else s" offering $offering"
       def arityExpected = ( if (extractor.hasSeq) "at least " else "" ) + productArity
 
-      def err(msg: String)         = currentUnit.error(tree.pos, msg)
-      def warn(msg: String)        = currentUnit.warning(tree.pos, msg)
+      def err(msg: String)         = context.error(tree.pos, msg)
+      def warn(msg: String)        = context.warning(tree.pos, msg)
       def arityError(what: String) = err(s"$what patterns for $owner$offerString: expected $arityExpected, found $totalArity")
 
       if (isStar && !isSeq)
@@ -117,17 +116,17 @@ trait ScalacPatternExpanders {
       aligned
     }
 
-    def apply(sel: Tree, args: List[Tree]): Aligned = {
+    def apply(context: Context, sel: Tree, args: List[Tree]): Aligned = {
       val fn = sel match {
         case Unapplied(fn) => fn
         case _             => sel
       }
       val patterns  = newPatterns(args)
-      val isSeq = sel.symbol.name == nme.unapplySeq
       val isUnapply = sel.symbol.name == nme.unapply
+
       val extractor = sel.symbol.name match {
-        case nme.unapply    => unapplyMethodTypes(fn.tpe, isSeq = false)
-        case nme.unapplySeq => unapplyMethodTypes(fn.tpe, isSeq = true)
+        case nme.unapply    => unapplyMethodTypes(firstParamType(fn.tpe), sel.tpe, isSeq = false)
+        case nme.unapplySeq => unapplyMethodTypes(firstParamType(fn.tpe), sel.tpe, isSeq = true)
         case _              => applyMethodTypes(fn.tpe)
       }
 
@@ -139,16 +138,18 @@ trait ScalacPatternExpanders {
       def acceptMessage   = if (extractor.isErroneous) "" else s" to hold ${extractor.offeringString}"
       val requiresTupling = isUnapply && patterns.totalArity == 1 && productArity > 1
 
-      if (requiresTupling && effectivePatternArity(args) == 1)
-        currentUnit.deprecationWarning(sel.pos, s"${sel.symbol.owner} expects $productArity patterns$acceptMessage but crushing into $productArity-tuple to fit single pattern (SI-6675)")
+      if (requiresTupling && effectivePatternArity(args) == 1) {
+        val sym = sel.symbol.owner
+        currentRun.reporting.deprecationWarning(sel.pos, sym, s"${sym} expects $productArity patterns$acceptMessage but crushing into $productArity-tuple to fit single pattern (SI-6675)")
+      }
 
       val normalizedExtractor = if (requiresTupling) tupleExtractor(extractor) else extractor
-      validateAligned(fn, Aligned(patterns, normalizedExtractor))
+      validateAligned(context, fn, Aligned(patterns, normalizedExtractor))
     }
 
-    def apply(tree: Tree): Aligned = tree match {
-      case Apply(fn, args)   => apply(fn, args)
-      case UnApply(fn, args) => apply(fn, args)
+    def apply(context: Context, tree: Tree): Aligned = tree match {
+      case Apply(fn, args)   => apply(context, fn, args)
+      case UnApply(fn, args) => apply(context, fn, args)
     }
   }
 }

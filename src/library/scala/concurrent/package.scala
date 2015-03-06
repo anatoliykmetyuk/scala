@@ -47,14 +47,19 @@ package object concurrent {
    *  Blocking on an [[Awaitable]] should be done using [[Await.result]] instead of `blocking`.
    *
    *  @param body         A piece of code which contains potentially blocking or long running calls.
-   *  @throws `CancellationException` if the computation was cancelled
-   *  @throws `InterruptedException` in the case that a wait within the blocking `body` was interrupted
+   *  @throws CancellationException if the computation was cancelled
+   *  @throws InterruptedException in the case that a wait within the blocking `body` was interrupted
    */
   @throws(classOf[Exception])
   def blocking[T](body: =>T): T = BlockContext.current.blockOn(body)(scala.concurrent.AwaitPermission)
 }
 
 package concurrent {
+  /**
+   * This marker trait is used by [[Await]] to ensure that [[Awaitable.ready]] and [[Awaitable.result]]
+   * are not directly called by user code. An implicit instance of this trait is only available when
+   * user code is currently calling the methods on [[Await]].
+   */
   @implicitNotFound("Don't call `Awaitable` methods directly, use the `Await` object.")
   sealed trait CanAwait
 

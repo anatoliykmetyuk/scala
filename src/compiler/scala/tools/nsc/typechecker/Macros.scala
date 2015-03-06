@@ -226,7 +226,8 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
       val Apply(_, pickledPayload) = wrapped
       val payload = pickledPayload.map{ case Assign(k, v) => (unpickleAtom(k), unpickleAtom(v)) }.toMap
 
-      import typer.TyperErrorGen._
+      // TODO: refactor error handling: fail always throws a TypeError,
+      // and uses global state (analyzer.lastTreeToTyper) to determine the position for the error
       def fail(msg: String) = MacroCantExpandIncompatibleMacrosError(msg)
       def unpickle[T](field: String, clazz: Class[T]): T = {
         def failField(msg: String) = fail(s"$field $msg")
@@ -263,7 +264,12 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
     }
 
   def isBlackbox(expandee: Tree): Boolean = isBlackbox(dissectApplied(expandee).core.symbol)
-  def isBlackbox(macroDef: Symbol): Boolean = {
+  def isBlackbox(macroDef: Symbol): Boolean = pluginsIsBlackbox(macroDef)
+
+  /** Default implementation of `isBlackbox`.
+   *  Can be overridden by analyzer plugins (see AnalyzerPlugins.pluginsIsBlackbox for more details)
+   */
+  def standardIsBlackbox(macroDef: Symbol): Boolean = {
     val fastTrackBoxity = fastTrack.get(macroDef).map(_.isBlackbox)
     val bindingBoxity = loadMacroImplBinding(macroDef).map(_.isBlackbox)
     fastTrackBoxity orElse bindingBoxity getOrElse false
@@ -417,9 +423,10 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
 
             val wrappedArgs = mapWithIndex(args)((arg, j) => {
               val fingerprint = implParams(min(j, implParams.length - 1))
+              val duplicatedArg = duplicateAndKeepPositions(arg)
               fingerprint match {
-                case LiftedTyped => context.Expr[Nothing](arg.duplicate)(TypeTag.Nothing) // TODO: SI-5752
-                case LiftedUntyped => arg.duplicate
+                case LiftedTyped => context.Expr[Nothing](duplicatedArg)(TypeTag.Nothing) // TODO: SI-5752
+                case LiftedUntyped => duplicatedArg
                 case _ => abort(s"unexpected fingerprint $fingerprint in $binding with paramss being $paramss " +
                                 s"corresponding to arg $arg in $argss")
               }
@@ -570,7 +577,10 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
                 // also see http://groups.google.com/group/scala-internals/browse_thread/thread/492560d941b315cc
                 val expanded1 = try onSuccess(duplicateAndKeepPositions(expanded)) finally popMacroContext()
                 if (!hasMacroExpansionAttachment(expanded1)) linkExpandeeAndExpanded(expandee, expanded1)
-                if (settings.Ymacroexpand.value == settings.MacroExpand.Discard) expandee.setType(expanded1.tpe)
+                if (settings.Ymacroexpand.value == settings.MacroExpand.Discard) {
+                  suppressMacroExpansion(expandee)
+                  expandee.setType(expanded1.tpe)
+                }
                 else expanded1
               case Fallback(fallback) => onFallback(fallback)
               case Delayed(delayed) => onDelayed(delayed)
@@ -615,7 +625,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
           // `macroExpandApply` is called from `adapt`, where implicit conversions are disabled
           // therefore we need to re-enable the conversions back temporarily
           val result = typer.context.withImplicitsEnabled(typer.typed(tree, mode, pt))
-          if (result.isErrorTyped && macroDebugVerbose) println(s"$label has failed: ${typer.context.reportBuffer.errors}")
+          if (result.isErrorTyped && macroDebugVerbose) println(s"$label has failed: ${typer.context.reporter.errors}")
           result
         }
       }
@@ -708,7 +718,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
 
   sealed abstract class MacroStatus(val result: Tree)
   case class Success(expanded: Tree) extends MacroStatus(expanded)
-  case class Fallback(fallback: Tree) extends MacroStatus(fallback) { currentRun.seenMacroExpansionsFallingBack = true }
+  case class Fallback(fallback: Tree) extends MacroStatus(fallback) { currentRun.reporting.seenMacroExpansionsFallingBack = true }
   case class Delayed(delayed: Tree) extends MacroStatus(delayed)
   case class Skipped(skipped: Tree) extends MacroStatus(skipped)
   case class Failure(failure: Tree) extends MacroStatus(failure)
@@ -782,7 +792,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
           }
         } catch {
           case ex: Throwable =>
-            popMacroContext()
+            if (openMacros.nonEmpty) popMacroContext() // weirdly we started popping on an empty stack when refactoring fatalWarnings logic
             val realex = ReflectionUtils.unwrapThrowable(ex)
             realex match {
               case ex: AbortMacroException => MacroGeneratedAbort(expandee, ex)

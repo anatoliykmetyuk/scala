@@ -30,12 +30,20 @@ import scala.collection.mutable.LinkedHashMap
 abstract class Delambdafy extends Transform with TypingTransformers with ast.TreeDSL with TypeAdaptingTransformer {
   import global._
   import definitions._
-  import CODE._
 
   val analyzer: global.analyzer.type = global.analyzer
 
   /** the following two members override abstract members in Transform */
   val phaseName: String = "delambdafy"
+
+  override def newPhase(prev: scala.tools.nsc.Phase): StdPhase = {
+    if (settings.Ydelambdafy.value == "method") new Phase(prev)
+    else new SkipPhase(prev)
+  }
+
+  class SkipPhase(prev: scala.tools.nsc.Phase) extends StdPhase(prev) {
+    def apply(unit: global.CompilationUnit): Unit = ()
+  }
 
   protected def newTransformer(unit: CompilationUnit): Transformer =
     new DelambdafyTransformer(unit)
@@ -236,55 +244,59 @@ abstract class Delambdafy extends Transform with TypingTransformers with ast.Tre
         //      - make `anonClass.isAnonymousClass` true.
         //      - use `newAnonymousClassSymbol` or push the required variations into a similar factory method
         //      - reinstate the assertion in `Erasure.resolveAnonymousBridgeClash`
-        val suffix = "$lambda$" + (
+        val suffix = nme.DELAMBDAFY_LAMBDA_CLASS_NAME + "$" + (
           if (funOwner.isPrimaryConstructor) ""
           else "$" + funOwner.name + "$"
         )
-        val name = unit.freshTypeName(s"${oldClass.name.decode}$suffix")
+        val oldClassPart = oldClass.name.decode
+        // make sure the class name doesn't contain $anon, otherwsie isAnonymousClass/Function may be true
+        val name = unit.freshTypeName(s"$oldClassPart$suffix".replace("$anon", "$nestedInAnon"))
 
-        val anonClass = pkg newClassSymbol(name, originalFunction.pos, FINAL | SYNTHETIC) addAnnotation SerialVersionUIDAnnotation
-        anonClass setInfo ClassInfoType(parents, newScope, anonClass)
+        val lambdaClass = pkg newClassSymbol(name, originalFunction.pos, FINAL | SYNTHETIC) addAnnotation SerialVersionUIDAnnotation
+        lambdaClass setInfo ClassInfoType(parents, newScope, lambdaClass)
+        assert(!lambdaClass.isAnonymousClass && !lambdaClass.isAnonymousFunction, "anonymous class name: "+ lambdaClass.name)
+        assert(lambdaClass.isDelambdafyFunction, "not lambda class name: " + lambdaClass.name)
 
         val captureProxies2 = new LinkedHashMap[Symbol, TermSymbol]
         captures foreach {capture =>
-          val sym = anonClass.newVariable(capture.name.toTermName, capture.pos, SYNTHETIC)
+          val sym = lambdaClass.newVariable(unit.freshTermName(capture.name.toString + "$"), capture.pos, SYNTHETIC)
           sym setInfo capture.info
           captureProxies2 += ((capture, sym))
         }
 
-      // the Optional proxy that will hold a reference to the 'this'
-      // object used by the lambda, if any. NoSymbol if there is no this proxy
-      val thisProxy = {
-        val target = targetMethod(originalFunction)
-        if (thisReferringMethods contains target) {
-          val sym = anonClass.newVariable(nme.FAKE_LOCAL_THIS, originalFunction.pos, SYNTHETIC)
-          sym.info = oldClass.tpe
-          sym
-        } else NoSymbol
-      }
+        // the Optional proxy that will hold a reference to the 'this'
+        // object used by the lambda, if any. NoSymbol if there is no this proxy
+        val thisProxy = {
+          val target = targetMethod(originalFunction)
+          if (thisReferringMethods contains target) {
+            val sym = lambdaClass.newVariable(nme.FAKE_LOCAL_THIS, originalFunction.pos, SYNTHETIC)
+            sym.info = oldClass.tpe
+            sym
+          } else NoSymbol
+        }
 
-      val decapturify = new DeCapturifyTransformer(captureProxies2, unit, oldClass, anonClass, originalFunction.symbol.pos, thisProxy)
+        val decapturify = new DeCapturifyTransformer(captureProxies2, unit, oldClass, lambdaClass, originalFunction.symbol.pos, thisProxy)
 
-      val accessorMethod = createAccessorMethod(thisProxy, originalFunction)
+        val accessorMethod = createAccessorMethod(thisProxy, originalFunction)
 
-      val decapturedFunction = decapturify.transform(originalFunction).asInstanceOf[Function]
+        val decapturedFunction = decapturify.transform(originalFunction).asInstanceOf[Function]
 
-      val members = (optionSymbol(thisProxy).toList ++ (captureProxies2 map (_._2))) map {member =>
-        anonClass.info.decls enter member
-        ValDef(member, gen.mkZero(member.tpe)) setPos decapturedFunction.pos
-      }
+        val members = (optionSymbol(thisProxy).toList ++ (captureProxies2 map (_._2))) map {member =>
+          lambdaClass.info.decls enter member
+          ValDef(member, gen.mkZero(member.tpe)) setPos decapturedFunction.pos
+        }
 
-      // constructor
-      val constr = createConstructor(anonClass, members)
+        // constructor
+        val constr = createConstructor(lambdaClass, members)
 
-      // apply method with same arguments and return type as original lambda.
-      val applyMethodDef = createApplyMethod(anonClass, decapturedFunction, accessorMethod, thisProxy)
+        // apply method with same arguments and return type as original lambda.
+        val applyMethodDef = createApplyMethod(lambdaClass, decapturedFunction, accessorMethod, thisProxy)
 
-      val bridgeMethod = createBridgeMethod(anonClass, originalFunction, applyMethodDef)
+        val bridgeMethod = createBridgeMethod(lambdaClass, originalFunction, applyMethodDef)
 
-      def fulldef(sym: Symbol) =
-        if (sym == NoSymbol) sym.toString
-        else s"$sym: ${sym.tpe} in ${sym.owner}"
+        def fulldef(sym: Symbol) =
+          if (sym == NoSymbol) sym.toString
+          else s"$sym: ${sym.tpe} in ${sym.owner}"
 
         bridgeMethod foreach (bm =>
           // TODO SI-6260 maybe just create the apply method with the signature (Object => Object) in all cases
@@ -296,7 +308,7 @@ abstract class Delambdafy extends Transform with TypingTransformers with ast.Tre
         val body = members ++ List(constr, applyMethodDef) ++ bridgeMethod
 
         // TODO if member fields are private this complains that they're not accessible
-        (localTyper.typedPos(decapturedFunction.pos)(ClassDef(anonClass, body)).asInstanceOf[ClassDef], thisProxy, accessorMethod)
+        (localTyper.typedPos(decapturedFunction.pos)(ClassDef(lambdaClass, body)).asInstanceOf[ClassDef], thisProxy, accessorMethod)
       }
 
       val (anonymousClassDef, thisProxy, accessorMethod) = makeAnonymousClass
