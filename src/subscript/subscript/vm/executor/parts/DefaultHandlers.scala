@@ -51,11 +51,8 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
            case n@N_epsilon                    (t) => insert(SuccessMsg(n)); insertDeactivation(n,null)
            case n@N_nu                         (t) => doNeutral(n);          insertDeactivation(n,null)
            case n@N_while                      (t) => setIteration_n_ary_op_ancestor(n); 
-                                                      n.hasSuccess = executeCode(n)
-                                                      doNeutral(n)
-                                                      if (!n.hasSuccess) {
-                                                         insert(Break(n, null, ActivationMode.Inactive))
-                                                      }
+                                                      if (executeCode(n)) doNeutral(n)
+                                                      else               {doNeutral(n); insert(Break(n, null, ActivationMode.Inactive))}
                                                       insertDeactivation(n,null)
                                                                        
            case n@N_launch                     (t) => activateFrom(CallGraphNode.getLowestLaunchAnchorAncestor(n), t.child0, Some(0)); doNeutral(n); insertDeactivation(n,null)
