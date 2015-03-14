@@ -4815,7 +4815,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 
           // Quick fix
           def issue(err: AbsTypeError) = {
-            throw new Exception("An error should have been here. Something went wrong in the typer after the merge with 2.11.5. Hence, this exception.")
+            throw err //new Exception("An error should have been here. Something went wrong in the typer after the merge with 2.11.5. Hence, this exception.")
           }
 
           if   (tree_scriptResolution != null) {

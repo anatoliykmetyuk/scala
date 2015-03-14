@@ -609,7 +609,7 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [      @{there.priority=  1}:{} + {}(-)] -> "->1"
    , [ {} + @{there.priority=  1}:     {}(-)] -> "->0"
    , [      @{there.priority= -1}:{} + {}(-)] -> "FAIL:->0"
-   , [ {} + @{there.priority= -1}:     {}(-)] -> "FAIL:->1"
+   , [ {} + @{there.priority= -1}:     {}(-)] -> "FAIL:->1" 
    
    // Various
    , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc ac->bc acc->bc acb->ac"
@@ -623,6 +623,18 @@ class OperatorsSuite extends OperatorsSuiteBase {
 
    
   val scriptBehaviourList_for_debug = List(
+      [ a
+        b; c
+/*        
+        {! !}
+        {* *}; {! !}
+        @{ }: {. .}
+        {! !}
+        if 1 != 0 then (+)
+*/
+      ] -> ""
+      
+      
    //  [ {Hello} ~~(msg:String)~~> {println(msg)} ]  -> "a->1"
  //, [{println("starting...");"hello"} ~~~(msg:String)~~~> {println(msg)} ]  -> "->1"
  //, [a ~~(t:String)~~>p(t)]       -> "a->a"

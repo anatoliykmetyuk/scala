@@ -1186,14 +1186,14 @@ TODO:
   <target name="quick.subscript"  depends="quick.comp">
     <staged-build with="locker"   stage="quick" project="subscript"/> </target>
 
-  <target name="quick.subscript-akka" depends="quick.subscript">
-    <staged-build with="locker"   stage="quick" project="subscript-akka"/> </target>
+  <target name="quick.subscript-akka" depends="quick.comp, quick.subscript">
+    <staged-build with="quick"   stage="quick" project="subscript-akka"/> </target>
 
-  <target name="quick.subscript-swing" depends="quick.subscript">
-    <staged-build with="locker"   stage="quick" project="subscript-swing"/> </target>
+  <target name="quick.subscript-swing" depends="quick.comp, quick.subscript">
+    <staged-build with="quick"   stage="quick" project="subscript-swing"/> </target>
 
-  <target name="quick.subscript-supplements" depends="quick.subscript, quick.subscript-swing, quick.subscript-akka">
-    <staged-build with="locker"   stage="quick" project="subscript-supplements"/> </target>
+  <target name="quick.subscript-supplements" depends="quick.comp, quick.subscript, quick.subscript-swing, quick.subscript-akka">
+    <staged-build with="quick"   stage="quick" project="subscript-supplements"/> </target>
 
 
   <target name="quick.modules" depends="quick.repl, quick.scaladoc, quick.interactive, quick.scalap, quick.subscript, quick.subscript-swing, quick.subscript-akka, quick.subscript-supplements"/>
