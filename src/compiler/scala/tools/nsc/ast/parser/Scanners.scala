@@ -106,17 +106,19 @@ trait Scanners extends ScannersCommon {
   abstract class Scanner extends CharArrayReader with TokenData with ScannerData with ScannerCommon {
     private def isDigit(c: Char) = java.lang.Character isDigit c
     
-    var prevWasInSubScript_script   = false
-    var isInSubScript_script        = false
-    var isInSubScript_header        = false
-    var isInSubScript_nativeCode    = false
-    var isInSubScript_val_var_init  = false
-    def isInSubScript_expression  = isInSubScript_script && 
-                                   !isInSubScript_header && 
-                                   !isInSubScript_nativeCode && 
-                                  (!isInSubScript_partialScript || isInSubScript_partialScript_caseScript)
+    ///////////////////// BEGIN OF SUBSCRIPT SECTION ///////////////////////////
+    var prevWasInSubScript_script  = false
+    var isInSubScript_script       = false
+    var isInSubScript_header       = false
+    var isInSubScript_nativeCode   = false
+    var isInSubScript_val_var_init = false
+    def isInSubScript_body         = isInSubScript_script && !isInSubScript_header 
+    def isInSubScript_expression   = isInSubScript_body && 
+                                    !isInSubScript_nativeCode && 
+                                    !isInSubScript_val_var_init &&
+                                   (!isInSubScript_partialScript || isInSubScript_partialScript_caseScript)
     
-    var sepRegions_SubScript_partialScript = -1
+    var sepRegions_SubScript_partialScript       = -1
     var level_SubScript_partialScript            = 0
     var level_SubScript_partialScript_caseScript = 0
     def   isInSubScript_partialScript            = level_SubScript_partialScript            > 0
@@ -128,6 +130,136 @@ trait Scanners extends ScannersCommon {
     def start_SubScript_val_var_init             = {isInSubScript_val_var_init = true; isInSubScript_nativeCode = true}
     def   end_SubScript_val_var_init             = {isInSubScript_val_var_init =false; isInSubScript_nativeCode =false}
 
+    var linePosOfScriptsSection  = 0 // in a "script.." section, the line position of "script" (or any modifier before it); often something like 4
+    var linePosOfScriptEqualsSym = 0 // in a script definition, the line position of "=" or "+="
+     var scriptExpressionParenthesesNestingLevel = 0
+    
+ 
+    // TBD cleanup
+    // lineOffset needs to be computed here since CharArrayReader sometimes increments its lineStartOffset earlier than expected
+    def isLeftOfEqualsSym(tokenOffset: Offset): Boolean = {
+      val lineOffset = if (tokenOffset < lineStartOffset) lastLineStartOffset else lineStartOffset
+//println(s"isLeftOfEqualsSym tokenOffset=${tokenOffset} lineOffset=$lineOffset tokenOffset-lineOffset=${tokenOffset-lineOffset} linePosOfScriptEqualsSym=$linePosOfScriptEqualsSym")
+      tokenOffset-lineOffset < linePosOfScriptEqualsSym
+    }
+    
+    def isIdent(token: Token) = token == IDENTIFIER || token == BACKQUOTED_IDENT
+
+    final val raw_space = "SPACE"
+    final val raw_semi  = ";"
+    final val raw_bar   = "|"
+    final val raw_bar2  = "||"
+    final val raw_amp   = "&"
+    final val raw_amp2  = "&&"
+    final val raw_slash = "/"
+    final val raw_mathDot = "\u00B7"
+      
+    final val subScriptInfixOperators_Set = Set(nme.raw.PLUS.toString, //SEMI_Name gets special treatment, like in Scala
+                                                raw_bar    .toString, 
+                                                raw_bar2   .toString, 
+                                                raw_amp    .toString,  
+                                                raw_amp2   .toString,
+                                                raw_slash  .toString,
+                                                raw_mathDot.toString,
+                                                raw_space  .toString
+                                               )
+    final val setSubScriptUnaryPrefixOp = Set(nme.raw.MINUS.toString, nme.raw.TILDE.toString, nme.raw.BANG.toString)
+    final val setSubScriptPostfixOp     = Set(nme.XOR.toString)
+
+
+    def isSubScriptUnaryPrefixOp (name     : String): Boolean = setSubScriptUnaryPrefixOp(name)
+    def isSubScriptPostfixOp     (name     : String): Boolean = setSubScriptPostfixOp    (name)
+    
+    def isSubScriptInfixOpName(name: String): Boolean = {
+      var result = subScriptInfixOperators_Set(name)
+      //println(s"isSubScriptInfixOpName($name): $result")
+      result 
+    }
+    def isSubScriptUnaryPrefixOp(tokenData: TokenData): Boolean = isIdent(tokenData.token) && isSubScriptUnaryPrefixOp(tokenData.name.toString)
+    def isSubScriptPostfixOp    (tokenData: TokenData): Boolean = isIdent(tokenData.token) && isSubScriptPostfixOp    (tokenData.name.toString)
+    def isSubScriptOperator(name: String): Boolean = isSubScriptUnaryPrefixOp(name) ||
+                                                     isSubScriptPostfixOp(    name) ||
+                                                     isSubScriptInfixOpName  (name)
+
+    // for uniformity: a SEMI becomes a name, like other script expression operators                                                                                   
+    def isSubScriptInfixOp(tokenData: TokenData): Boolean = {
+      val result = tokenData.token match {
+      case IDENTIFIER         => isSubScriptInfixOpName(tokenData.name.toString)
+      case SEMI               => false
+      case NEWLINE | NEWLINES => false // in.isSubScriptTermStarter(in.next)    TBD: remove these two lines
+      case _                  => false
+      }
+//println(s"isSubScriptInfixOp($tokenData): $result") 
+      result
+    }
+    def isSubScriptInfixOpOrSemiOrCommaOrColonOrOpenBrace(token: Token): Boolean =
+      token match {
+        case SEMI 
+         | COMMA 
+         | COLON
+         | LESS2                   
+         | LPAREN                   
+         | LPAREN_PLUS_RPAREN       
+         | LPAREN_MINUS_RPAREN      
+         | LPAREN_PLUS_MINUS_RPAREN 
+         | LPAREN_SEMI_RPAREN       
+         | LPAREN_ASTERISK       
+         | LPAREN_ASTERISK2       
+         | LBRACE                   
+         | LBRACE_DOT               
+         | LBRACE_DOT3              
+         | LBRACE_QMARK             
+         | LBRACE_EMARK             
+         | LBRACE_ASTERISK          
+         | LBRACE_CARET       => true
+        case IDENTIFIER       => isSubScriptInfixOpName(token.toString)
+        case _ => false
+      }
+    
+    def isSubScriptTermStarter: Boolean = {val result = token match {
+      case VAL                      
+         | VAR                      
+         | PRIVATE                  
+         | BACKQUOTED_IDENT         
+         | THIS                     
+         | SUPER 
+         | NEW
+         | AT                       
+         | WHILE                    
+         | DOT                      
+         | DOT2                     
+         | DOT3                     
+         | LESS2                   
+         | LPAREN                   
+         | LPAREN_PLUS_RPAREN       
+         | LPAREN_MINUS_RPAREN      
+         | LPAREN_PLUS_MINUS_RPAREN 
+         | LPAREN_SEMI_RPAREN       
+         | LPAREN_ASTERISK       
+         | LPAREN_ASTERISK2       
+         | LBRACE                   
+         | LBRACE_DOT               
+         | LBRACE_DOT3              
+         | LBRACE_QMARK             
+         | LBRACE_EMARK             
+         | LBRACE_ASTERISK          
+         | LBRACE_CARET                               => true
+      case IDENTIFIER if (!isSubScriptInfixOp(this)) => true
+      case CHARLIT | INTLIT | LONGLIT 
+        | FLOATLIT | DOUBLELIT 
+        | STRINGLIT | INTERPOLATIONID | SYMBOLLIT 
+        | TRUE | FALSE | NULL                         => true // isLiteralToken
+      case _                                          => isSubScriptUnaryPrefixOp(this) // MINUS is always OK, also for -1 etc
+      }
+      //println(s"isSubScriptTermStarter(${tokenData.token}:${tokenData.name}): $result")
+      result
+    }
+
+    def isIF_or_DO(token: Token): Boolean = token match {case IF | DO => true case _ => false}
+
+    
+    ///////////////////// END OF SUBSCRIPT SECTION ///////////////////////////
+    
     private var openComments = 0
     protected def putCommentChar(): Unit = nextChar()
 
@@ -234,13 +366,10 @@ trait Scanners extends ScannersCommon {
             )
               if (name == nme.MACROkw)
                 syntaxError(s"$name is now a reserved word; usage as an identifier is disallowed")
+              else if (isInSubScript_script && name.toString=="then") token = THEN
               else if (emitIdentifierDeprecationWarnings)
                 deprecationWarning(s"$name is now a reserved word; usage as an identifier is deprecated")
           }
-        }
-        if (isInSubScript_script && name.toString=="then") {
-          //println(s"token was: $token idtoken=$idtoken cbuf.toString=${cbuf.toString}")
-          token = THEN
         }
       }
     }
@@ -339,7 +468,7 @@ trait Scanners extends ScannersCommon {
         if (inStringInterpolation) fetchStringPart() 
         else                       fetchToken()
 
-//println("fetched:  "+this)        //////////
+//println("fetching:  "+this)        //////////
 
         if(token == ERROR) {
           if (  inMultiLineInterpolation) sepRegions = sepRegions.tail.tail
@@ -348,25 +477,38 @@ trait Scanners extends ScannersCommon {
       } else {
         this copyFrom next
         next.token = EMPTY
-//println("Fetched:  "+this)        ///////////
+//println("Fetching:  "+this)        ///////////
       }
 
-      /** Insert NEWLINE or NEWLINES if
-       *  - we are after a newline
-       *  - we are within a { ... } or on toplevel (wrt sepRegions)
-       *  - NOT isInSubScript_expression (except isInSubScript_val_var_init) 
-       *    AND the current token can start a statement and the one before can end it
+      /** Insert NEWLINE or NEWLINES
+       *  if we are after a newline
+       *  && we are within a { ... } or on toplevel (wrt sepRegions)
+       *  && NOT isInSubScript_expression 
+       *  && the current token can start a statement and the one before can end it
+       *  
        *  insert NEWLINES if we are past a blank line, NEWLINE otherwise
        * 
-       *  TBD: maybe require different handling if isInSubScript_expression
+       *   
+       *  If isInSubScript_expression theb the parser will deal with newline issues
        */
-      if (!applyBracePatch() && afterLineEnd() && 
-          (
-           (!isInSubScript_expression || isInSubScript_val_var_init) && 
-           inLastOfStat(lastToken) && inFirstOfStat(token)) &&
-          (sepRegions.isEmpty || sepRegions.head == RBRACE)) {
+      if (!applyBracePatch() 
+      &&   afterLineEnd() 
+      &&  ( if (isInSubScript_header) false
+            else if (isInSubScript_expression)
+               !isSubScriptInfixOpOrSemiOrCommaOrColonOrOpenBrace(lastToken)
+            && (isSubScriptTermStarter || isIF_or_DO(token))
+            && lastToken != NEWLINE 
+            && lastToken != NEWLINES
+            else  inLastOfStat(lastToken) 
+              && inFirstOfStat(token) 
+              && (  sepRegions.isEmpty 
+                 || sepRegions.head == RBRACE)
+          ) 
+         )
+      {
         next copyFrom this
         offset = if (lineStartOffset <= offset) lineStartOffset else lastLineStartOffset
+//println(s"Inserting ${token2string(if (pastBlankLine()) NEWLINES else NEWLINE)} before: ${this} lastToken=${token2string(lastToken)} isInSubScript_script: $isInSubScript_script")        ///////////
         token  = if (pastBlankLine()) NEWLINES else NEWLINE
         
         // uncomment to see where the NEWLINE(S)'s are inserted
@@ -460,7 +602,7 @@ trait Scanners extends ScannersCommon {
           getIdentRest()
           if (ch == '"' && token == IDENTIFIER)
             token = INTERPOLATIONID
-       case '~' => if (isInSubScript_expression && !isInSubScript_val_var_init) {
+       case '~' => if (isInSubScript_expression) {
                       val  lookahead = lookaheadReader; lookahead.nextChar()
                       if  (lookahead.ch == '>') {nextChar2(); token = CURLYARROW1; return} // ~>
                       if  (lookahead.ch == '~') {lookahead.nextChar()
@@ -543,7 +685,7 @@ trait Scanners extends ScannersCommon {
             putChar(chOld)
             getOperatorRest()
           }
-        case '+' => if (isInSubScript_expression && !isInSubScript_val_var_init) {
+        case '+' => if (isInSubScript_expression) {
                       val lookahead = lookaheadReader; lookahead.nextChar()
                       if  (lookahead.ch == '~') {lookahead.nextChar()
                        if (lookahead.ch == '~') {lookahead.nextChar()
@@ -1245,8 +1387,8 @@ trait Scanners extends ScannersCommon {
       case STRINGPART      =>      "stringpart(" +   strVal + ")"
       case INTERPOLATIONID => "interpolationid(" +     name + ")"
       case SEMI            => ";"
-      case NEWLINE         => ";"
-      case NEWLINES        => ";;"
+      case NEWLINE         => "'\\n'"
+      case NEWLINES        => "'\\n\\n'"
       case COMMA           => ","
       case _               => token2string(token)
     }

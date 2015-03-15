@@ -36,12 +36,21 @@ trait GraphNode {
     c._parents += this.asInstanceOf[c.Parent]
   }
   
+  def removeFrom[T<:AnyRef](lb: ListBuffer[T], elt: T) {
+    // lb -= elt    
+    // not applicable for nodes since these are case classes with a too generous Equals method.
+    // use eq() instead
+    val indexToRemove = lb.indexWhere(_.eq(elt))
+    lb.remove(indexToRemove)
+  }
   /**
    * Unlinks the child.
    */
   def removeChild(c: Child) {
-    _children -= c
-    c._parents -= this.asInstanceOf[c.Parent]
+    //_children -= c
+    //c._parents -= this.asInstanceOf[c.Parent]
+    removeFrom(_children , c)
+    removeFrom(c._parents, this.asInstanceOf[c.Parent])
   }
 }
 

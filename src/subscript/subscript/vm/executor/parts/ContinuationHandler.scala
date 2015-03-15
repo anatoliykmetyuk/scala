@@ -371,10 +371,14 @@ These effects do not hold when the operand is in an optional group.
       val deactivatedChildren = message.deactivations.map(_.child)
       val resultDecisiveNodes = deactivatedChildren.filter(_.hasSuccess==isLogicalOr)
 
+      //deactivatedChildren.foreach{n => println(s"deactivatedChild: $n hasSuccess=${n.hasSuccess}")}
+      
       if (!resultDecisiveNodes.isEmpty) {
-        nodesToBeExcluded = node.children diff deactivatedChildren
+        nodesToBeExcluded = node.children //diff deactivatedChildren
         activateNext = false // override possibly earlier decision; needed for a/./b after a happened.
         activationEnded = true // possibly message.node.activationMode should be set to Inactive 
+
+        //println(s"nodesToBeExcluded=$nodesToBeExcluded")        
       }
     }
   }

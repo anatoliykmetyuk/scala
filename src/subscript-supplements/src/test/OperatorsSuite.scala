@@ -445,8 +445,37 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [a/(+)]   -> "->1a a"
    , [(+)/a]   -> "->1"
                                
+   // break a
+   , [break a]  -> "->1"
+   , [break&a]  -> "->1"
+   , [break&&a] -> "->1"
+                            
+   , [break+a]  -> "->0"
+   , [break|a]  -> "->0"
+   , [break||a] -> "->0"
+   , [break/a]  -> "->0"
+                               
+   // while(pass<1) a
+   , [while(pass<1) a]  -> "->a a"
+   , [while(pass<1)&a]  -> "->a a"
+   , [while(pass<1)&&a] -> "->a a"
+
+   , [while(pass<1)+a]  -> "->a a"
+   , [while(pass<1)|a]  -> "->a a"
+   , [while(pass<1)||a] -> "->a a"
+   , [while(pass<1)/a]  -> "->a a"
+                               
+   // while(pass<2) a
+   , [while(pass<2) a]  -> "->a  a->a aa"
+   , [while(pass<2)&a]  -> "->aa a->a aa"
+   , [while(pass<2)&&a] -> "->aa a->a aa"
+
+   , [while(pass<2)+a]  -> "->aa a"
+   , [while(pass<2)|a]  -> "->aa a->1a aa"
+   , [while(pass<2)||a] -> "->aa a"
+   , [while(pass<2)/a]  -> "->aa a"
+                               
    // 2 operand sequences with iterator or break or optional break, 
-   , [break a] -> "->1"
    , [. a]     -> "->1a a"
    , [.. a]    -> "->1a a->1a aa->1a"
    , [... a]   -> "->a  a->a  aa->a"
@@ -526,12 +555,12 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [ a b / ..  ]             -> "->a  a->ab ab aa->ab"
    , [ a / . / b ]             -> "->a a"
    , [ a b / . / c d ]         -> "->a a->bc  ab     ac->d  acd"
-   , [ a b & . & c d ]         -> "->a a->bc  ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
+   , [ a b & . & c d ]         -> "->a a->bc  FAIL:ab->1c ac->bd abc->d  abcd acb->d  acd->b  acbd acdb"
    , [ a b | . | c d ]         -> "->a a->bc  ab->1c ac->bd abc->1d abcd acb->1d acd->1b acbd acdb"
-   , [ . / a b ]               -> "->1a a->b  ab"
-   , [ . & a b ]               -> "->1a a->b  ab"
-   , [ . | a b ]               -> "->1a a->b  ab"
-   , [ . / a b / . / c d ]     -> "->1a a->bc ab ac->d acd"
+   , [ . / a b ]               -> "FAIL:->1a a->b  ab"
+   , [ . & a b ]               -> "->1a FAIL:a->b  ab"
+   , [ . | a b ]               -> "FAIL:->1a a->b  ab"
+   , [ . / a b / . / c d ]     -> "FAIL:->1a a->bc ab ac->d acd"
    , [ a b  | .  | (+) ]       -> "->a a->1b ab"
    , [ a b || . || (+) ]       -> "->a a"
    , [ a b  & .  & (-) ]       -> "->a a->b ab->0"
@@ -608,11 +637,11 @@ class OperatorsSuite extends OperatorsSuiteBase {
    // priorities
    , [      @{there.priority=  1}:{} + {}(-)] -> "->1"
    , [ {} + @{there.priority=  1}:     {}(-)] -> "->0"
-   , [      @{there.priority= -1}:{} + {}(-)] -> "FAIL:->0"
-   , [ {} + @{there.priority= -1}:     {}(-)] -> "FAIL:->1"
+   , [      @{there.priority= -1}:{} + {}(-)] -> "->0"
+   , [ {} + @{there.priority= -1}:     {}(-)] -> "->1" 
    
    // Various
-   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc ac->bc acc->bc acb->ac"
+   , [(a {**} b) ... || c...]  -> "->ac FAIL:a->bc FAIL:ab->ac c->ac cc->ac FAIL:ca->bc FAIL:ac->bc FAIL:acc->bc FAIL:acb->ac"
    
    // problem in LookupFrame2: after 2 iterations an optional success of the guard  (a . b . c)
    // caused a "bypass" of the searchcommand (d) so that the search (e) was activated
@@ -623,6 +652,18 @@ class OperatorsSuite extends OperatorsSuiteBase {
 
    
   val scriptBehaviourList_for_debug = List(
+      [ a
+        b; c
+/*        
+        {! !}
+        {* *}; {! !}
+        @{ }: {. .}
+        {! !}
+        if 1 != 0 then (+)
+*/
+      ] -> ""
+      
+      
    //  [ {Hello} ~~(msg:String)~~> {println(msg)} ]  -> "a->1"
  //, [{println("starting...");"hello"} ~~~(msg:String)~~~> {println(msg)} ]  -> "->1"
  //, [a ~~(t:String)~~>p(t)]       -> "a->a"
