@@ -692,6 +692,7 @@
           <arg value=   "-Dfile=${path}.jar" />
           <arg value="-Pgpg" />
           <arg value="-Dgpg.useagent=true" />
+          <arg value="-Dgpg.passphrase=${passphrase}" />
         </artifact:mvn>
       </else></if>
     </sequential>
@@ -726,6 +727,7 @@
           <arg value=   "-Dfile=${path}-pom-filtered.xml" />
           <arg value="-Pgpg" />
           <arg value="-Dgpg.useagent=true" />
+          <arg value="-Dgpg.passphrase=${passphrase}" />
         </artifact:mvn>
       </else></if>
     </sequential>
