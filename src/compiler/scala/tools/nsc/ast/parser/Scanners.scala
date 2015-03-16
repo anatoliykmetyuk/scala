@@ -199,10 +199,6 @@ trait Scanners extends ScannersCommon {
          | COLON
          | LESS2                   
          | LPAREN                   
-         | LPAREN_PLUS_RPAREN       
-         | LPAREN_MINUS_RPAREN      
-         | LPAREN_PLUS_MINUS_RPAREN 
-         | LPAREN_SEMI_RPAREN       
          | LPAREN_ASTERISK       
          | LPAREN_ASTERISK2       
          | LBRACE                   
