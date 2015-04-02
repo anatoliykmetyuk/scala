@@ -24,9 +24,11 @@ object NodeStateEvent extends Enumeration {
   type NodeStateEvent = Value
   val
     OnActivate,
-    OnActivateOrResume,
     OnDeactivate,
-    OnDeactivateOrSuspend,
-    OnSuccess
+    OnSuspend,
+    OnResume,
+    OnSuccess,
+    OnFailure,
+    OnExclude
   = Value
 }

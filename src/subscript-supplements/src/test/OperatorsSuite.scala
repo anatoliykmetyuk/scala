@@ -544,6 +544,7 @@ class OperatorsSuite extends OperatorsSuiteBase {
    , [a||b||c]     -> "->abc a b c"  
                                        
    // disruption with compound left hand operand
+   , [(a+b)/c]     -> "->abc a b c"
    , [(a|b)/c]     -> "->abc a->1bc b->1ac c ac bc ab ba"
    , [(a;b)/c]     -> "->ac a->bc ab c ac" 
    , [(a;b)/(+)]   -> "->1a a->1b ab"

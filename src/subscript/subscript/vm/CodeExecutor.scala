@@ -261,43 +261,6 @@ class ThreadedCodeFragmentExecutor[R](n: N_code_threaded[R], scriptExecutor: Scr
       myThread.start()
   }
 }
-class SwingCodeExecutorAdapter[R,CE<:CodeExecutorTrait] extends CodeExecutorAdapter[R,CE]{
-  def n = adaptee.n
-  def scriptExecutor = adaptee.scriptExecutor
-
-  override def      executeAA: Unit = {
-    adaptee.regardStartAndEndAsSeparateAtomicActions = adaptee.asynchronousAllowed
-    adaptee.executeAA(this) // Not to be called? TBD: clean up class/trait hierarchy
-  }
-  override def afterExecuteAA_internal: Unit = adaptee.afterExecuteAA_internal  // TBD: clean up class/trait hierarchy so that this def can be ditched
-  override def    interruptAA: Unit = adaptee.interruptAA     // TBD: clean up class/trait hierarchy so that this def can be ditched
-  override def doCodeExecution[R](code: =>R): R = {
-
-    // we need here the default value for R (false, 0, null or a "Unit")
-    // for some strange reason, the following line would go wrong:
-    //
-    // var result: R = _
-    //
-    // A solution using a temporary class was found at
-    // http://missingfaktor.blogspot.com/2011/08/emulating-cs-default-keyword-in-scala.html
-    var result: R = null.asInstanceOf[R]
-    // luckily we have the default value for type R now...
-
-    if (adaptee.asynchronousAllowed) {
-      var runnable = new Runnable {
-        def run(): Unit = {result = adaptee.doCodeExecution(code)}
-      }
-      javax.swing.SwingUtilities.invokeLater(runnable)
-    }
-    else {
-      var runnable = new Runnable {
-        def run(): Unit = {result = adaptee.doCodeExecution(code)}
-      }
-      javax.swing.SwingUtilities.invokeAndWait(runnable)
-    }
-    result
-  }
-}
 case class EventHandlingCodeFragmentExecutor[R](_n: N_code_fragment[R], _scriptExecutor: ScriptExecutor[_])
    extends AACodeFragmentExecutor[R](_n, _scriptExecutor)  {
 

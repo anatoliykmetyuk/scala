@@ -2087,6 +2087,8 @@ self =>
       else if (in.token==SEMI) {in.nextToken()}
       else {polishOp2 = polishOp1}
 
+      newLinesOpt()
+      
       // note: the main call of scriptExpression, to scriptExpr_dataflow, 
       // is at the bottom of this method, after several local methods
     
@@ -2896,7 +2898,7 @@ self =>
         else p
       case _ if (isLiteral) => atPos(in.offset)(literal(isNegated))
       case NEW    => syntaxError(in.offset, "'new' expressions not yet supported in script bodies"); EmptyTree
-      case _      => syntaxErrorOrIncomplete("illegal start of simple script term", true); errorTermTree
+      case _      => syntaxErrorOrIncomplete(s"illegal start of simple script term: $currentToken", true); errorTermTree
     }
     }
     

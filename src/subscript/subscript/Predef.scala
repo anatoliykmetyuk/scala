@@ -40,8 +40,8 @@ import subscript.vm.model.callgraph.generic._
 object Predef {
   
   def `$`         [R]               (implicit s: Script[R]): Try[R]    = s.$
-  def `$success`  [R]               (implicit s: Script[R]): R         = s.$.asInstanceOf[Success[R]].value
-  def `$failure`  [R]               (implicit s: Script[R]): Throwable = {val f=s.$.asInstanceOf[Failure[R]]; if(f==null)null else f.exception}
+  def `$success`  [R]               (implicit s: Script[R]): R         = s.$ match {case Success(s) => s}
+  def `$failure`  [R]               (implicit s: Script[R]): Throwable = s.$ match {case Failure(f) => f case null => null}
   def `$_=`       [R] (v: Try[R]   )(implicit s: Script[R])            = {s.$=v; v match {case Failure(_) => s.fail /*; println("$=Failure(_)")*/ case _ => }}
   def `$success_=`[R] (v: R        )(implicit s: Script[R])            = {s.$=Success(v)}
   def `$failure_=`[R] (v: Throwable)(implicit s: Script[R])            = {s.$=Failure(v); s.fail /*; println("$failure_=")*/}
