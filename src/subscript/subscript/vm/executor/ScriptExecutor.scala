@@ -83,7 +83,7 @@ trait ScriptExecutor[S] extends MsgPublisher with TaskSupplyInterface with Trace
    * Synchronizes all the collections in a thread-safe manner.
    */
   def updateCollections() = stateAccessLock.synchronized {
-    msgQueue   .commit()
+    //msgQueue   .commit()
     msgHandlers.commit()
   }
 }
@@ -131,7 +131,11 @@ class CommonScriptExecutor[S] extends AbstractScriptExecutor[S] with Tracer with
     DefaultHandlers {
   var traceLevel = 0
 
-  msgQueue addListener new MessageQueuedNotifier(this)
+  // the next statement is outcommented because the locking interferes with the synchronisation of the queue itself
+  // the purpose was to notify this executor when an asynchronously executed code fragment had finished
+  // so that this executor could wake up in case it had been waiting.
+  // this notification is now only done in doCodeThatInsertsMsgs_synchronized
+  //msgQueue addListener new MessageQueuedNotifier(this)
   msgHandlers sInsert defaultHandler
   msgHandlers sInsert communicationHandler
   msgHandlers sInsert continuationHandler

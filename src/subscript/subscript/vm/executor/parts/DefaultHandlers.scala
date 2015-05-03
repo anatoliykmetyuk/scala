@@ -394,7 +394,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
       case aa: N_code_fragment[_] =>
         aa.codeExecutor.cancelAA
         if (aa.msgAAToBeExecuted != null) {
-          remove(message) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
+          traceRemoval(aa.msgAAToBeExecuted) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
           aa.msgAAToBeExecuted = null
         }
         // TBD: also for caNodes!!
