@@ -7,8 +7,8 @@ import subscript.vm.model.template._
 import subscript.vm.model.template.concrete._
 import subscript.vm.model.callgraph._
 
-class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] with MsgPublisher with MessagePriorities {self =>
-  private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
+class MessageQueue(val lock: AnyRef) extends MsgPublisher with MessagePriorities {self =>
+  //private case class Enqueue(msg: CallGraphMessage) extends Operation {def commit = self enqueue msg}
   
   def isEmpty = collection.isEmpty
   
@@ -25,22 +25,38 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
   private var _nMessages = 0
   private def nextMessageID = {_nMessages+=1; _nMessages}
   
-  
-  /* Public unsafe API */
+  def mySynchronized[T0](s: String)(arg0: ⇒ T0): T0 = {
+    //println("synchronized start: "+s)
+    //try 
+    synchronized{
+      //try 
+      arg0
+      //finally println("synchronized code done: "+s)    
+    }
+    //finally println("synchronized end: "+s)
+  }
+
   def insert(e: CallGraphMessage): Unit = {
     e.index = nextMessageID
     enqueue(e)
-    messageQueued(e)
   }
  
-  def enqueue(e: CallGraphMessage): Unit = collection += e
-  
-  def remove(m: CallGraphMessage) = {
+  def enqueue(e: CallGraphMessage): Unit = {
+    mySynchronized("enqueue: "+e) {collection += e; messageQueued(e)}
+  }
+
+  /*
+   * For debugging only: trace that the given message is effectively removed.
+   * The underlying priorityQueue does not support this.
+   * For the time being the message should be implicitly be removed, e.g. by a "canceled" flag
+   */
+  def traceRemoval(m: CallGraphMessage) = {
     messageDequeued(m)
     //scriptGraphMessages -= m  is not allowed...FTTB we will ignore this message, by checking the canceled flag in the executor
   }
  
   def dequeue(minimalPriorityForAA: Int): CallGraphMessage = {
+   mySynchronized("dequeue") {
     if (collection.isEmpty) return null
     
     if (minimalPriorityForAA > Int.MinValue) {
@@ -59,12 +75,8 @@ class MessageQueue(val lock: AnyRef) extends SafeCollection[CallGraphMessage] wi
     //}
     messageDequeued(result)
     result
+   }
   }
-  
-  
-  /* Pubic safe API */
-  def sEnqueue(e: CallGraphMessage): Unit = this push Enqueue(e)
-
 }
 
 /**
@@ -81,6 +93,7 @@ trait MQExtras {this: MessageQueue =>
   def insertDeactivation(n:CallGraphNode,c:CallGraphNode) = insert(Deactivation(n, c, false))
   
   def insertContinuation(message: CallGraphMessage, child: CallGraphNode = null): Unit = {
+   mySynchronized("insertContinuation") { // absolutely needed; if absent race conditions may well harm execution
     val n = message.node.asInstanceOf[ N_n_ary_op]
     var c = n.continuation 
     
@@ -121,9 +134,11 @@ trait MQExtras {this: MessageQueue =>
        insert(c)
     }
     else messageContinuation(message, c)
+   }
   }
   // insert a continuation message for a unary operator
   def insertContinuation1(message: CallGraphMessage): Unit = {
+   mySynchronized("insertContinuation1") {
     val n = message.node.asInstanceOf[N_1_ary_op]
     var c = n.continuation
     if (c==null) {
@@ -132,6 +147,7 @@ trait MQExtras {this: MessageQueue =>
       enqueue(c)
     }
     enqueue(Continuation1(n))
+   }
   }
 }
 
@@ -140,8 +156,8 @@ trait TrackToBeExecuted extends MessageQueue {
     super.insert(m)
     track(m, true)
   }
-  override def remove(m: CallGraphMessage) {
-    super.remove(m)
+  override def traceRemoval(m: CallGraphMessage) {
+    super.traceRemoval(m)
     track(m, false)
   }
   override def dequeue(minimalPriorityForAA: Int) = {

@@ -36,6 +36,7 @@ import subscript.vm.model.callgraph._
   case object DurationalCodeFragmentEnded   extends AAHappenedMode
   
   trait MessagePriorities {
+    val PRIORITY_InvokeFromET                 = Int.MinValue + 1000 // TBD; beware overflow; must be lower than vast majority of priorities 
     val PRIORITY_AAToBeReexecuted             =  0
     val PRIORITY_AAToBeExecuted               =  1
     val PRIORITY_CAActivatedTBD               =  2
@@ -47,13 +48,12 @@ import subscript.vm.model.callgraph._
     val PRIORITY_Activation                   =  8
     val PRIORITY_Suspend                      =  9
     val PRIORITY_Resume                       = 10
-    val PRIORITY_Exclude                      = 11
-    val PRIORITY_Success                      = 12
-    val PRIORITY_Break                        = 13
-    val PRIORITY_AAActivated                  = 14
-    val PRIORITY_CAActivated                  = 15
-    val PRIORITY_AAHappened                   = 17
-    val PRIORITY_InvokeFromET                 = Int.MinValue + 1000 // TBD; beware overflow; must be lower than vast majority of priorities 
+    val PRIORITY_Success                      = 11
+    val PRIORITY_Break                        = 12
+    val PRIORITY_AAActivated                  = 13
+    val PRIORITY_CAActivated                  = 14
+    val PRIORITY_AAHappened                   = 15
+    val PRIORITY_Exclude                      = 16 // should at least be higher than of Success 
   }
 
   trait CallGraphMessage {

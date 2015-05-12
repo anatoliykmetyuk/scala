@@ -123,13 +123,17 @@ These effects do not hold when the operand is in an optional group.
   * 
   */
   def handleContinuation(message: Continuation): Unit = new Decisions(message) {
-    decideActivationProgress
-    decideExclusion
-    decideSuccess
+    
+    if (!node.isExcluded) {
+    
+      decideActivationProgress
+      decideExclusion
+      decideSuccess
 
+    }
     trace
 
-    executeDecisions
+    executeDecisions // if isExcluded this may well do a Deactivation
   }
 
   trait ActivationProgressState {this: Stateful =>
@@ -334,15 +338,20 @@ These effects do not hold when the operand is in an optional group.
         
     private def disrupt {
       nodesToBeExcluded = Nil
-      
       // deactivate to the left when an atomic action has happened somewhere in an operand
-      // Note: for |/ and |/| such a happening atomic action may be shared among multiple operands;
-      // Then deactivate to the left from the rightmost of such operands.
       val aaHappenedChildren = message.aaHappeneds.map(_.child)
       if (!aaHappenedChildren.isEmpty) {
         val indexes_aaHappenedChildren = aaHappenedChildren.map(_.index)
         val maxIndex = indexes_aaHappenedChildren.max
-        nodesToBeExcluded ++= node.children.filter{n => val index = n.index; index<maxIndex && !indexes_aaHappenedChildren.contains(index)}
+        nodesToBeExcluded ++= node.children.filter{n => n.index<maxIndex}
+      // Note: for |/ and |/| such a happening atomic action may be shared among multiple operands;
+      // Then deactivate to the left from the rightmost of such operands.
+      // However, the next outcommented code line would not catch that correctly, since it would also allow for multiple AAHappeneds that
+      // resulted from asynchronous execution, rather than from script sharing (communication):
+        
+      // nodesToBeExcluded ++= node.children.filter{n => val index = n.index; index<maxIndex && !indexes_aaHappenedChildren.contains(index)}
+
+        //println(s">>>>>>>>> disrupt maxIndex=$maxIndex nodesToBeExcluded=$nodesToBeExcluded")      
       }
       
       // deactivate to the right when one has finished successfully

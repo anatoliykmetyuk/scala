@@ -118,8 +118,11 @@ class SimpleScriptDebuggerClass extends MsgListener {
           case _ =>
         }
   }
-  override def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m)
-  override def messageDequeued    (m: CallGraphMessage                 ) = trace(2, "-- ", m)
+  def messageQueueMsgs: String = if (traceLevel >= 999) {"\n"+callGraphMessages.toList.map(_.toString).mkString("\n") } else ""
+  def messageQueueMsgs(m: CallGraphMessage): String = if (m.isInstanceOf[AAToBeExecuted[_]]) messageQueueMsgs else ""
+  
+  override def messageQueued      (m: CallGraphMessage                 ) = trace(2, "++ ", m, messageQueueMsgs)
+  override def messageDequeued    (m: CallGraphMessage                 ) = trace(2, "-- ", m, messageQueueMsgs)
   override def messageContinuation(m: CallGraphMessage, c: Continuation) = trace(2, "** ", c)
   override def messageAwaiting: Unit = {traceTree; traceMessages}
 }

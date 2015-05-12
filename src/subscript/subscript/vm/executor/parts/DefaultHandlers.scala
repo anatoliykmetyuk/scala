@@ -28,7 +28,6 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
    */
   def handleActivation(message: Activation): Unit = {
       executeCodeIfDefined(message.node, message.node.onActivate)
-      executeCodeIfDefined(message.node, message.node.onActivateOrResume)
       message.node match {
            //case n@N_root            (t: T_1_ary     ) => activateFrom(n, t.child0)
            case n@N_code_tiny                  (t) => n.hasSuccess = true; executeCode(n); if (n.hasSuccess) doNeutral(n); insertDeactivation(n,null)
@@ -111,6 +110,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
          //if (message.node.hasSuccess) {
          //  return // should not occur?
          //}
+         if (message.node.isExcluded) return // may occur in {. .}/a
     
          message.node match {
                                            // Note: message.child!=null is needed because of doNeutral(n) in handleDeactivation()
@@ -180,7 +180,8 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
       }
       node.forEachParent(p => insertDeactivation(p,node))
       executeCodeIfDefined(node, node.onDeactivate)
-      executeCodeIfDefined(node, node.onDeactivateOrSuspend)
+      if (!message.excluded 
+      &&  !node.hasSuccess) executeCodeIfDefined(node, node.onFailure)
       disconnect(childNode = node)
   }
 
@@ -382,6 +383,7 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
    */
   def handleExclude(message: Exclude): Unit = { // TBD: remove messages for the node; interrupt execution
     val n = message.node
+    if (n.isExcluded) return // may occur for c in (a&b)/d, where a,b = c
     n.isExcluded = true
     
     if (message.node.template.isInstanceOf[TemplateCodeHolder[_,_]] && message.node.codeExecutor != null)
@@ -392,13 +394,14 @@ trait DefaultHandlers extends ContinuationHandler {this: ScriptExecutor[_] with 
       case aa: N_code_fragment[_] =>
         aa.codeExecutor.cancelAA
         if (aa.msgAAToBeExecuted != null) {
-          remove(message) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
+          traceRemoval(aa.msgAAToBeExecuted) // does not really remove from the queue; will have to check the canceled flag of the codeExecutor...
           aa.msgAAToBeExecuted = null
         }
         // TBD: also for caNodes!!
         insert(Deactivation(aa, null, excluded=true))
       case _ =>
     }
+    executeCodeIfDefined(n, n.onExclude)
     
     n.children.foreach {c => insert(Exclude(n,c))}
   }
